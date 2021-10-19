@@ -20,7 +20,7 @@ test_jb.o: test_jb.c ../jb.h ../ ../bits.h
 test_jb_table.o: test_jb_table.c ../jb_table.h
 
 clean:
-	rm -f *.o $(EXE)
+	rm -f *.o $(EXECS)
 
 mrproper: clean
 	rm -f *~ #*
