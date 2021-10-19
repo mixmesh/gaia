@@ -1,35 +1,23 @@
-CFLAGS=-Wpedantic -Werror
-ALSA_CFLAGS=-g $(shell pkg-config --cflags alsa) -lm
-LDLIBS =
-ALSA_LDLIBS = $(shell pkg-config --libs alsa)
+CFLAGS=-g $(shell pkg-config --cflags alsa) -lm
+LDLIBS=$(shell pkg-config --libs alsa)
+EXECS=test_jb test_jb_table display simple_playback simple_recording
 
-EXE=test_jb test_jb_table
-
-all: $(EXE)
+all: $(EXECS)
 
 run: test_jb test_jb_table
 	./test_jb
 	./test_jb_table
 
-# Executable files
-
 test_jb: test_jb.o
-	$(CC) $(LDLIBS) ../jb.o test_jb.o -o test_jb
+	(cd ..;$(MAKE))
+	$(CC) $(LDLIBS) test_jb.o ../jb.o -o test_jb
 
 test_jb_table: test_jb_table.o
-	$(CC) $(LDLIBS) ../jb.o ../jb_table.o test_jb_table.o -o test_jb_table
-
-# Object files
+	$(CC) $(LDLIBS) test_jb_table.o ../jb.o ../jb_table.o -o test_jb_table
 
 test_jb.o: test_jb.c ../jb.h ../ ../bits.h
-	(cd ..;$(MAKE))
-	$(CC) $(CFLAGS) -c test_jb.c
 
-test_jb_table.o: test_jb_table.c ../jb.h ../jb_table.h ../ ../bits.h
-	(cd ..;$(MAKE))
-	$(CC) $(CFLAGS) -c test_jb_table.c
-
-# Misc
+test_jb_table.o: test_jb_table.c ../jb_table.h
 
 clean:
 	rm -f *.o $(EXE)

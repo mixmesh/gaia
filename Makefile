@@ -1,41 +1,28 @@
-CFLAGS=-std=c18 -Wpedantic -Werror
-ALSA_CFLAGS=-g $(shell pkg-config --cflags alsa) -lm
-LDLIBS =
-ALSA_LDLIBS = $(shell pkg-config --libs alsa)
+CFLAGS=-g $(shell pkg-config --cflags alsa) -lm
+LDLIBS=$(shell pkg-config --libs alsa)
+EXECS=server client
 
-EXE=server client
-
-all: $(EXE)
+all: $(EXECS)
 
 test:
 	(cd test; $(MAKE))
 
-# Executable files
-
 server: jb.o jb_table.o server.o
-	$(CC) $(LDLIBS) jb.o jb_table.o server.o -o server
 
-client: jb.o client.o
-	$(CC) $(LDLIBS) jb.o client.o -o client
+client: jb.o client.o audio.o timing.o
 
-# Object files
+jb.o: jb.c jb.h bits.h globals.h
 
-jb.o: jb.c jb.h
-	$(CC) $(CFLAGS) -c jb.c
+jb_table.o: jb_table.c jb.h
 
-jb_table.o: jb.c jb.h jb_table.c jb_table.h
-	$(CC) $(CFLAGS) -c jb_table.c
+server.o: server.c jb.h jb_table.h globals.h bits.h
 
-server.o: server.c jb.h jb_table.h
-	$(CC) $(CFLAGS) -c server.c
+client.o: client.c jb.h globals.h audio.h timing.h
 
-client.o: client.c jb.h
-	$(CC) $(CFLAGS) -c client.c
-
-# Misc
+audio.o: audio.c audio.h
 
 clean:
-	rm -f *.o $(EXE)
+	rm -f *.o $(EXECS)
 
 mrproper: clean
 	rm -f *~ #* 

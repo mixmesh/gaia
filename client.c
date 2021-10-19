@@ -3,32 +3,40 @@
 #include <stdbool.h>
 #include <time.h>
 #include <assert.h>
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include "jb.h"
 #include "globals.h"
+#include "audio.h"
+#include "timing.h"
 
 #define SOCKET_ERROR 1
 
 void usage(char *command, uint16_t status) {
-  fprintf(stderr, "Usage: %s name [host] [port]\n", command);
+  fprintf(stderr, "Usage: %s userid [host] [port]\n", command);
   exit(status);
 }
 
-void msleep(long ms) {
-  struct timespec req = 
-    {
-     .tv_sec = ms / 1000,
-     .tv_nsec = (ms % 1000) * 1000000L
-    };
-  nanosleep(&req, NULL);
+audio_info_t *audio_info = NULL;
+int sockfd = -1;
+
+void sigint(int sig) {
+  if (audio_info != NULL) {
+    audio_free(audio_info);
+  }
+  if (sockfd != -1) {
+    close(sockfd);
+  }
+  exit(1);
 }
 
-void start_client(char *name, in_addr_t host, uint16_t port) {
+void start_client(uint32_t userid, in_addr_t host, uint16_t port) {
+  // Ctrl-c
+  signal(SIGINT, sigint);
   // Create socket
-  int sockfd;
   if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
     perror("socket creation failed");
     exit(SOCKET_ERROR);
@@ -38,22 +46,47 @@ void start_client(char *name, in_addr_t host, uint16_t port) {
   servaddr.sin_family = AF_INET;
   servaddr.sin_addr.s_addr = host;
   servaddr.sin_port = htons(port);
+  // Open ALSA device
+  int err;
+  if ((err = audio_new(&audio_info)) < 0) {
+    fprintf(stderr, "could not initialize audio: %s\n", snd_strerror(err));
+    exit(1);
+  }
   // Send loop
-  uint8_t buf[UDP_BUF_SIZE];
-  strcpy((char *)buf, name); 
+  uint8_t udp_buf[HEADER_SIZE + audio_info->period_size_in_bytes];
+  udp_buf[0] = userid & 0xff;
+  udp_buf[1] = (userid >> 8) & 0xff;
+  udp_buf[2] = (userid >> 16) & 0xff;
+  udp_buf[3] = (userid >> 24) & 0xff;
   uint32_t index = 0;
   while (true) {
-    // Send |name:32|index:4|data:DATA_SIZE| = UDP_BUF_SIZE bytes
-    buf[32] = index & 0xff;
-    buf[33] = (index >> 8) & 0xff;
-    buf[34] = (index >> 16) & 0xff;
-    buf[35] = (index >> 24) & 0xff;
-    ssize_t n = sendto(sockfd, buf, UDP_BUF_SIZE, 0,
+    // Prepare header
+    udp_buf[4] = index & 0xff;
+    udp_buf[5] = (index >> 8) & 0xff;
+    udp_buf[6] = (index >> 16) & 0xff;
+    udp_buf[7] = (index >> 24) & 0xff;
+    uint32_t timestamp = get_timestamp();
+    udp_buf[8] = timestamp & 0xff;
+    udp_buf[9] = (timestamp >> 8) & 0xff;
+    udp_buf[10] = (timestamp >> 16) & 0xff;
+    udp_buf[11] = (timestamp >> 24) & 0xff;
+    // Read audio data
+    int err = snd_pcm_readi(audio_info->handle, &udp_buf[12],
+                            audio_info->period_size_in_frames);
+    if (err == -EPIPE) {
+      fprintf(stderr, "overrun occurred\n");
+      snd_pcm_prepare(audio_info->handle);
+    } else if (err < 0) {
+      fprintf(stderr, "error from read: %s\n", snd_strerror(err));
+    } else if (err != audio_info->period_size_in_frames) {
+      fprintf(stderr, "short read, read %d frames\n", err);
+    }
+    // Write UDP packet    
+    ssize_t n = sendto(sockfd, udp_buf, audio_info->buffer_size_in_bytes, 0,
                        (struct sockaddr *)&servaddr,
                        sizeof(servaddr));
-    assert(n == UDP_BUF_SIZE);
+    assert(n == audio_info->buffer_size_in_bytes);
     fprintf(stderr, "+");
-    msleep(10);
     ++index;
   }
 }
@@ -62,7 +95,11 @@ int main (int argc, char *argv[]) {
   if (argc < 2 || argc > 4) {
     usage(argv[0], 1);
   }
-  char *name = argv[1];
+  char *endptr;
+  long userid = strtol(argv[1], &endptr, 10);
+  if (strlen(endptr) != 0) {
+    usage(argv[0], 3);
+  }
   in_addr_t host = inet_addr(DEFAULT_HOST);
   uint16_t port = DEFAULT_PORT;
   if (argc > 2) {
@@ -70,13 +107,12 @@ int main (int argc, char *argv[]) {
       usage(argv[0], 2);
     }    
     if (argc > 3) {
-      char *endptr;
       port = strtol(argv[3], &endptr, 10);
       if (strlen(endptr) != 0) {
         usage(argv[0], 3);
       }
     }
   }
-  start_client(name, host, port);
+  start_client(userid, host, port);
   return 0;
 }

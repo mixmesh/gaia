@@ -14,6 +14,11 @@
 #define BIND_ERROR 2
 #define MAX_JITTER_BUFFER_ENTRIES 20
 
+
+// FIXME
+#define UDP_BUF_SIZE 100000
+#define DATA_SIZE 100000
+
 void usage(char *command, uint16_t status) {
   fprintf(stderr, "Usage: %s [port]\n", command);
   exit(status);

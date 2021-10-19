@@ -3,7 +3,8 @@
 #include "../jb.h"
 #include "../jb_table.h"
 #include "../bits.h"
-#include "../globals.h"
+
+#define DATA_SIZE 16
 
 /*
  * jb.c test suite

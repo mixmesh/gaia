@@ -3,8 +3,7 @@
 
 #define DEFAULT_HOST "127.0.0.1"
 #define DEFAULT_PORT 54382
-#define UDP_BUF_SIZE 508
-#define HEADER_SIZE (32 + 4)
-#define DATA_SIZE (UDP_BUF_SIZE - HEADER_SIZE)
+// |userid:4|seqnum:4|timestamp:4|
+#define HEADER_SIZE (4+4+4)
 
 #endif
