@@ -34,7 +34,7 @@ typedef struct {
   char *buffer;
 } audio_info_t;
 
-int audio_new(audio_info_t **audio_info);
+int audio_new(snd_pcm_stream_t stream, audio_info_t **audio_info);
 void audio_free(audio_info_t *audio_info);
 void audio_print_parameters(audio_info_t *audio_info);
   

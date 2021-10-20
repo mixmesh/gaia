@@ -1,20 +1,6 @@
-/**
- * alsa_playback.c
- */
-
-/**
- * Paul Davis
- * http://equalarea.com/paul/alsa-audio.html#howto
- */
-
-/**
- * Jan Newmarch
- */
-
-#include <stdio.h>
-#include <stdlib.h>
 #include <alsa/asoundlib.h>
-	      
+#include "../audio.h"
+
 int main(int argc, char *argv[])
 {
   int i;

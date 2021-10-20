@@ -1,11 +1,9 @@
 #include "audio.h"
 
-int audio_new(audio_info_t **audio_info) {
+int audio_new(snd_pcm_stream_t stream, audio_info_t **audio_info) {
   snd_pcm_t *handle;
   int err;
-  if ((err = snd_pcm_open(&handle, AUDIO_DEVICE, SND_PCM_STREAM_CAPTURE,
-                          0)) < 0) {
-    
+  if ((err = snd_pcm_open(&handle, AUDIO_DEVICE, stream, 0)) < 0) {
     return err;
   }
   snd_pcm_hw_params_t *params;
@@ -60,18 +58,20 @@ int audio_new(audio_info_t **audio_info) {
   buffer_size_in_frames = 2 * period_size_in_frames;
   unsigned int buffer_size_in_bytes =
     buffer_size_in_frames * AUDIO_FRAME_SIZE_IN_BYTES;
-  uint8_t *buffer = (char *)malloc(buffer_size_in_bytes);
+  char *buffer = (char *)malloc(buffer_size_in_bytes);
   *audio_info = malloc(sizeof(audio_info_t));
   (*audio_info)->handle = handle;
   (*audio_info)->params = params;
   (*audio_info)->rate = rate;
   (*audio_info)->period_size_in_frames = period_size_in_frames;
   (*audio_info)->buffer_size_in_bytes = buffer_size_in_bytes;
+  (*audio_info)->period_size_in_bytes = period_size_in_bytes;
   (*audio_info)->buffer = buffer;
   return 0;
 }
 
 void audio_free(audio_info_t *audio_info) {
+  snd_pcm_drain(audio_info->handle);
   snd_pcm_close(audio_info->handle);
   snd_pcm_hw_params_free(audio_info->params);
   free(audio_info->buffer);
@@ -102,9 +102,7 @@ AUDIO_BUFFER_SIZE_IN_BYTES = %d\n",
           AUDIO_BUFFER_SIZE_IN_FRAMES,
           AUDIO_BUFFER_SIZE_IN_BYTES);
 
-  fprintf(stderr, "\n\
-Runtime Parameters\n\
-==================\n");
+  fprintf(stderr, "Runtime Parameters\n==================\n");
   fprintf(stderr, "pcm_name = '%s'\n", snd_pcm_name(audio_info->handle));
 
   fprintf(stderr, "pcm_state = '%s'\n",
@@ -166,7 +164,7 @@ Runtime Parameters\n\
 
   unsigned int is_block_transfer =
     snd_pcm_hw_params_is_block_transfer(audio_info->params);
-  printf("is_block_transfer = %d\n", is_block_transfer);
+  fprintf(stderr, "is_block_transfer = %d\n", is_block_transfer);
   
   unsigned int is_double = snd_pcm_hw_params_is_double(audio_info->params);
   fprintf(stderr, "is_double = %d\n", is_double);

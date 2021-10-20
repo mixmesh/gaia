@@ -1,4 +1,3 @@
-#define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <stdbool.h>
 #include <time.h>
@@ -15,7 +14,7 @@
 
 #define SOCKET_ERROR 1
 
-void usage(char *command, uint16_t status) {
+void usage(char *command, int status) {
   fprintf(stderr, "Usage: %s userid [host] [port]\n", command);
   exit(status);
 }
@@ -34,7 +33,7 @@ void sigint(int sig) {
 }
 
 void start_client(uint32_t userid, in_addr_t host, uint16_t port) {
-  // Ctrl-c
+  // Handle Ctrl-c
   signal(SIGINT, sigint);
   // Create socket
   if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -47,19 +46,31 @@ void start_client(uint32_t userid, in_addr_t host, uint16_t port) {
   servaddr.sin_addr.s_addr = host;
   servaddr.sin_port = htons(port);
   // Open ALSA device
+  fprintf(stderr, "0\n");
   int err;
-  if ((err = audio_new(&audio_info)) < 0) {
+  if ((err = audio_new(SND_PCM_STREAM_CAPTURE, &audio_info)) < 0) {
     fprintf(stderr, "could not initialize audio: %s\n", snd_strerror(err));
     exit(1);
   }
+  fprintf(stderr, "0a\n");
+  audio_print_parameters(audio_info);
   // Send loop
-  uint8_t udp_buf[HEADER_SIZE + audio_info->period_size_in_bytes];
+  fprintf(stderr, "2\n");
+  int udp_buf_size = HEADER_SIZE + audio_info->period_size_in_bytes;
+  fprintf(stderr, "3\n");
+  uint8_t udp_buf[udp_buf_size];
+  fprintf(stderr, "UUU: %d\n", userid);
   udp_buf[0] = userid & 0xff;
+  fprintf(stderr, "3\n");
   udp_buf[1] = (userid >> 8) & 0xff;
+  fprintf(stderr, "3a\n");
   udp_buf[2] = (userid >> 16) & 0xff;
+  fprintf(stderr, "3b\n");
   udp_buf[3] = (userid >> 24) & 0xff;
   uint32_t index = 0;
+  fprintf(stderr, "4\n");
   while (true) {
+    fprintf(stderr, "1\n");
     // Prepare header
     udp_buf[4] = index & 0xff;
     udp_buf[5] = (index >> 8) & 0xff;
@@ -82,10 +93,10 @@ void start_client(uint32_t userid, in_addr_t host, uint16_t port) {
       fprintf(stderr, "short read, read %d frames\n", err);
     }
     // Write UDP packet    
-    ssize_t n = sendto(sockfd, udp_buf, audio_info->buffer_size_in_bytes, 0,
+    ssize_t n = sendto(sockfd, udp_buf, udp_buf_size, 0,
                        (struct sockaddr *)&servaddr,
                        sizeof(servaddr));
-    assert(n == audio_info->buffer_size_in_bytes);
+    assert(n == udp_buf_size);
     fprintf(stderr, "+");
     ++index;
   }
@@ -100,6 +111,7 @@ int main (int argc, char *argv[]) {
   if (strlen(endptr) != 0) {
     usage(argv[0], 3);
   }
+  fprintf(stderr, "userid: %ld\n", userid);
   in_addr_t host = inet_addr(DEFAULT_HOST);
   uint16_t port = DEFAULT_PORT;
   if (argc > 2) {

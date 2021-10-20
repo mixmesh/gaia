@@ -4,6 +4,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <string.h>
 #include <assert.h>
 #include "jb.h"
 #include "jb_table.h"
@@ -14,12 +15,11 @@
 #define BIND_ERROR 2
 #define MAX_JITTER_BUFFER_ENTRIES 20
 
-
 // FIXME
 #define UDP_BUF_SIZE 100000
 #define DATA_SIZE 100000
 
-void usage(char *command, uint16_t status) {
+void usage(char *command, int status) {
   fprintf(stderr, "Usage: %s [port]\n", command);
   exit(status);
 }
