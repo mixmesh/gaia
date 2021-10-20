@@ -1,6 +1,6 @@
 CFLAGS=-std=c18 -pedantic -Werror -D_POSIX_C_SOURCE=200809L $(shell pkg-config --cflags alsa)
 LDLIBS=$(shell pkg-config --libs alsa) -lm
-EXECS=test_jb test_jb_table display simple_recording simple_playback
+EXECS=test_jb test_jb_table display capture playback
 
 all: $(EXECS)
 
@@ -15,19 +15,21 @@ test_jb: test_jb.o
 test_jb_table: test_jb_table.o
 	$(CC) test_jb_table.o ../jb.o ../jb_table.o $(LDLIBS) -o test_jb_table
 
-simple_recording: simple_recording.o
+capture: capture.o
 	(cd ..;$(MAKE))
-	$(CC) simple_recording.o ../audio.o $(LDLIBS) -o simple_recording
+	$(CC) capture.o ../audio.o $(LDLIBS) -o capture
 
-simple_playback: simple_playback.o
+playback: playback.o
 	(cd ..;$(MAKE))
-	$(CC) simple_playback.o ../audio.o $(LDLIBS) -o simple_playback
+	$(CC) playback.o ../audio.o $(LDLIBS) -o playback
 
 test_jb.o: test_jb.c ../jb.h ../ ../bits.h
 
 test_jb_table.o: test_jb_table.c ../jb_table.h
 
-simple_recording.o: simple_recording.c ../audio.h 
+capture.o: capture.c ../audio.h
+
+playback.o: playback.c ../audio.h 
 
 clean:
 	rm -f *.o $(EXECS)
