@@ -1,0 +1,9 @@
+* Remove defines from audio.h and replace with calcs in audio_new()
+* Add more params to audio_new
+* Extend audio_info_t with more params
+* Update audio_print_parameters()
+* Fix client.c (send udp = perido_size_in_bytes)
+* Fix server.c (disable jitter buffer for now)
+* Run client and server on same machine
+* Calc latency on same machine
+* Run client and server on differnt machines machine
