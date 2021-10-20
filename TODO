@@ -7,3 +7,23 @@
 * Run client and server on same machine
 * Calc latency on same machine
 * Run client and server on differnt machines machine
+* Merge client and server into a single gaia.c
+
+  thread 1: listen on udp and write to speaker
+  thread 2: write from mic and write to udp
+
+  thread 1: listen on udp and write to jitter buffer
+  thread 2: read from jitter buffer and write to speaker
+  thread 3: write from mic and write to udp
+
+Not now:
+
+  thread 1: listen on udp and write to jitter buffers (many)
+  thread 2: read from jitter buffer (many) and write to speaker
+  thread 3: write from mic and write to udp (many)
+
+* udp hole punching
+* encrypt
+
+
+
