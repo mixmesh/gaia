@@ -2,14 +2,16 @@
 #include "../audio.h"
 
 int main() {
-  // Open ALSA device
+  // Open audio device
   audio_info_t *audio_info;
   int err;
-  if ((err = audio_new(SND_PCM_STREAM_PLAYBACK, &audio_info)) < 0) {
+  if ((err = audio_new("default", SND_PCM_STREAM_PLAYBACK,
+                       SND_PCM_FORMAT_MU_LAW, 1, 8000, 1, 50,
+                       3, &audio_info)) < 0) {
     fprintf(stderr, "could not initialize audio: %s\n", snd_strerror(err));
     exit(1);
   }
-  audio_print_parameters(audio_info);
+  audio_print_info(audio_info);
   // Playback 5 seconds of audio data
   unsigned int period_time;
   int dir;

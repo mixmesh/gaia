@@ -8,10 +8,12 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include "jb.h"
-#include "globals.h"
 #include "audio.h"
 #include "timing.h"
 
+#define DEFAULT_HOST "127.0.0.1"
+#define DEFAULT_PORT 54382
+#define HEADER_SIZE (4 + 4 + 4)
 #define SOCKET_ERROR 1
 
 void usage(char *command, int status) {
@@ -45,15 +47,17 @@ void start_client(uint32_t userid, in_addr_t host, uint16_t port) {
   servaddr.sin_family = AF_INET;
   servaddr.sin_addr.s_addr = host;
   servaddr.sin_port = htons(port);
-  // Open ALSA device
+  // Open audio device
   fprintf(stderr, "0\n");
   int err;
-  if ((err = audio_new(SND_PCM_STREAM_CAPTURE, &audio_info)) < 0) {
+  if ((err = audio_new("default", SND_PCM_STREAM_PLAYBACK,
+                       SND_PCM_FORMAT_MU_LAW, 1, 8000, 1, 50,
+                       3, &audio_info)) < 0) {
     fprintf(stderr, "could not initialize audio: %s\n", snd_strerror(err));
     exit(1);
   }
   fprintf(stderr, "0a\n");
-  audio_print_parameters(audio_info);
+  audio_print_info(audio_info);
   // Send loop
   fprintf(stderr, "2\n");
   int udp_buf_size = HEADER_SIZE + audio_info->period_size_in_bytes;

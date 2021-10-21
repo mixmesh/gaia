@@ -3,7 +3,7 @@
 
 #include <inttypes.h>
 
-void msleep(long ms);
+void msleep(uint32_t ms);
 uint32_t get_timestamp(void);
 
 #endif

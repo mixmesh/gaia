@@ -8,9 +8,11 @@
 #include <assert.h>
 #include "jb.h"
 #include "jb_table.h"
-#include "globals.h"
 #include "bits.h"
 
+#define DEFAULT_HOST "127.0.0.1"
+#define DEFAULT_PORT 54382
+#define HEADER_SIZE (4 + 4 + 4)
 #define SOCKET_ERROR 1
 #define BIND_ERROR 2
 #define MAX_JITTER_BUFFER_ENTRIES 20

@@ -2,7 +2,6 @@
 #include <stdbool.h>
 #include "jb.h"
 #include "bits.h"
-#include "globals.h"
 
 jb_t *jb_new(char *name) {
   jb_t *jb = malloc(sizeof(jb_t));

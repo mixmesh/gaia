@@ -2,7 +2,7 @@
 #include <assert.h>
 #include "timing.h"
 
-void msleep(long ms) {
+void msleep(uint32_t ms) {
   struct timespec req = 
     {
      .tv_sec = ms / 1000,

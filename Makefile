@@ -11,13 +11,13 @@ server: jb.o jb_table.o server.o
 
 client: jb.o client.o audio.o timing.o
 
-jb.o: jb.c jb.h bits.h globals.h
+jb.o: jb.c jb.h bits.h
 
 jb_table.o: jb_table.c jb.h
 
-server.o: server.c jb.h jb_table.h globals.h bits.h
+server.o: server.c jb.h jb_table.h bits.h
 
-client.o: client.c jb.h globals.h audio.h timing.h
+client.o: client.c jb.h audio.h timing.h
 
 audio.o: audio.c audio.h
 
