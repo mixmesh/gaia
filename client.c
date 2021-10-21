@@ -23,6 +23,7 @@ void usage(char *command, int status) {
 
 audio_info_t *audio_info = NULL;
 int sockfd = -1;
+uint8_t *udp_buf = NULL;
 
 void sigint(int sig) {
   if (audio_info != NULL) {
@@ -30,6 +31,9 @@ void sigint(int sig) {
   }
   if (sockfd != -1) {
     close(sockfd);
+  }
+  if (udp_buf != NULL) {
+    free(udp_buf);
   }
   exit(1);
 }
@@ -48,43 +52,23 @@ void start_client(uint32_t userid, in_addr_t host, uint16_t port) {
   servaddr.sin_addr.s_addr = host;
   servaddr.sin_port = htons(port);
   // Open audio device
-  fprintf(stderr, "0\n");
   int err;
-  if ((err = audio_new("default", SND_PCM_STREAM_PLAYBACK,
+  if ((err = audio_new("default", SND_PCM_STREAM_CAPTURE,
                        SND_PCM_FORMAT_MU_LAW, 1, 8000, 1, 50,
                        3, &audio_info)) < 0) {
     fprintf(stderr, "could not initialize audio: %s\n", snd_strerror(err));
     exit(1);
   }
-  fprintf(stderr, "0a\n");
   audio_print_info(audio_info);
   // Send loop
-  fprintf(stderr, "2\n");
-  int udp_buf_size = HEADER_SIZE + audio_info->period_size_in_bytes;
-  fprintf(stderr, "3\n");
-  uint8_t udp_buf[udp_buf_size];
-  fprintf(stderr, "UUU: %d\n", userid);
+  uint32_t udp_buf_size = HEADER_SIZE + audio_info->period_size_in_bytes;
+  udp_buf = malloc(udp_buf_size);
   udp_buf[0] = userid & 0xff;
-  fprintf(stderr, "3\n");
   udp_buf[1] = (userid >> 8) & 0xff;
-  fprintf(stderr, "3a\n");
   udp_buf[2] = (userid >> 16) & 0xff;
-  fprintf(stderr, "3b\n");
   udp_buf[3] = (userid >> 24) & 0xff;
   uint32_t index = 0;
-  fprintf(stderr, "4\n");
   while (true) {
-    fprintf(stderr, "1\n");
-    // Prepare header
-    udp_buf[4] = index & 0xff;
-    udp_buf[5] = (index >> 8) & 0xff;
-    udp_buf[6] = (index >> 16) & 0xff;
-    udp_buf[7] = (index >> 24) & 0xff;
-    uint32_t timestamp = get_timestamp();
-    udp_buf[8] = timestamp & 0xff;
-    udp_buf[9] = (timestamp >> 8) & 0xff;
-    udp_buf[10] = (timestamp >> 16) & 0xff;
-    udp_buf[11] = (timestamp >> 24) & 0xff;
     // Read audio data
     int err = snd_pcm_readi(audio_info->handle, &udp_buf[12],
                             audio_info->period_size_in_frames);
@@ -96,7 +80,17 @@ void start_client(uint32_t userid, in_addr_t host, uint16_t port) {
     } else if (err != audio_info->period_size_in_frames) {
       fprintf(stderr, "short read, read %d frames\n", err);
     }
-    // Write UDP packet    
+    // Prepare header
+    udp_buf[4] = index & 0xff;
+    udp_buf[5] = (index >> 8) & 0xff;
+    udp_buf[6] = (index >> 16) & 0xff;
+    udp_buf[7] = (index >> 24) & 0xff;
+    uint32_t timestamp = get_timestamp();
+    udp_buf[8] = timestamp & 0xff;
+    udp_buf[9] = (timestamp >> 8) & 0xff;
+    udp_buf[10] = (timestamp >> 16) & 0xff;
+    udp_buf[11] = (timestamp >> 24) & 0xff;
+    // Write UDP packet
     ssize_t n = sendto(sockfd, udp_buf, udp_buf_size, 0,
                        (struct sockaddr *)&servaddr,
                        sizeof(servaddr));
