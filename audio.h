@@ -6,6 +6,8 @@
 typedef struct {
   snd_pcm_t *handle;
   snd_pcm_hw_params_t *params;
+  uint8_t channels;
+  uint8_t sample_size_in_bytes;
   uint32_t latency_in_ms;
   uint32_t wanted_rate_in_hz;
   uint32_t rate_in_hz;

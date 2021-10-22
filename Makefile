@@ -7,7 +7,7 @@ all: $(EXECS)
 test:
 	(cd test; $(MAKE))
 
-server: jb.o jb_table.o server.o
+server: jb.o jb_table.o server.o audio.o timing.o
 
 client: jb.o client.o audio.o timing.o
 
@@ -15,7 +15,7 @@ jb.o: jb.c jb.h bits.h
 
 jb_table.o: jb_table.c jb.h
 
-server.o: server.c jb.h jb_table.h bits.h
+server.o: server.c jb.h jb_table.h bits.h timing.h
 
 client.o: client.c jb.h audio.h timing.h
 

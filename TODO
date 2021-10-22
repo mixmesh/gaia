@@ -1,3 +1,7 @@
+* jb -> int instead of string keys
+* rename index to seqnum
+
+
 * Fix client.c (send udp = perido_size_in_bytes)
 * Fix server.c (disable jitter buffer for now)
 * Run client and server on same machine

@@ -76,6 +76,8 @@ int audio_new(char *device_name, snd_pcm_stream_t stream,
   *audio_info = malloc(sizeof(audio_info_t));
   (*audio_info)->handle = handle;
   (*audio_info)->params = params;
+  (*audio_info)->channels = channels;
+  (*audio_info)->sample_size_in_bytes = sample_size_in_bytes;
   (*audio_info)->latency_in_ms = latency_in_ms;
   (*audio_info)->wanted_rate_in_hz = wanted_rate_in_hz;
   (*audio_info)->rate_in_hz = rate_in_hz;

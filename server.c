@@ -6,29 +6,60 @@
 #include <netinet/in.h>
 #include <string.h>
 #include <assert.h>
+#include <signal.h>
+#include <alsa/asoundlib.h>
 #include "jb.h"
 #include "jb_table.h"
 #include "bits.h"
+#include "audio.h"
+#include "timing.h"
 
 #define DEFAULT_HOST "127.0.0.1"
 #define DEFAULT_PORT 54382
+
+// |userid:4|seqnum:4|timestamp:4|
 #define HEADER_SIZE (4 + 4 + 4)
+
 #define SOCKET_ERROR 1
 #define BIND_ERROR 2
-#define MAX_JITTER_BUFFER_ENTRIES 20
 
-// FIXME
-#define UDP_BUF_SIZE 100000
-#define DATA_SIZE 100000
+#define MAX_JITTER_BUFFER_ENTRIES 20
 
 void usage(char *command, int status) {
   fprintf(stderr, "Usage: %s [port]\n", command);
   exit(status);
 }
 
+audio_info_t *audio_info = NULL;
+int sockfd = -1;
+uint8_t *udp_buf = NULL;
+
+void sigint(int sig) {
+  if (audio_info != NULL) {
+    audio_free(audio_info);
+  }
+  if (sockfd != -1) {
+    close(sockfd);
+  }
+  if (udp_buf != NULL) {
+    free(udp_buf);
+  }
+  exit(1);
+}
+
 void start_server(uint16_t port) {
+  // Handle Ctrl-c
+  signal(SIGINT, sigint);
+  // Open audio device
+  int err;
+  if ((err = audio_new("default", SND_PCM_STREAM_PLAYBACK,
+                       SND_PCM_FORMAT_MU_LAW, 1, 8000, 1, 40,
+                       3, &audio_info)) < 0) {
+    fprintf(stderr, "could not initialize audio: %s\n", snd_strerror(err));
+    exit(1);
+  }
+  audio_print_info(audio_info);
   // Create socket
-  int sockfd;
   if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
     perror("socket creation failed");
     exit(SOCKET_ERROR);
@@ -45,35 +76,65 @@ void start_server(uint16_t port) {
     exit(BIND_ERROR);
   }
   // Receive loop
-  char name[32] = {0};
+  uint32_t userid = 0;
   jb_t *jb = NULL;
   jb_t *jb_table = jb_table_new();
-  uint8_t buf[UDP_BUF_SIZE];
+  uint32_t safe_udp_buf_size = HEADER_SIZE + audio_info->period_size_in_bytes * 2;
+  udp_buf = malloc(safe_udp_buf_size);
+  uint32_t udp_packet_counter = 0;
+  uint32_t audio_data_size = 0;
+  uint32_t latency = 0;
   while (true) {
-    // Receive |name:32|index:4|data:DATA_SIZE| = UDP_BUF_SIZE bytes
-    ssize_t n = recvfrom(sockfd, buf, UDP_BUF_SIZE, 0, NULL, NULL);
-    assert(n == UDP_BUF_SIZE);
+    // Read UDP packet:
+    // |userid:4|seqnum:4|timestamp:4|audio:(received_bytes-HEADER_SIZE)|
+    ssize_t received_bytes =
+      recvfrom(sockfd, udp_buf, safe_udp_buf_size, 0, NULL, NULL);
+    assert(received_bytes > HEADER_SIZE);
+    uint32_t new_userid =
+      udp_buf[0] + (udp_buf[1] << 8) + (udp_buf[2] << 16) + (udp_buf[3] << 24);
+    uint32_t seqnum =
+      udp_buf[4] + (udp_buf[5] << 8) + (udp_buf[6] << 16) + (udp_buf[7] << 24);
+    uint32_t timestamp =
+      udp_buf[8] + (udp_buf[9] << 8) + (udp_buf[10] << 16) +
+      (udp_buf[11] << 24);
+    // Print measured latency each 50 udp packet
+    latency = latency * 0.9 + 0.1 * (get_timestamp() - timestamp);
+    if (udp_packet_counter++ % 50 == 0) {
+      printf("measured latency: %u ms\n", latency / 1000);
+    }
     // Get jitter buffer (create if needed)    
-    if (jb == NULL || strcmp((char *)buf, name) != 0) {
-      memcpy(name, buf, 32);      
+    if (jb == NULL || new_userid != userid) {
+      userid = new_userid;
+      // Start fulhack
+      char name[32];
+      sprintf(name, "%d", userid);
+      // Stop fulhack
       if ((jb = jb_table_find(&jb_table, name)) == NULL) {
         jb = jb_new(name);
         jb_table_add(&jb_table, jb);
       }
+      audio_data_size = received_bytes - HEADER_SIZE;
     }
+    if (jb->head != NULL && seqnum != jb->head->index + 1) {
+      printf("expected sequence number %d but got %d\n", jb->head->index + 1,
+             seqnum);
+    }
+    /*
+    printf("%u : %u : %u : %lu : %d\n", userid, seqnum, timestamp,
+           received_bytes, audio_data_size);
+    */
     // Insert jitter buffer entry
-    uint32_t index =
-      buf[32] + (buf[33] << 8) + (buf[34] << 16) + (buf[35] << 24);
-    if (jb->tail == NULL || index > jb->tail->index ) {
+    if (jb->tail == NULL || seqnum > jb->tail->index ) {
       // Prepare new jitter buffer entry
       jb_entry_t *jb_entry;
       if (jb->entries == MAX_JITTER_BUFFER_ENTRIES) {
         jb_entry = jb_pop(jb);
       } else {
-        jb_entry = jb_entry_new(DATA_SIZE);
+          assert(audio_data_size != 0);
+          jb_entry = jb_entry_new(audio_data_size);
       }
-      jb_entry->index = index;
-      memcpy(jb_entry->data, &buf[HEADER_SIZE], DATA_SIZE);
+      jb_entry->index = seqnum;
+      memcpy(jb_entry->data, &udp_buf[HEADER_SIZE], audio_data_size);
       // Insert!
       uint8_t result = jb_insert(jb, jb_entry);
       assert(CHK_FLAG(result,
@@ -81,20 +142,34 @@ void start_server(uint16_t port) {
                       FIRST_INSERTED));
       if (CHK_FLAG(result, ALREADY_EXISTS)) {
         jb_entry_free(jb_entry);
-        fprintf(stderr, "D");
+        printf("D\n");
       } else if (CHK_FLAG(result, TAIL_INSERTED)) {
-        fprintf(stderr, ">");
+        printf(">\n");
       } else if (CHK_FLAG(result, HEAD_INSERTED)) {
-        //fprintf(stderr, "<");
+        //printf("<\n");
       } else if (CHK_FLAG(result, FIRST_INSERTED)) {
-        fprintf(stderr, "0");
+        printf("0\n");
       } else if (CHK_FLAG(result, INTERMEDIATE_INSERTED)) {
-        fprintf(stderr, ".");
+        printf(".\n");
       } else {
-        fprintf(stderr, "?");
+        assert(false);
+      }
+      // Playback audio data directly. Fulhack.
+      snd_pcm_sframes_t received_frames =
+        audio_data_size / audio_info->channels / audio_info->sample_size_in_bytes;
+      snd_pcm_sframes_t frames =
+        snd_pcm_writei(audio_info->handle, &udp_buf[HEADER_SIZE],
+                       received_frames);
+      if (frames == -EPIPE) {
+        printf("underrun occurred\n");
+        snd_pcm_prepare(audio_info->handle);
+      } else if (frames < 0) {
+        fprintf(stderr, "error from writei: %s\n", snd_strerror(frames));
+      } else if (frames != received_frames) {
+        fprintf(stderr, "short write, write %ld frames\n", frames);
       }
     } else {
-      fprintf(stderr, "I");
+      printf("I\n");
     }
   }
 }

@@ -12,7 +12,7 @@ void msleep(uint32_t ms) {
 }
 
 uint32_t get_timestamp() {
-  struct timespec tp;
-  assert(clock_gettime(CLOCK_REALTIME, &tp) == 0);
-  return tp.tv_sec * 1000 + tp.tv_nsec * 1000;
+  struct timespec now;
+  assert(clock_gettime(CLOCK_REALTIME, &now) == 0);
+  return (now.tv_sec - SECONDS_BETWEEN_1970_and_2021) * 1000000 + now.tv_nsec / (double)1000;
 }
