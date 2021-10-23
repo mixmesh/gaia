@@ -156,14 +156,11 @@ int main (int argc, char *argv[]) {
 
   // Read userid
   char *endptr;
-  uint32_t userid = strtol(argv[1], &endptr, 10);
-  if (strlen(endptr) != 0) {
+  int32_t userid = strtol(argv[1], &endptr, 10);
+  if (strlen(endptr) != 0 || userid < 1) {
     usage(argv[0], ARG_ERROR);
   }
-  if (userid == 0) {
-    usage(argv[0], ARG_ERROR);
-  }
-
+  
   // Read host
   in_addr_t host = inet_addr(DEFAULT_HOST);
   if (argc > 2) {
@@ -171,17 +168,17 @@ int main (int argc, char *argv[]) {
       usage(argv[0], ARG_ERROR);
     }
   }
-
+  
   // Read port
-  uint16_t port = DEFAULT_PORT;
+  int32_t port = DEFAULT_PORT;
   if (argc > 3) {
     port = strtol(argv[3], &endptr, 10);
-    if (strlen(endptr) != 0) {
+    if (strlen(endptr) != 0 || port < 1) {
       usage(argv[0], ARG_ERROR);
     }
   }
-
+  
   start_sending(userid, host, port);
-
+  
   return 0;
 }
