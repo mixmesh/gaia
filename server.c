@@ -50,6 +50,7 @@ void sigint(int sig) {
 void start_server(uint16_t port) {
   // Handle Ctrl-c
   signal(SIGINT, sigint);
+
   // Open audio device
   int err;
   if ((err = audio_new("default", SND_PCM_STREAM_PLAYBACK,
@@ -58,6 +59,7 @@ void start_server(uint16_t port) {
     fprintf(stderr, "could not initialize audio: %s\n", snd_strerror(err));
     exit(1);
   }
+
   audio_print_info(audio_info);
   // Create socket
   if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -102,7 +104,7 @@ void start_server(uint16_t port) {
     if (udp_packet_counter++ % 50 == 0) {
       printf("measured latency: %u ms\n", latency / 1000);
     }
-    // Get jitter buffer (create if needed)    
+    // Get jitter buffer (create if needed)
     if (jb == NULL || new_userid != userid) {
       userid = new_userid;
       // Start fulhack

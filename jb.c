@@ -41,12 +41,12 @@ jb_entry_t *jb_pop(jb_t *jb) {
 }
 
 uint8_t jb_insert(jb_t *jb, jb_entry_t *new_jb_entry) {
-  uint8_t result = 0;
+  uint8_t flags = 0;
   if (jb->head != NULL) {
     jb_entry_t *jb_entry = jb->head;
     while (true) {
       if (jb_entry != NULL && new_jb_entry->index == jb_entry->index) {
-        result = SET_FLAG(result, ALREADY_EXISTS);
+        SET_FLAG(flags, ALREADY_EXISTS);
         break;
       } else if (jb_entry != NULL && new_jb_entry->index < jb_entry->index) {
         jb_entry = jb_entry->next;
@@ -57,21 +57,21 @@ uint8_t jb_insert(jb_t *jb, jb_entry_t *new_jb_entry) {
           new_jb_entry->prev = jb->tail;
           jb->tail->next = new_jb_entry;
           jb->tail = new_jb_entry;
-          result = SET_FLAG(result, TAIL_INSERTED);
+          SET_FLAG(flags, TAIL_INSERTED);
         } else if (jb_entry == jb->head) {
           // Insert new head jitter buffer entry
           jb->head = new_jb_entry;
           new_jb_entry->next = jb_entry;
           new_jb_entry->prev = NULL;
           jb_entry->prev = new_jb_entry;
-          result = SET_FLAG(result, HEAD_INSERTED);
+          SET_FLAG(flags, HEAD_INSERTED);
         } else {
           // Insert new intermediate jitter buffer entry
           new_jb_entry->next = jb_entry;
           new_jb_entry->prev = jb_entry->prev;
           jb_entry->prev->next = new_jb_entry;
           jb_entry->prev = new_jb_entry;
-          result = SET_FLAG(result, INTERMEDIATE_INSERTED);
+          SET_FLAG(flags, INTERMEDIATE_INSERTED);
         }
         ++jb->entries;
         break;
@@ -83,9 +83,9 @@ uint8_t jb_insert(jb_t *jb, jb_entry_t *new_jb_entry) {
     jb->entries = 1;
     jb->head = new_jb_entry;
     jb->tail = new_jb_entry;
-    result = SET_FLAG(result, FIRST_INSERTED);
+    SET_FLAG(flags, FIRST_INSERTED);
   }
-  return result;
+  return flags;
 }
 
 jb_entry_t *jb_entry_new(uint32_t data_size) {

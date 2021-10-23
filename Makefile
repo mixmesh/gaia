@@ -1,6 +1,8 @@
-CFLAGS=-std=c18 -pedantic -Werror -D_POSIX_C_SOURCE=200809L $(shell pkg-config --cflags alsa)
+CFLAGS=-std=c18 -pedantic -Wall -Werror -D_POSIX_C_SOURCE=200809L $(shell pkg-config --cflags alsa)
 LDLIBS=$(shell pkg-config --libs alsa) -lm
-EXECS=server client
+#EXECS=server client
+
+EXECS=client
 
 all: $(EXECS)
 
