@@ -11,8 +11,9 @@ void msleep(uint32_t ms) {
   nanosleep(&req, NULL);
 }
 
-uint32_t get_timestamp() {
+uint64_t utimestamp() {
   struct timespec now;
   assert(clock_gettime(CLOCK_REALTIME, &now) == 0);
-  return (now.tv_sec - SECONDS_BETWEEN_1970_and_2021) * 1000000 + now.tv_nsec / (double)1000;
+  return (uint64_t)(now.tv_sec - SECONDS_BETWEEN_1970_and_2021) * 1000000 +
+    now.tv_nsec / 1000;
 }

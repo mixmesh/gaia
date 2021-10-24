@@ -8,8 +8,8 @@
 #define DEFAULT_HOST "127.0.0.1"
 #define DEFAULT_PORT 5422
 
-// |userid:4|seqnum:4|timestamp:4| = 12 bytes
-#define HEADER_SIZE (4 + 4 + 4)
+// |userid:4|seqnum:4|timestamp:8| = 16 bytes
+#define HEADER_SIZE (4 + 4 + 8)
 
 #define SCHED_ERROR 1
 #define SOCKET_ERROR 2
@@ -100,24 +100,31 @@ void start_sending(uint32_t userid, in_addr_t host, uint16_t port) {
   uint32_t seqnum = 0;
 
   // Add userid to header
+  memcpy(udp_buf, &userid, sizeof(userid));
+  /*
   udp_buf[0] = userid & 0xff;
   udp_buf[1] = (userid >> 8) & 0xff;
   udp_buf[2] = (userid >> 16) & 0xff;
   udp_buf[3] = (userid >> 24) & 0xff;
-
+  */
+  
   while (true) {
-    // Add sequence number to header
+    // Add sequence number and timestamp to header
+    memcpy(&udp_buf[4], &seqnum, sizeof(seqnum));
+    /*
     udp_buf[4] = seqnum & 0xff;
     udp_buf[5] = (seqnum >> 8) & 0xff;
     udp_buf[6] = (seqnum >> 16) & 0xff;
     udp_buf[7] = (seqnum >> 24) & 0xff;
-
-    // Add timestamp to header
-    uint32_t timestamp = get_timestamp();
+    */
+    uint64_t timestamp = utimestamp();
+    memcpy(&udp_buf[8], &timestamp, sizeof(timestamp));
+    /*
     udp_buf[8] = timestamp & 0xff;
     udp_buf[9] = (timestamp >> 8) & 0xff;
     udp_buf[10] = (timestamp >> 16) & 0xff;
     udp_buf[11] = (timestamp >> 24) & 0xff;
+    */
 
     // Read audio data
     snd_pcm_uframes_t frames =
@@ -136,7 +143,7 @@ void start_sending(uint32_t userid, in_addr_t host, uint16_t port) {
     }
 
     // Send audio data:
-    // |userid:4|seqnum:4|timestamp:4|data:period_size_in_bytes| = udp_buf_size
+    // |userid:4|seqnum:4|timestamp:8|data:period_size_in_bytes| = udp_buf_size
     ssize_t sent_bytes;
     if ((sent_bytes = sendto(sockfd, &udp_buf[HEADER_SIZE],
                              period_size_in_bytes, 0,
@@ -144,6 +151,7 @@ void start_sending(uint32_t userid, in_addr_t host, uint16_t port) {
                              sizeof(dest_addr))) < 0) {
       perror("All bytes could not be sent");
     }
+    assert(sent_bytes == period_size_in_bytes);
 
     seqnum++;
   }
