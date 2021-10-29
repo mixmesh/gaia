@@ -1,30 +1,34 @@
 CFLAGS=-std=c18 -pedantic -Wall -Werror -D_POSIX_C_SOURCE=200809L $(shell pkg-config --cflags alsa)
 LDLIBS=$(shell pkg-config --libs alsa) -lm
-#EXECS=server sender
+DEPDIR := .deps
+DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.d
+COMPILE.c = $(CC) $(DEPFLAGS) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c
 
-EXECS=sender
+EXECS=receiver sender
+SRCS=receiver.c sender.c audio.c scheduling.c timing.c server.c jb.c jb_table.c
 
 all: $(EXECS)
+
+receiver: audio.o receiver.o scheduling.o
+
+sender: audio.o sender.o scheduling.o timing.o
 
 test:
 	(cd test; $(MAKE))
 
-server: jb.o jb_table.o server.o audio.o timing.o
+%.o : %.c
+%.o : %.c $(DEPDIR)/%.d | $(DEPDIR)
+	$(COMPILE.c) $(OUTPUT_OPTION) $<
 
-sender: jb.o sender.o audio.o timing.o
+$(DEPDIR): ; @mkdir -p $@
 
-jb.o: jb.c jb.h bits.h
-
-jb_table.o: jb_table.c jb.h
-
-server.o: server.c jb.h jb_table.h bits.h timing.h
-
-sender.o: sender.c jb.h audio.h timing.h
-
-audio.o: audio.c audio.h
+DEPFILES := $(SRCS:%.c=$(DEPDIR)/%.d)
+$(DEPFILES):
 
 clean:
 	rm -f *.o $(EXECS)
 
 mrproper: clean
 	rm -f *~ #* 
+
+include $(wildcard $(DEPFILES))

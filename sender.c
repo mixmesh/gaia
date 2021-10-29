@@ -1,9 +1,9 @@
 #include <stdbool.h>
 #include <signal.h>
-#include <sched.h>
 #include <arpa/inet.h>
 #include "audio.h"
 #include "timing.h"
+#include "scheduling.h"
 
 #define DEFAULT_HOST "127.0.0.1"
 #define DEFAULT_PORT 5422
@@ -18,55 +18,60 @@
 
 audio_info_t *audio_info = NULL;
 int sockfd = -1;
-uint8_t *udp_buf = NULL;
+uint8_t *buf = NULL;
 
 void usage(char *command, int status) {
   fprintf(stderr, "Usage: %s userid [host] [port]\n", command);
-  fprintf(stderr, "Example: sudo ./client 1 172.16.0.116 2305\n");
+  fprintf(stderr, "Example: sudo %s 1 172.16.0.116 %d\n", command,
+          DEFAULT_PORT);
   exit(status);
 }
 
-void sigint(int sig) {
+void cleanup() {
   if (audio_info != NULL) {
     audio_free(audio_info);
+  }
+  if (buf != NULL) {
+    free(buf);
   }
   if (sockfd != -1) {
     close(sockfd);
   }
-  if (udp_buf != NULL) {
-    free(udp_buf);
-  }
-  exit(0);
 }
 
-void start_sending(uint32_t userid, in_addr_t host, uint16_t port) {
+void sigint_handler(int sig) {
+  cleanup();
+  exit(sig);
+}
+
+void send_udp_packets(uint32_t userid, in_addr_t host, uint16_t port) {
+  int err;
+  
   // Hardwired audio settings
   char *pcm_name = "hw:0,0";
   snd_pcm_stream_t stream = SND_PCM_STREAM_CAPTURE;
+  int mode = 0;
   snd_pcm_format_t format = SND_PCM_FORMAT_S16_LE;
   uint8_t channels = 2;
   uint8_t sample_size_in_bytes = 2;
+  uint8_t frame_size_in_bytes = channels * sample_size_in_bytes;
   uint32_t rate_in_hz = 48000;
   snd_pcm_uframes_t period_size_in_frames = 128;
-  uint8_t buffer_multiplicator = 4;
+  uint32_t period_size_in_bytes = period_size_in_frames * frame_size_in_bytes;
+  uint8_t buffer_multiplicator = 10;
 
   // Handle Ctrl-c
-  signal(SIGINT, sigint);
-
+  signal(SIGINT, sigint_handler);
+  
   // Set scheduling parameters
-  struct sched_param sched_param;
-  if (sched_getparam(0, &sched_param) < 0) {
-    perror("Could not get scheduling parameters");
-    exit(SCHED_ERROR);
-  }
-  sched_param.sched_priority = sched_get_priority_max(SCHED_FIFO);
-  if (sched_setscheduler(0, SCHED_FIFO, &sched_param) == -1) {
+  int priority;
+  if ((priority = set_fifo_scheduling()) < 0) {
     perror("Could not set FIFO scheduling policy");
     exit(SCHED_ERROR);
   }
   fprintf(stderr, "FIFO scheduling policy has been set with priority %i\n",
-          sched_param.sched_priority);
-
+          priority);
+  
   // Create socket
   if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
     perror("Socket creation failed");
@@ -79,8 +84,7 @@ void start_sending(uint32_t userid, in_addr_t host, uint16_t port) {
   dest_addr.sin_addr.s_addr = host;
 
   // Open audio device
-  int err;
-  if ((err = audio_new(pcm_name, stream, format, channels, rate_in_hz,
+  if ((err = audio_new(pcm_name, stream, mode, format, channels, rate_in_hz,
                        sample_size_in_bytes, period_size_in_frames,
                        buffer_multiplicator, &audio_info)) < 0) {
     fprintf(stderr, "Could not initialize audio: %s\n", snd_strerror(err));
@@ -88,73 +92,82 @@ void start_sending(uint32_t userid, in_addr_t host, uint16_t port) {
   }
   audio_print_parameters(audio_info);
 
-  uint32_t period_size_in_bytes =
-    period_size_in_frames * channels * sample_size_in_bytes;
   double period_size_in_ms =
     (double)period_size_in_frames / (rate_in_hz / 1000);
   fprintf(stderr, "Period size is %d bytes (%fms)\n", period_size_in_bytes,
           period_size_in_ms);
-  uint32_t udp_buf_size = HEADER_SIZE + period_size_in_bytes;
-  udp_buf = malloc(udp_buf_size);
+  uint32_t buf_size = HEADER_SIZE + period_size_in_bytes;
+  buf = malloc(buf_size);
 
   uint32_t seqnum = 0;
-
-  // Add userid to header
-  memcpy(udp_buf, &userid, sizeof(userid));
-  /*
-  udp_buf[0] = userid & 0xff;
-  udp_buf[1] = (userid >> 8) & 0xff;
-  udp_buf[2] = (userid >> 16) & 0xff;
-  udp_buf[3] = (userid >> 24) & 0xff;
-  */
   
+  // Add userid to header
+  memcpy(buf, &userid, sizeof(userid));
+  /*
+  buf[0] = userid & 0xff;
+  buf[1] = (userid >> 8) & 0xff;
+  buf[2] = (userid >> 16) & 0xff;
+  buf[3] = (userid >> 24) & 0xff;
+  */
+
+  // Sender loop
+  fprintf(stderr, "Sending audio...\n");
   while (true) {
     // Add sequence number and timestamp to header
-    memcpy(&udp_buf[4], &seqnum, sizeof(seqnum));
+    memcpy(&buf[4], &seqnum, sizeof(seqnum));
     /*
-    udp_buf[4] = seqnum & 0xff;
-    udp_buf[5] = (seqnum >> 8) & 0xff;
-    udp_buf[6] = (seqnum >> 16) & 0xff;
-    udp_buf[7] = (seqnum >> 24) & 0xff;
+    buf[4] = seqnum & 0xff;
+    buf[5] = (seqnum >> 8) & 0xff;
+    buf[6] = (seqnum >> 16) & 0xff;
+    buf[7] = (seqnum >> 24) & 0xff;
     */
     uint64_t timestamp = utimestamp();
-    memcpy(&udp_buf[8], &timestamp, sizeof(timestamp));
+    memcpy(&buf[8], &timestamp, sizeof(timestamp));
     /*
-    udp_buf[8] = timestamp & 0xff;
-    udp_buf[9] = (timestamp >> 8) & 0xff;
-    udp_buf[10] = (timestamp >> 16) & 0xff;
-    udp_buf[11] = (timestamp >> 24) & 0xff;
+    buf[8] = timestamp & 0xff;
+    buf[9] = (timestamp >> 8) & 0xff;
+    buf[10] = (timestamp >> 16) & 0xff;
+    buf[11] = (timestamp >> 24) & 0xff;
     */
 
     // Read audio data
     snd_pcm_uframes_t frames =
-      snd_pcm_readi(audio_info->pcm, &udp_buf[HEADER_SIZE],
+      snd_pcm_readi(audio_info->pcm, &buf[HEADER_SIZE],
                     period_size_in_frames);
-    if (frames == -EBADFD) {
-      fprintf(stderr, "Bad pcm state\n");
-    } else if (frames == -EPIPE) {
-      fprintf(stderr, "Overrun occurred\n");
-      assert(snd_pcm_recover(audio_info->pcm, frames, 0) == 0);
-    } else if (frames == -ESTRPIPE) {
-      fprintf(stderr, "Suspend event occurred \n");
-      assert(snd_pcm_recover(audio_info->pcm, frames, 0) == 0);
-    } else if (frames != period_size_in_frames) {
-      fprintf(stderr, "Short read, read %lu frames\n", frames);
-    }
 
-    // Send audio data:
-    // |userid:4|seqnum:4|timestamp:8|data:period_size_in_bytes| = udp_buf_size
-    ssize_t sent_bytes;
-    if ((sent_bytes = sendto(sockfd, &udp_buf[HEADER_SIZE],
-                             period_size_in_bytes, 0,
-                             (struct sockaddr *)&dest_addr,
-                             sizeof(dest_addr))) < 0) {
-      perror("All bytes could not be sent");
+    fprintf(stderr, "BAJSo device: %s\n", snd_strerror(frames));
+    
+    if (frames == -EPIPE || frames == -ESTRPIPE) {
+      fprintf(stderr, "Failed to read from audio device: %s\n", snd_strerror(frames));
+      if (snd_pcm_recover(audio_info->pcm, frames, 0) < 0) {
+        fprintf(stderr, "Failed to recover audio device: %s\n", snd_strerror(frames));
+        break;
+      }
+    } else if (frames < 0) {
+      fprintf(stderr, "Failed to read from audio device: %s\n", snd_strerror(frames));
+      break;
+    } else if (frames != period_size_in_frames) {
+      fprintf(stderr, "Expected to read %ld frames from audio device but only got %ld\n",
+              period_size_in_frames, frames);
+      break;
     }
-    assert(sent_bytes == period_size_in_bytes);
+    
+    // Send audio data:
+    // |userid:4|seqnum:4|timestamp:8|data:period_size_in_bytes| = buf_size
+    ssize_t bytes;
+    if ((bytes = sendto(sockfd, &buf[HEADER_SIZE], period_size_in_bytes, 0,
+                        (struct sockaddr *)&dest_addr,
+                        sizeof(dest_addr))) < 0) {
+      perror("Failed to write tosocket");
+    } else if (bytes != period_size_in_bytes) {
+      perror("Failed to write all bytes to socket");
+      break;
+    }
 
     seqnum++;
   }
+  
+  cleanup();
 }
 
 int main (int argc, char *argv[]) {
@@ -186,7 +199,7 @@ int main (int argc, char *argv[]) {
     }
   }
   
-  start_sending(userid, host, port);
+  send_udp_packets(userid, host, port);
   
   return 0;
 }

@@ -6,10 +6,12 @@
 typedef struct {
   snd_pcm_t *pcm;
   snd_pcm_hw_params_t *hw_params;
+  snd_pcm_sw_params_t *sw_params;
 } audio_info_t;
 
 int audio_new(char *pcm_name,
               snd_pcm_stream_t stream,
+              int mode,
               snd_pcm_format_t format,
               uint8_t channels,
               uint32_t rate_in_hz,
