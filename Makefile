@@ -1,15 +1,16 @@
 CFLAGS=-std=c18 -pedantic -Wall -Werror -D_POSIX_C_SOURCE=200809L $(shell pkg-config --cflags alsa)
 LDLIBS=$(shell pkg-config --libs alsa) -lm
-DEPDIR := .deps
-DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.d
-COMPILE.c = $(CC) $(DEPFLAGS) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c
+DEPDIR:=.deps
+DEPFLAGS=-MT $@ -MMD -MP -MF $(DEPDIR)/$*.d
+COMPILE.c=$(CC) $(DEPFLAGS) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c
 
 EXECS=receiver sender
-SRCS=receiver.c sender.c audio.c scheduling.c timing.c server.c jb.c jb_table.c
+SRCS=receiver.c sender.c audio.c scheduling.c timing.c jb.c jb_table.c
+OBJS=$(SRCS:%.c=%.o)
 
 all: $(EXECS)
 
-objs: jb.o
+objs: $(OBJS)
 
 receiver: audio.o receiver.o scheduling.o
 
