@@ -12,7 +12,7 @@ all: $(EXECS)
 
 objs: $(OBJS)
 
-receiver: audio.o receiver.o scheduling.o
+receiver: audio.o receiver.o scheduling.o timing.o
 
 sender: audio.o sender.o scheduling.o timing.o
 

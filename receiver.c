@@ -4,15 +4,19 @@
 #include <sys/time.h>
 #include "audio.h"
 #include "scheduling.h"
+#include "timing.h"
 
 #define DEFAULT_PORT 2305
 
-#define BUF_SIZE 32768
+// |userid:4|timestamp:8| = 12 bytes
+#define HEADER_SIZE (4 + 8)
 
 #define SCHED_ERROR 1
 #define SOCKET_ERROR 2
 #define AUDIO_ERROR 3
 #define ARG_ERROR 4
+
+#define FOUR_SECONDS_IN_US (4 * 1000000)
 
 audio_info_t *audio_info = NULL;
 int sockfd = -1;
@@ -87,9 +91,10 @@ void receive_udp_packets(uint16_t port) {
   
   struct timeval zero_timeout = {.tv_usec = 0, .tv_sec = 0};
   struct timeval one_second_timeout = {.tv_usec = 0, .tv_sec = 1};
+
+  uint32_t buf_size = HEADER_SIZE + period_size_in_bytes;
+  buf = malloc(buf_size);
   
-  buf = malloc(BUF_SIZE);
-                  
   while (true) {
     bool give_up = false;
 
@@ -125,7 +130,7 @@ void receive_udp_packets(uint16_t port) {
       } else if (nfds == 0) {
         break;
       }
-      if (recvfrom(sockfd, buf, BUF_SIZE, 0, NULL, NULL) < 0) {
+      if (recvfrom(sockfd, buf, buf_size, 0, NULL, NULL) < 0) {
         perror("Failed to drain socket receive buffer\n");
         give_up = true;
         break;
@@ -143,6 +148,9 @@ void receive_udp_packets(uint16_t port) {
     // Read from socket and write to non-blocking audio device
     printf("Receiving audio...\n");
 
+    double latency = 0;
+    uint64_t last_latency_printout = 0;
+    
     while (true) {
       // Wait for incoming socket data (or timeout)
       FD_ZERO(&readfds);
@@ -159,19 +167,34 @@ void receive_udp_packets(uint16_t port) {
       
       // Read from socket
       int n;
-      if ((n = recvfrom(sockfd, buf, BUF_SIZE, 0, NULL, NULL)) < 0) {
+      if ((n = recvfrom(sockfd, buf, buf_size, 0, NULL, NULL)) < 0) {
         perror("Failed to read from socket");
         give_up = true;
         break;
       }
-      assert(n == period_size_in_bytes);
+      assert(n == buf_size);
+
+      // Extract buffer header
+      uint32_t userid;
+      memcpy(&userid, buf, sizeof(uint32_t));
+      uint64_t timestamp;
+      memcpy(&timestamp, &buf[4], sizeof(uint64_t));
+
+      // Calculate latency
+      uint64_t now = utimestamp();
+      latency = latency * 0.9 + (now - timestamp) * 0.1;
+      if (now - last_latency_printout > FOUR_SECONDS_IN_US) {
+        printf("Latency: %fms\n", latency / 1000);
+        last_latency_printout = now;
+      }
       
       // Write to audio device
       uint32_t written_frames = 0;
       while (written_frames < period_size_in_frames) {
         snd_pcm_uframes_t frames =
           snd_pcm_writei(audio_info->pcm,
-                         &buf[written_frames * frame_size_in_bytes],
+                         &buf[HEADER_SIZE +
+                              written_frames * frame_size_in_bytes],
                          period_size_in_frames - written_frames);
         if (frames == -EAGAIN) {
           printf("Failed to write to audio device: %s\n", snd_strerror(err));
