@@ -11,14 +11,14 @@
  */
 
 void print_jb(jb_t *jb) {
-  jb_entry_t *entry = jb->head;
+  jb_entry_t *entry = jb->tail;
   while (entry != NULL) {
     fprintf(stderr, "%d:%s -> ", entry->index, entry->data);
     entry = entry->next;
   }
   fprintf(stderr, "\n");
   /*
-  entry = jb->tail;
+  entry = jb->head;
   while (entry != NULL) {
     fprintf(stderr, "%d:%s <- ", entry->index, entry->data);
     entry = entry->previous;
@@ -60,7 +60,7 @@ int main (int argc, char *argv[]) {
   jb_entry->index = 10;
   strcpy((char *)jb_entry->data, "10");
   result = jb_insert(jb, jb_entry);
-  assert(CHK_FLAG(result, HEAD_INSERTED));
+  assert(CHK_FLAG(result, TAIL_INSERTED));
   assert(jb->entries == 2);
   print_jb(jb);
 
@@ -69,7 +69,7 @@ int main (int argc, char *argv[]) {
   jb_entry->index = 20;
   strcpy((char *)jb_entry->data, "20");
   result = jb_insert(jb, jb_entry);
-  assert(CHK_FLAG(result, HEAD_INSERTED));
+  assert(CHK_FLAG(result, TAIL_INSERTED));
   assert(jb->entries == 3);
   print_jb(jb);
 
@@ -96,7 +96,7 @@ int main (int argc, char *argv[]) {
   jb_entry->index = 1;
   strcpy((char *)jb_entry->data, "1");
   result = jb_insert(jb, jb_entry);
-  assert(CHK_FLAG(result, TAIL_INSERTED));
+  assert(CHK_FLAG(result, HEAD_INSERTED));
   assert(jb->entries == 6);
   print_jb(jb);
 
@@ -105,7 +105,7 @@ int main (int argc, char *argv[]) {
   jb_entry->index = 30;
   strcpy((char *)jb_entry->data, "30");
   result = jb_insert(jb, jb_entry);
-  assert(CHK_FLAG(result, HEAD_INSERTED));
+  assert(CHK_FLAG(result, TAIL_INSERTED));
   assert(jb->entries == 7);
   print_jb(jb);
 
@@ -114,7 +114,7 @@ int main (int argc, char *argv[]) {
   jb_entry->index = 40;
   strcpy((char *)jb_entry->data, "40");
   result = jb_insert(jb, jb_entry);
-  assert(CHK_FLAG(result, HEAD_INSERTED));
+  assert(CHK_FLAG(result, TAIL_INSERTED));
   assert(jb->entries == 8);
   print_jb(jb);
 
@@ -123,7 +123,7 @@ int main (int argc, char *argv[]) {
   jb_entry->index = 50;
   strcpy((char *)jb_entry->data, "50");
   result = jb_insert(jb, jb_entry);
-  assert(CHK_FLAG(result, HEAD_INSERTED));
+  assert(CHK_FLAG(result, TAIL_INSERTED));
   assert(jb->entries == 8);
   print_jb(jb);
 

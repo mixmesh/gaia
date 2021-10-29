@@ -15,8 +15,8 @@ typedef struct jb_entry {
 typedef struct {
   char name[32];
   uint32_t entries;
-  jb_entry_t *head;
   jb_entry_t *tail;
+  jb_entry_t *head;
   UT_hash_handle hh;
 } jb_t;
 

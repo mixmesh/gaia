@@ -54,7 +54,7 @@ void send_udp_packets(uint32_t userid, in_addr_t host, uint16_t port) {
   uint8_t sample_size_in_bytes = 2;
   uint8_t frame_size_in_bytes = channels * sample_size_in_bytes;
   uint32_t rate_in_hz = 48000;
-  snd_pcm_uframes_t period_size_in_frames = 128;
+  snd_pcm_uframes_t period_size_in_frames = 256;
   uint32_t period_size_in_bytes = period_size_in_frames * frame_size_in_bytes;
   uint8_t buffer_multiplicator = 4;
   
@@ -77,11 +77,11 @@ void send_udp_packets(uint32_t userid, in_addr_t host, uint16_t port) {
   }
   int flags = fcntl(sockfd, F_GETFL, 0);
   if (flags < 0) {
-    perror("Socket could nopt be made non-blocking");
+    perror("Socket could not be made non-blocking");
     exit(SOCKET_ERROR);
   }
   if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) < 0) {
-    perror("Socket could nopt be made non-blocking");
+    perror("Socket could not be made non-blocking");
     exit(SOCKET_ERROR);
   }
   
