@@ -44,7 +44,7 @@ void sigint_handler(int sig) {
 
 void receive_udp_packets(uint16_t port) {
   int err;
-
+  
   // Hardwired audio settings
   char *pcm_name = "hw:0,0";
   snd_pcm_stream_t stream = SND_PCM_STREAM_PLAYBACK;
@@ -80,17 +80,16 @@ void receive_udp_packets(uint16_t port) {
   src_addr.sin_family = AF_INET;
   src_addr.sin_port = htons(port);
   src_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-
+  
   if (bind(sockfd, (struct sockaddr *)&src_addr, sizeof(src_addr)) < 0) {
     perror("Binding of socket failed");
     exit(SOCKET_ERROR);
   }
   
-  // Receiver loop
   struct timeval zero_timeout = {.tv_usec = 0, .tv_sec = 0};
   struct timeval one_second_timeout = {.tv_usec = 0, .tv_sec = 1};
   buf = malloc(BUF_SIZE);
-
+  
   while (true) {
     // Wait for incoming audio
     fprintf(stderr, "Waiting for incoming audio...\n");
@@ -163,16 +162,20 @@ void receive_udp_packets(uint16_t port) {
                          &buf[written_frames * frame_size_in_bytes],
                          period_size_in_frames - written_frames);
         if (frames == -EAGAIN) {
-          fprintf(stderr, "Failed to write to audio device: %s\n", snd_strerror(err));
+          fprintf(stderr, "Failed to write to audio device: %s\n",
+                  snd_strerror(err));
           break;
         } else if (frames == -EPIPE) {
-          fprintf(stderr, "Failed to write to audio device: %s\n", snd_strerror(err));
+          fprintf(stderr, "Failed to write to audio device: %s\n",
+                  snd_strerror(err));
           if ((err = snd_pcm_prepare(audio_info->pcm)) < 0) {
-            fprintf(stderr, "Failed to prepare audio device: %s\n", snd_strerror(err));
+            fprintf(stderr, "Failed to prepare audio device: %s\n",
+                    snd_strerror(err));
           }
           break;
         } else if (frames < 0) {
-          fprintf(stderr, "Failed to prepare audio device: %s\n", snd_strerror(err));
+          fprintf(stderr, "Failed to prepare audio device: %s\n",
+                  snd_strerror(err));
           break;
         } else {
           written_frames += frames;
@@ -190,7 +193,7 @@ int main (int argc, char *argv[]) {
   if (argc > 2) {
     usage(argv[0], 1);
   }
-
+  
   // Read port
   int32_t port = DEFAULT_PORT;
   if (argc > 3) {
@@ -202,6 +205,5 @@ int main (int argc, char *argv[]) {
   }
   
   receive_udp_packets(port);
-  
   return 0;
 }

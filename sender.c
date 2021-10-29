@@ -8,9 +8,6 @@
 #define DEFAULT_HOST "127.0.0.1"
 #define DEFAULT_PORT 5422
 
-// |userid:4|seqnum:4|timestamp:8| = 16 bytes
-#define HEADER_SIZE (4 + 4 + 8)
-
 #define SCHED_ERROR 1
 #define SOCKET_ERROR 2
 #define AUDIO_ERROR 3
@@ -96,66 +93,38 @@ void send_udp_packets(uint32_t userid, in_addr_t host, uint16_t port) {
     (double)period_size_in_frames / (rate_in_hz / 1000);
   fprintf(stderr, "Period size is %d bytes (%fms)\n", period_size_in_bytes,
           period_size_in_ms);
-  uint32_t buf_size = HEADER_SIZE + period_size_in_bytes;
+  uint32_t buf_size = period_size_in_bytes;
   buf = malloc(buf_size);
-
-  uint32_t seqnum = 0;
   
-  // Add userid to header
-  memcpy(buf, &userid, sizeof(userid));
-  /*
-  buf[0] = userid & 0xff;
-  buf[1] = (userid >> 8) & 0xff;
-  buf[2] = (userid >> 16) & 0xff;
-  buf[3] = (userid >> 24) & 0xff;
-  */
-
-  // Sender loop
+  // Read from audio device and write to socket
   fprintf(stderr, "Sending audio...\n");
   while (true) {
-    // Add sequence number and timestamp to header
-    memcpy(&buf[4], &seqnum, sizeof(seqnum));
-    /*
-    buf[4] = seqnum & 0xff;
-    buf[5] = (seqnum >> 8) & 0xff;
-    buf[6] = (seqnum >> 16) & 0xff;
-    buf[7] = (seqnum >> 24) & 0xff;
-    */
-    uint64_t timestamp = utimestamp();
-    memcpy(&buf[8], &timestamp, sizeof(timestamp));
-    /*
-    buf[8] = timestamp & 0xff;
-    buf[9] = (timestamp >> 8) & 0xff;
-    buf[10] = (timestamp >> 16) & 0xff;
-    buf[11] = (timestamp >> 24) & 0xff;
-    */
-
-    // Read audio data
+    // Read from audio device
     snd_pcm_uframes_t frames =
-      snd_pcm_readi(audio_info->pcm, &buf[HEADER_SIZE],
-                    period_size_in_frames);
-
-    fprintf(stderr, "Failed to read from audio device: %s\n", snd_strerror(frames));
-    
+      snd_pcm_readi(audio_info->pcm, buf, period_size_in_frames);
     if (frames == -EPIPE || frames == -ESTRPIPE) {
-      fprintf(stderr, "Failed to read from audio device: %s\n", snd_strerror(frames));
+      fprintf(stderr, "Failed to read from audio device: %s\n",
+              snd_strerror(frames));
       if (snd_pcm_recover(audio_info->pcm, frames, 0) < 0) {
-        fprintf(stderr, "Failed to recover audio device: %s\n", snd_strerror(frames));
+        fprintf(stderr, "Failed to recover audio device: %s\n",
+                snd_strerror(frames));
         break;
       }
     } else if (frames < 0) {
-      fprintf(stderr, "Failed to read from audio device: %s\n", snd_strerror(frames));
+      fprintf(stderr, "Failed to read from audio device: %s\n",
+              snd_strerror(frames));
       break;
     } else if (frames != period_size_in_frames) {
-      fprintf(stderr, "Expected to read %ld frames from audio device but only read %ld\n",
+      fprintf(stderr,
+              "Expected to read %ld frames from audio device but only read \
+%ld\n",
               period_size_in_frames, frames);
       break;
     }
     
-    // Send audio data:
-    // |userid:4|seqnum:4|timestamp:8|data:period_size_in_bytes| = buf_size
+    // Write to socket
     ssize_t bytes;
-    if ((bytes = sendto(sockfd, &buf[HEADER_SIZE], period_size_in_bytes, 0,
+    if ((bytes = sendto(sockfd, buf, period_size_in_bytes, 0,
                         (struct sockaddr *)&dest_addr,
                         sizeof(dest_addr))) < 0) {
       perror("Failed to write tosocket");
@@ -163,8 +132,6 @@ void send_udp_packets(uint32_t userid, in_addr_t host, uint16_t port) {
       perror("Failed to write all bytes to socket");
       break;
     }
-
-    seqnum++;
   }
   
   cleanup();
@@ -200,6 +167,5 @@ int main (int argc, char *argv[]) {
   }
   
   send_udp_packets(userid, host, port);
-  
   return 0;
 }
