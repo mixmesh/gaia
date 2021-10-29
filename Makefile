@@ -9,6 +9,8 @@ SRCS=receiver.c sender.c audio.c scheduling.c timing.c server.c jb.c jb_table.c
 
 all: $(EXECS)
 
+objs: jb.o
+
 receiver: audio.o receiver.o scheduling.o
 
 sender: audio.o sender.o scheduling.o timing.o

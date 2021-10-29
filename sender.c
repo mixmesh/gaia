@@ -135,7 +135,7 @@ void send_udp_packets(uint32_t userid, in_addr_t host, uint16_t port) {
       snd_pcm_readi(audio_info->pcm, &buf[HEADER_SIZE],
                     period_size_in_frames);
 
-    fprintf(stderr, "BAJSo device: %s\n", snd_strerror(frames));
+    fprintf(stderr, "Failed to read from audio device: %s\n", snd_strerror(frames));
     
     if (frames == -EPIPE || frames == -ESTRPIPE) {
       fprintf(stderr, "Failed to read from audio device: %s\n", snd_strerror(frames));
@@ -147,7 +147,7 @@ void send_udp_packets(uint32_t userid, in_addr_t host, uint16_t port) {
       fprintf(stderr, "Failed to read from audio device: %s\n", snd_strerror(frames));
       break;
     } else if (frames != period_size_in_frames) {
-      fprintf(stderr, "Expected to read %ld frames from audio device but only got %ld\n",
+      fprintf(stderr, "Expected to read %ld frames from audio device but only read %ld\n",
               period_size_in_frames, frames);
       break;
     }

@@ -146,7 +146,7 @@ void receive_udp_packets(uint16_t port) {
       } else if (nfds == 0) {
         break;
       }
-            
+      
       // Read from socket
       int bytes;
       if ((bytes = recvfrom(sockfd, buf, BUF_SIZE, 0, NULL, NULL)) < 0) {
