@@ -1,11 +1,11 @@
-* Update jitter buffer to accept uint64_t as userid
-
 * Add jitter buffer to receiver
 
 * Merge sender.c and receiver.c into single gaia.c (keep sender.c and receiver.c)
 
   thread 1: listen on udp and write to speaker
   thread 2: write from mic and write to udp
+
+  * set scheduling correct in a posix context
 
   * Measure latency
 
