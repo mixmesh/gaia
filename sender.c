@@ -5,6 +5,7 @@
 #include "timing.h"
 #include "scheduling.h"
 
+#define DEFAULT_USERID 1
 #define DEFAULT_HOST "127.0.0.1"
 #define DEFAULT_PORT 2305
 
@@ -18,7 +19,7 @@ int sockfd = -1;
 uint8_t *buf = NULL;
 
 void usage(char *command, int status) {
-  fprintf(stderr, "Usage: %s userid [host] [port]\n", command);
+  fprintf(stderr, "Usage: %s [userid] [host] [port]\n", command);
   fprintf(stderr, "Example: sudo %s 1 172.16.0.116 %d\n", command,
           DEFAULT_PORT);
   exit(status);
@@ -158,15 +159,19 @@ void send_udp_packets(uint32_t userid, in_addr_t host, uint16_t port) {
 }
 
 int main (int argc, char *argv[]) {
-  if (argc < 2 || argc > 4) {
+  if (argc < 1 || argc > 4) {
     usage(argv[0], 1);
   }
-
-  // Read userid
+  
   char *endptr;
-  int32_t userid = strtol(argv[1], &endptr, 10);
-  if (strlen(endptr) != 0 || userid < 1) {
-    usage(argv[0], ARG_ERROR);
+  
+  // Read userid
+  int32_t userid = DEFAULT_USERID;
+  if (argc > 1) {
+    userid = strtol(argv[1], &endptr, 10);
+    if (strlen(endptr) != 0 || userid < 1) {
+      usage(argv[0], ARG_ERROR);
+    }
   }
   
   // Read host
