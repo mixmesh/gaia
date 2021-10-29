@@ -1,7 +1,6 @@
-* Add user, seqnum and timestamp to both sender and receiver
-  * Measure latency
+* Update jitter buffer to accept uint64_t as userid
 
-* Add jitter buffer to receiver (is it possible to make it lock free?)
+* Add jitter buffer to receiver
 
 * Merge sender.c and receiver.c into single gaia.c (keep sender.c and receiver.c)
 
@@ -13,6 +12,8 @@
 * Reinstall pi4 and and build a box
 
 * Run sender, receiver and gaia on different machines
+
+  * Measure latency
 
 * Update gaia.c
 
