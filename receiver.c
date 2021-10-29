@@ -6,7 +6,7 @@
 #include "scheduling.h"
 
 #define DEFAULT_HOST "127.0.0.1"
-#define DEFAULT_PORT 5422
+#define DEFAULT_PORT 2305
 
 #define BUF_SIZE 32768
 
@@ -45,7 +45,7 @@ void sigint_handler(int sig) {
 void receive_udp_packets(uint16_t port) {
   int err;
   
-  // Hardwired audio settings
+  // Hardwired audio parameters
   char *pcm_name = "hw:0,0";
   snd_pcm_stream_t stream = SND_PCM_STREAM_PLAYBACK;
   int mode = SND_PCM_NONBLOCK;
@@ -88,6 +88,7 @@ void receive_udp_packets(uint16_t port) {
   
   struct timeval zero_timeout = {.tv_usec = 0, .tv_sec = 0};
   struct timeval one_second_timeout = {.tv_usec = 0, .tv_sec = 1};
+
   buf = malloc(BUF_SIZE);
   
   while (true) {
@@ -132,7 +133,7 @@ void receive_udp_packets(uint16_t port) {
     }
     fprintf(stderr, "Socket receive buffer has been drained\n");
     
-    // Read from socket and write to audio device
+    // Read from socket and write to non-blocking audio device
     while (true) {
       // Wait for incoming socket data (or timeout)
       FD_ZERO(&readfds);
