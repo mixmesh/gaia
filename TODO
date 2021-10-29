@@ -4,17 +4,20 @@
 
 * Rewrite jitter buffer to work on numbers and not strings
   * Fix tests
+  * Think about memory handling of buffers again
 
 * Add jitter buffer to receiver (is it possible to make it lock free?)
 
-* Merge sender and receiver into single gaia.c (keep receiver and sender)
+* Merge sender.c and receiver.c into single gaia.c (keep sender.c and receiver.c)
 
   thread 1: listen on udp and write to speaker
   thread 2: write from mic and write to udp
 
-* Reinstall pi4 and and buid a box
+  * Measure latency
 
-* Run client and server on differnt machines machine
+* Reinstall pi4 and and build a box
+
+* Run sender, receiver and gaia on different machines
 
 * Update gaia.c
 
