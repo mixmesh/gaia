@@ -1,29 +1,35 @@
-* jb -> int instead of string keys
-* rename index to seqnum
+* Add user, seqnum and timestamp to both sender and receiver
+  * Remove all traces of index and rename it to seqnum
+  * Measure latency
 
+* Rewrite jitter buffer to work on numbers and not strings
+  * Fix tests
 
-* Fix client.c (send udp = perido_size_in_bytes)
-* Fix server.c (disable jitter buffer for now)
-* Run client and server on same machine
-* Calc latency on same machine
-* Run client and server on differnt machines machine
-* Merge client and server into a single gaia.c
+* Add jitter buffer to receiver (is it possible to make it lock free?)
+
+* Merge sender and receiver into single gaia.c (keep receiver and sender)
 
   thread 1: listen on udp and write to speaker
   thread 2: write from mic and write to udp
+
+* Reinstall pi4 and and buid a box
+
+* Run client and server on differnt machines machine
+
+* Update gaia.c
 
   thread 1: listen on udp and write to jitter buffer
   thread 2: read from jitter buffer and write to speaker
   thread 3: write from mic and write to udp
 
-Not now:
+* Update gaia.c
 
   thread 1: listen on udp and write to jitter buffers (many)
   thread 2: read from jitter buffer (many) and write to speaker
   thread 3: write from mic and write to udp (many)
 
 * udp hole punching
+
 * encrypt
 
-
-
+* Use libopus as codec
