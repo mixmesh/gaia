@@ -9,28 +9,29 @@ int main (int argc, char *argv[]) {
 
   jb_t *jb_table = jb_table_new();
   jb_t *jb;
+  int8_t res;
+  
+  jb = jb_new(1);
+  res = jb_table_add(&jb_table, jb);
+  assert(res == JB_TABLE_SUCCESS && jb_table_count(&jb_table) == 1);
 
-  jb = jb_new("foo");
-  jb_table_add(&jb_table, jb);
-  assert(jb_table_count(&jb_table) == 1);
+  jb = jb_new(2);
+  res = jb_table_add(&jb_table, jb);
+  assert(res == JB_TABLE_SUCCESS && jb_table_count(&jb_table) == 2);
 
-  jb = jb_new("bar");
-  jb_table_add(&jb_table, jb);
-  assert(jb_table_count(&jb_table) == 2);
-
-  jb = jb_table_find(&jb_table, "foo");
+  jb = jb_table_find(&jb_table, 1);
   assert(jb != NULL);
 
-  jb = jb_table_find(&jb_table, "baz");
+  jb = jb_table_find(&jb_table, 3);
   assert(jb == NULL);
 
   for (jb = jb_table; jb != NULL; jb = jb->hh.next) {
-    printf("Jitter buffer %s (%d)\n", jb->name, jb->entries);
+    printf("Jitter buffer %d (%d)\n", jb->userid, jb->entries);
   }
   
-  jb_table_delete(&jb_table, "foo");
+  jb_table_delete(&jb_table, 1);
   assert(jb_table_count(&jb_table) == 1);
-  jb = jb_table_find(&jb_table, "foo");
+  jb = jb_table_find(&jb_table, 1);
   assert(jb == NULL);
 
   return 0;

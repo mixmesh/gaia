@@ -1,10 +1,5 @@
 * Add user, seqnum and timestamp to both sender and receiver
-  * Remove all traces of index and rename it to seqnum
   * Measure latency
-
-* Rewrite jitter buffer to work on numbers and not strings
-  * Fix tests
-  * Think about memory handling of buffers again
 
 * Add jitter buffer to receiver (is it possible to make it lock free?)
 
@@ -31,7 +26,9 @@
   thread 2: read from jitter buffer (many) and write to speaker
   thread 3: write from mic and write to udp (many)
 
-* udp hole punching
+* udp hole punching server
+
+* extend hole punching server with hlr functionality
 
 * encrypt
 
