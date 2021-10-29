@@ -5,7 +5,6 @@
 #include "audio.h"
 #include "scheduling.h"
 
-#define DEFAULT_HOST "127.0.0.1"
 #define DEFAULT_PORT 2305
 
 #define BUF_SIZE 32768
@@ -46,7 +45,7 @@ void receive_udp_packets(uint16_t port) {
   int err;
   
   // Hardwired audio parameters
-  char *pcm_name = "hw:0,0";
+  char *pcm_name = "default";
   snd_pcm_stream_t stream = SND_PCM_STREAM_PLAYBACK;
   int mode = SND_PCM_NONBLOCK;
   snd_pcm_format_t format = SND_PCM_FORMAT_S16_LE;
@@ -88,12 +87,14 @@ void receive_udp_packets(uint16_t port) {
   
   struct timeval zero_timeout = {.tv_usec = 0, .tv_sec = 0};
   struct timeval one_second_timeout = {.tv_usec = 0, .tv_sec = 1};
-
-  buf = malloc(BUF_SIZE);
   
+  buf = malloc(BUF_SIZE);
+                  
   while (true) {
-    // Wait for incoming audio
-    fprintf(stderr, "Waiting for incoming audio...\n");
+    bool give_up = false;
+
+    // Waiting for incoming audio
+    printf("Waiting for incoming audio...\n");
     fd_set readfds;
     FD_ZERO(&readfds);
     FD_SET(sockfd, &readfds);
@@ -101,7 +102,6 @@ void receive_udp_packets(uint16_t port) {
       perror("Failed to wait for incoming audio");
       break;
     }
-    fprintf(stderr, "Receiving audio...\n");
     
     // Open audio device
     if ((err = audio_new(pcm_name, stream, mode, format, channels, rate_in_hz,
@@ -111,7 +111,7 @@ void receive_udp_packets(uint16_t port) {
       break;
     }
     audio_print_parameters(audio_info);
-    
+      
     // Drain socket receive buffer
     while (true) {
       FD_ZERO(&readfds);
@@ -119,21 +119,30 @@ void receive_udp_packets(uint16_t port) {
       struct timeval timeout = zero_timeout;
       int nfds = select(sockfd + 1, &readfds, 0, 0, &timeout);
       if (nfds < 0) {
-        perror("Failed to drain socket receive buffer");
+        perror("Failed to drain socket receive buffer\n");
+        give_up = true;
         break;
       } else if (nfds == 0) {
         break;
       }
       if (recvfrom(sockfd, buf, BUF_SIZE, 0, NULL, NULL) < 0) {
-        perror("Failed to drain socket receive buffer");
+        perror("Failed to drain socket receive buffer\n");
+        give_up = true;
         break;
       }
       FD_ZERO(&readfds);
       FD_SET(sockfd, &readfds);
     }
-    fprintf(stderr, "Socket receive buffer has been drained\n");
     
+    if (give_up) {
+      break;
+    } else {
+      printf("Socket receive buffer has been drained\n");
+    }
+
     // Read from socket and write to non-blocking audio device
+    printf("Receiving audio...\n");
+
     while (true) {
       // Wait for incoming socket data (or timeout)
       FD_ZERO(&readfds);
@@ -142,18 +151,20 @@ void receive_udp_packets(uint16_t port) {
       int nfds = select(sockfd + 1, &readfds, 0, 0, &timeout);
       if (nfds < 0) {
         perror("Failed to wait for incoming socket data");
+        give_up = true;
         break;
       } else if (nfds == 0) {
         break;
       }
       
       // Read from socket
-      int bytes;
-      if ((bytes = recvfrom(sockfd, buf, BUF_SIZE, 0, NULL, NULL)) < 0) {
+      int n;
+      if ((n = recvfrom(sockfd, buf, BUF_SIZE, 0, NULL, NULL)) < 0) {
         perror("Failed to read from socket");
+        give_up = true;
         break;
       }
-      assert(bytes == period_size_in_bytes);
+      assert(n == period_size_in_bytes);
       
       // Write to audio device
       uint32_t written_frames = 0;
@@ -163,27 +174,28 @@ void receive_udp_packets(uint16_t port) {
                          &buf[written_frames * frame_size_in_bytes],
                          period_size_in_frames - written_frames);
         if (frames == -EAGAIN) {
-          fprintf(stderr, "Failed to write to audio device: %s\n",
-                  snd_strerror(err));
+          printf("Failed to write to audio device: %s\n", snd_strerror(err));
           break;
         } else if (frames == -EPIPE) {
-          fprintf(stderr, "Failed to write to audio device: %s\n",
-                  snd_strerror(err));
+          printf("Failed to write to audio device: %s\n", snd_strerror(err));
           if ((err = snd_pcm_prepare(audio_info->pcm)) < 0) {
-            fprintf(stderr, "Failed to prepare audio device: %s\n",
-                    snd_strerror(err));
+            printf("Failed to prepare audio device: %s\n", snd_strerror(err));
           }
           break;
         } else if (frames < 0) {
-          fprintf(stderr, "Failed to prepare audio device: %s\n",
-                  snd_strerror(err));
+          printf("Failed to prepare audio device: %s\n", snd_strerror(err));
           break;
         } else {
           written_frames += frames;
         }
       }
+
+      if (give_up) {
+        break;
+      }
     }
-    
+
+    printf("Not receiving audio!\n");
     audio_free(audio_info);
   }
   

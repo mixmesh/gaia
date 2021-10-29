@@ -107,8 +107,10 @@ void send_udp_packets(uint32_t userid, in_addr_t host, uint16_t port) {
   
   // Read from audio device and write to non blocking socket
   fprintf(stderr, "Sending audio...\n");
-  
+
   while (true) {
+    bool give_up = false;
+
     // Read from audio device
     snd_pcm_uframes_t frames =
       snd_pcm_readi(audio_info->pcm, buf, period_size_in_frames);
@@ -133,18 +135,22 @@ void send_udp_packets(uint32_t userid, in_addr_t host, uint16_t port) {
     // Write to non-blocking socket
     uint32_t written_bytes = 0;
     while (written_bytes < period_size_in_bytes) {
-      ssize_t bytes =
-        sendto(sockfd, buf, period_size_in_bytes, 0,
-               (struct sockaddr *)&dest_addr, sizeof(dest_addr));
-      if (bytes < 0) {
+      ssize_t n = sendto(sockfd, buf, period_size_in_bytes, 0,
+                         (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+      if (n < 0) {
         if (errno == EWOULDBLOCK) {
-          bytes = 0;
+          n = 0;
         } else {
           perror("Failed to write to socket");
+          give_up = true;
           break;
         }
       }
-      written_bytes += bytes;
+      written_bytes += n;
+    }
+
+    if (give_up) {
+      break;
     }
   }
   
