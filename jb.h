@@ -6,14 +6,14 @@
 #include "uthash/uthash.h"
 
 typedef struct jb_entry {
-  uint32_t seqnum;
+  uint64_t timestamp;
   uint8_t *data;
   struct jb_entry *next;
   struct jb_entry *prev;
 } jb_entry_t;
 
 typedef struct {
-  int32_t userid;
+  uint32_t userid;
   uint32_t entries;
   jb_entry_t *tail;
   jb_entry_t *head;
@@ -26,7 +26,7 @@ typedef struct {
 #define FIRST_INSERTED        (1 << 3)
 #define INTERMEDIATE_INSERTED (1 << 4)
 
-jb_t *jb_new(int32_t userid);
+jb_t *jb_new(uint32_t userid);
 void jb_free(jb_t *jb);
 jb_entry_t *jb_pop(jb_t *jb);
 uint8_t jb_insert(jb_t *jb, jb_entry_t *new_jb_entry);
