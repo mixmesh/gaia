@@ -125,6 +125,7 @@ int audio_new(char *pcm_name,
   (*audio_info)->pcm = pcm;
   (*audio_info)->hw_params = hw_params;
   (*audio_info)->sw_params = sw_params;
+  (*audio_info)->period_size_in_frames = period_size_in_frames;
   
   return 0;
 }

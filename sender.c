@@ -99,6 +99,7 @@ void send_udp_packets(uint32_t userid, in_addr_t host, uint16_t port) {
     exit(AUDIO_ERROR);
   }
   audio_print_parameters(audio_info);
+  assert(period_size_in_frames == audio_info->period_size_in_frames);
   
   double period_size_in_ms =
     (double)period_size_in_frames / (rate_in_hz / 1000);

@@ -7,6 +7,7 @@ typedef struct {
   snd_pcm_t *pcm;
   snd_pcm_hw_params_t *hw_params;
   snd_pcm_sw_params_t *sw_params;
+  snd_pcm_uframes_t period_size_in_frames;
 } audio_info_t;
 
 int audio_new(char *pcm_name,
