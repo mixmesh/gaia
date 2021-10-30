@@ -1,5 +1,3 @@
-* Add jitter buffer to receiver
-
 * Merge sender.c and receiver.c into single gaia.c (keep sender.c and receiver.c)
 
   thread 1: listen on udp and write to speaker
@@ -19,6 +17,7 @@
 
   thread 1: listen on udp and write to jitter buffer
   thread 2: read from jitter buffer and write to speaker
+            NOTE: Here we start to use the jitter buffer
   thread 3: write from mic and write to udp
 
 * Update gaia.c
@@ -33,4 +32,4 @@
 
 * encrypt
 
-* Use libopus as codec
+* Use libopus as codec (variable payload)
