@@ -8,17 +8,15 @@
 #define DEFAULT_USERID 1
 #define DEFAULT_HOST "127.0.0.1"
 #define DEFAULT_PORT 2305
-
 // |userid:4|timestamp:8| = 12 bytes
 #define HEADER_SIZE (4 + 8)
-
 #define SCHED_ERROR 1
 #define SOCKET_ERROR 2
 #define AUDIO_ERROR 3
 #define ARG_ERROR 4
 
 int sockfd = -1;
-uint8_t *buf = NULL;
+uint8_t *udp_buf = NULL;
 audio_info_t *audio_info = NULL;
 
 void usage(char *command, int status) {
@@ -32,8 +30,8 @@ void cleanup() {
   if (audio_info != NULL) {
     audio_free(audio_info);
   }
-  if (buf != NULL) {
-    free(buf);
+  if (udp_buf != NULL) {
+    free(udp_buf);
   }
   if (sockfd != -1) {
     close(sockfd);
@@ -107,11 +105,11 @@ void send_udp_packets(uint32_t userid, in_addr_t host, uint16_t port) {
   fprintf(stderr, "Period size is %d bytes (%fms)\n", period_size_in_bytes,
           period_size_in_ms);
 
-  uint32_t buf_size = HEADER_SIZE + period_size_in_bytes;
-  buf = malloc(buf_size);
+  uint32_t udp_buf_size = HEADER_SIZE + period_size_in_bytes;
+  udp_buf = malloc(udp_buf_size);
 
   // Add userid to buffer header
-  memcpy(buf, &userid, sizeof(userid));
+  memcpy(udp_buf, &userid, sizeof(userid));
   
   // Read from audio device and write to non blocking socket
   fprintf(stderr, "Sending audio...\n");
@@ -121,11 +119,11 @@ void send_udp_packets(uint32_t userid, in_addr_t host, uint16_t port) {
 
     // Add timestamp to buffer header
     uint64_t timestamp = utimestamp();
-    memcpy(&buf[4], &timestamp, sizeof(timestamp));
+    memcpy(&udp_buf[4], &timestamp, sizeof(timestamp));
     
     // Read from audio device
     snd_pcm_uframes_t frames =
-      snd_pcm_readi(audio_info->pcm, &buf[HEADER_SIZE], period_size_in_frames);
+      snd_pcm_readi(audio_info->pcm, &udp_buf[HEADER_SIZE], period_size_in_frames);
     if (frames == -EPIPE || frames == -ESTRPIPE) {
       printf("Failed to read from audio device: %s\n", snd_strerror(frames));
       if (snd_pcm_recover(audio_info->pcm, frames, 0) < 0) {
@@ -146,8 +144,9 @@ void send_udp_packets(uint32_t userid, in_addr_t host, uint16_t port) {
     
     // Write to non-blocking socket
     uint32_t written_bytes = 0;
-    while (written_bytes < buf_size) {
-      ssize_t n = sendto(sockfd, &buf[written_bytes], buf_size - written_bytes,
+    while (written_bytes < udp_buf_size) {
+      ssize_t n = sendto(sockfd, &udp_buf[written_bytes],
+                         udp_buf_size - written_bytes,
                          0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
       if (n < 0) {
         if (errno == EWOULDBLOCK) {

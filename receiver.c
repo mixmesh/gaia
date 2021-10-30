@@ -8,19 +8,14 @@
 #include "jb_table.h"
 
 #define DEFAULT_PORT 2305
-
 // |userid:4|timestamp:8| = 12 bytes
 #define HEADER_SIZE (4 + 8)
-
 #define SCHED_ERROR 1
 #define SOCKET_ERROR 2
 #define AUDIO_ERROR 3
 #define ARG_ERROR 4
-
 #define FOUR_SECONDS_IN_US (4 * 1000000)
-
 #define DRAIN_BUF_SIZE 32768
-
 #define MAX_JITTER_BUFFER_SIZE 20
 
 int sockfd = -1;
@@ -96,9 +91,7 @@ void receive_udp_packets(uint16_t port) {
   
   struct timeval zero_timeout = {.tv_usec = 0, .tv_sec = 0};
   struct timeval one_second_timeout = {.tv_usec = 0, .tv_sec = 1};
-
-  uint32_t buf_size = HEADER_SIZE + period_size_in_bytes;
-
+  uint32_t udp_buf_size = HEADER_SIZE + period_size_in_bytes;
   uint8_t drain_buf[DRAIN_BUF_SIZE];
   
   while (true) {
@@ -194,32 +187,36 @@ void receive_udp_packets(uint16_t port) {
       if (jb->entries > MAX_JITTER_BUFFER_SIZE) {
         jb_entry = jb_pop(jb);
       } else {
-        jb_entry = jb_entry_new(buf_size);
+        jb_entry = jb_entry_new(udp_buf_size);
       }            
       
       // Read from socket
       int n;
-      if ((n = recvfrom(sockfd, jb_entry->data, buf_size, 0, NULL, NULL)) < 0) {
+      if ((n = recvfrom(sockfd, jb_entry->data, udp_buf_size, 0, NULL, NULL)) < 0) {
         perror("Failed to read from socket");
         give_up = true;
         break;
       }
-      assert(n == buf_size);
+      assert(n == udp_buf_size);
       
       // Add timestamp to jitter buffer entry and insert it into jitter buffer
-      memcpy(&jb_entry->timestamp, &jb_entry->data[4], sizeof(uint64_t));
+      // NOTE: The jitter buffer is not used for now! See below.
+      uint64_t timestamp;
+      memcpy(&timestamp, &jb_entry->data[4], sizeof(uint64_t));
+      jb_entry->timestamp = timestamp;
       assert(jb_insert(jb, jb_entry) != 0);
-      // NOTE: The jitter buffer is not used for now! It will though!
       
       // Calculate latency
       uint64_t now = utimestamp();
-      latency = latency * 0.9 + (now - jb_entry->timestamp) * 0.1;
+      latency = latency * 0.9 + (now - timestamp) * 0.1;
       if (now - last_latency_printout > FOUR_SECONDS_IN_US) {
         printf("Latency: %fms\n", latency / 1000);
         last_latency_printout = now;
       }
       
       // Write to audio device
+      // NOTE: This will later on be done in a separate thread which
+      // reads from the jitter buffer and writes to audio device
       uint32_t written_frames = 0;
       while (written_frames < period_size_in_frames) {
         snd_pcm_uframes_t frames =
