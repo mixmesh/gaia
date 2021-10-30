@@ -245,7 +245,7 @@ void receive_udp_packets(uint16_t port) {
       }
     }
 
-    printf("Not receiving any audio!\n");
+    printf("No longer receiving audio!\n");
 
     audio_free(audio_info);
     audio_info = NULL;
