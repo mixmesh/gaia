@@ -17,9 +17,9 @@
 #define AUDIO_ERROR 3
 #define ARG_ERROR 4
 
-audio_info_t *audio_info = NULL;
 int sockfd = -1;
 uint8_t *buf = NULL;
+audio_info_t *audio_info = NULL;
 
 void usage(char *command, int status) {
   fprintf(stderr, "Usage: %s [userid] [host] [port]\n", command);

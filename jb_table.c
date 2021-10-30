@@ -1,7 +1,20 @@
+#include "uthash/uthash.h"
 #include "jb_table.h"
+
+#define HASH_FIND_UINT32(head, findint, out) \
+HASH_FIND(hh, head, findint, sizeof(uint32_t), out)
+#define HASH_ADD_UINT32(head, intfield, add) \
+HASH_ADD(hh, head, intfield, sizeof(uint32_t), add)
 
 jb_t *jb_table_new(void) {
   return NULL;
+}
+
+void jb_table_free(jb_t *jb_table) { 
+  jb_t *jb, *tmp;
+  HASH_ITER(hh, jb_table, jb, tmp) {
+    jb_free(jb);
+  }
 }
 
 int8_t jb_table_add(jb_t **jb_table, jb_t *jb) {

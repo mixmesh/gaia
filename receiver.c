@@ -5,6 +5,7 @@
 #include "audio.h"
 #include "scheduling.h"
 #include "timing.h"
+#include "jb_table.h"
 
 #define DEFAULT_PORT 2305
 
@@ -18,9 +19,10 @@
 
 #define FOUR_SECONDS_IN_US (4 * 1000000)
 
-audio_info_t *audio_info = NULL;
 int sockfd = -1;
 uint8_t *buf = NULL;
+audio_info_t *audio_info = NULL;
+jb_t *jb_table = NULL;
 
 void usage(char *command, int status) {
   fprintf(stderr, "Usage: %s [port]\n", command);
@@ -29,6 +31,9 @@ void usage(char *command, int status) {
 }
 
 void cleanup() {
+  if (jb_table != NULL) {
+    jb_table_free(jb_table);
+  }
   if (audio_info != NULL) {
     audio_free(audio_info);
   }
@@ -148,6 +153,9 @@ void receive_udp_packets(uint16_t port) {
     // Read from socket and write to non-blocking audio device
     printf("Receiving audio...\n");
 
+    jb_table = jb_table_new();
+    uint64_t userid = 0;
+    jb_t *jb = NULL;
     double latency = 0;
     uint64_t last_latency_printout = 0;
     
@@ -174,12 +182,21 @@ void receive_udp_packets(uint16_t port) {
       }
       assert(n == buf_size);
 
-      // Extract buffer header
-      uint32_t userid;
-      memcpy(&userid, buf, sizeof(uint32_t));
+      // Extract header
+      uint32_t new_userid;
+      memcpy(&new_userid, buf, sizeof(uint32_t));
       uint64_t timestamp;
       memcpy(&timestamp, &buf[4], sizeof(uint64_t));
 
+      // Get jitter buffer
+      if (userid != new_userid) {
+        if ((jb = jb_table_find(&jb_table, new_userid)) == NULL) {
+          jb = jb_new(new_userid);
+          assert(jb_table_add(&jb_table, jb) == JB_TABLE_SUCCESS);
+        } else
+        userid = new_userid;
+      }
+      
       // Calculate latency
       uint64_t now = utimestamp();
       latency = latency * 0.9 + (now - timestamp) * 0.1;
@@ -219,7 +236,12 @@ void receive_udp_packets(uint16_t port) {
     }
 
     printf("Not receiving audio!\n");
+
     audio_free(audio_info);
+    audio_info = NULL;
+
+    jb_table_free(jb_table);
+    jb_table = NULL;
   }
   
   cleanup();
