@@ -19,8 +19,11 @@
 
 #define FOUR_SECONDS_IN_US (4 * 1000000)
 
+#define DRAIN_BUF_SIZE 32768
+
+#define MAX_JITTER_BUFFER_SIZE 20
+
 int sockfd = -1;
-uint8_t *buf = NULL;
 audio_info_t *audio_info = NULL;
 jb_t *jb_table = NULL;
 
@@ -36,9 +39,6 @@ void cleanup() {
   }
   if (audio_info != NULL) {
     audio_free(audio_info);
-  }
-  if (buf != NULL) {
-    free(buf);
   }
   if (sockfd != -1) {
     close(sockfd);
@@ -98,7 +98,8 @@ void receive_udp_packets(uint16_t port) {
   struct timeval one_second_timeout = {.tv_usec = 0, .tv_sec = 1};
 
   uint32_t buf_size = HEADER_SIZE + period_size_in_bytes;
-  buf = malloc(buf_size);
+
+  uint8_t drain_buf[DRAIN_BUF_SIZE];
   
   while (true) {
     bool give_up = false;
@@ -135,7 +136,7 @@ void receive_udp_packets(uint16_t port) {
       } else if (nfds == 0) {
         break;
       }
-      if (recvfrom(sockfd, buf, buf_size, 0, NULL, NULL) < 0) {
+      if (recvfrom(sockfd, drain_buf, DRAIN_BUF_SIZE, 0, NULL, NULL) < 0) {
         perror("Failed to drain socket receive buffer\n");
         give_up = true;
         break;
@@ -143,7 +144,6 @@ void receive_udp_packets(uint16_t port) {
       FD_ZERO(&readfds);
       FD_SET(sockfd, &readfds);
     }
-    
     if (give_up) {
       break;
     } else {
@@ -152,7 +152,6 @@ void receive_udp_packets(uint16_t port) {
 
     // Read from socket and write to non-blocking audio device
     printf("Receiving audio...\n");
-
     jb_table = jb_table_new();
     uint64_t userid = 0;
     jb_t *jb = NULL;
@@ -173,33 +172,48 @@ void receive_udp_packets(uint16_t port) {
         break;
       }
       
-      // Read from socket
-      int n;
-      if ((n = recvfrom(sockfd, buf, buf_size, 0, NULL, NULL)) < 0) {
-        perror("Failed to read from socket");
+      // Peek into the into socket and extract userid
+      uint32_t new_userid;
+      if (recvfrom(sockfd, &new_userid, sizeof(uint32_t), MSG_PEEK, NULL, NULL) < 0) {
+        perror("Failed to peek into socket and extract userid");
         give_up = true;
         break;
       }
-      assert(n == buf_size);
-
-      // Extract header
-      uint32_t new_userid;
-      memcpy(&new_userid, buf, sizeof(uint32_t));
-      uint64_t timestamp;
-      memcpy(&timestamp, &buf[4], sizeof(uint64_t));
-
+      
       // Get jitter buffer
       if (userid != new_userid) {
         if ((jb = jb_table_find(&jb_table, new_userid)) == NULL) {
           jb = jb_new(new_userid);
           assert(jb_table_add(&jb_table, jb) == JB_TABLE_SUCCESS);
-        } else
+        }
         userid = new_userid;
       }
       
+      // Prepare new jitter buffer entry
+      jb_entry_t *jb_entry;
+      if (jb->entries > MAX_JITTER_BUFFER_SIZE) {
+        jb_entry = jb_pop(jb);
+      } else {
+        jb_entry = jb_entry_new(buf_size);
+      }            
+      
+      // Read from socket
+      int n;
+      if ((n = recvfrom(sockfd, jb_entry->data, buf_size, 0, NULL, NULL)) < 0) {
+        perror("Failed to read from socket");
+        give_up = true;
+        break;
+      }
+      assert(n == buf_size);
+      
+      // Add timestamp to jitter buffer entry and insert it into jitter buffer
+      memcpy(&jb_entry->timestamp, &jb_entry->data[4], sizeof(uint64_t));
+      assert(jb_insert(jb, jb_entry) != 0);
+      // NOTE: The jitter buffer is not used for now! It will though!
+      
       // Calculate latency
       uint64_t now = utimestamp();
-      latency = latency * 0.9 + (now - timestamp) * 0.1;
+      latency = latency * 0.9 + (now - jb_entry->timestamp) * 0.1;
       if (now - last_latency_printout > FOUR_SECONDS_IN_US) {
         printf("Latency: %fms\n", latency / 1000);
         last_latency_printout = now;
@@ -210,8 +224,8 @@ void receive_udp_packets(uint16_t port) {
       while (written_frames < period_size_in_frames) {
         snd_pcm_uframes_t frames =
           snd_pcm_writei(audio_info->pcm,
-                         &buf[HEADER_SIZE +
-                              written_frames * frame_size_in_bytes],
+                         &jb_entry->data[HEADER_SIZE +
+                                         written_frames * frame_size_in_bytes],
                          period_size_in_frames - written_frames);
         if (frames == -EAGAIN) {
           printf("Failed to write to audio device: %s\n", snd_strerror(err));
@@ -229,17 +243,15 @@ void receive_udp_packets(uint16_t port) {
           written_frames += frames;
         }
       }
-
       if (give_up) {
         break;
       }
     }
 
-    printf("Not receiving audio!\n");
+    printf("Not receiving any audio!\n");
 
     audio_free(audio_info);
     audio_info = NULL;
-
     jb_table_free(jb_table);
     jb_table = NULL;
   }
