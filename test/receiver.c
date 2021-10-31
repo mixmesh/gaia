@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sched.h>
-#include "network_receiver.h"
+#include "../network_receiver.h"
 
 #define DEFAULT_PORT 2305
 

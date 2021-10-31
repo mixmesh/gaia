@@ -3,7 +3,7 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <sched.h>
-#include "network_sender.h"
+#include "../network_sender.h"
 
 #define DEFAULT_USERID 1
 #define DEFAULT_ADDR "127.0.0.1"

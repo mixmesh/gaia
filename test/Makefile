@@ -1,7 +1,7 @@
 CFLAGS=-std=c18 -pedantic -Wall -Werror -D_POSIX_C_SOURCE=200809L $(shell pkg-config --cflags alsa)
 LDLIBS=$(shell pkg-config --libs alsa) -lm
 
-EXECS=capture playback test_jb test_jb_table display
+EXECS=capture display playback receiver sender test_jb test_jb_table
 
 all: $(EXECS)
 
@@ -11,30 +11,44 @@ run: test_jb test_jb_table
 
 capture: capture.o ../audio.o
 	(cd ..;$(MAKE) objs)
-	$(CC) capture.o ../audio.o $(LDLIBS) -o capture
+	$(CC) $^ $(LDLIBS) -o $@
 
 playback: playback.o ../audio.o
 	(cd ..;$(MAKE) objs)
-	$(CC) playback.o ../audio.o $(LDLIBS) -o playback
+	$(CC) $^ $(LDLIBS) -o $@
+
+receiver: receiver.o ../audio.o ../network_receiver.o ../jb.o ../jb_table.o ../timing.o
+	(cd ..;$(MAKE) objs)
+	$(CC) $^ $(LDLIBS) -o $@
+
+sender: sender.o ../audio.o ../network_sender.o ../timing.o
+	(cd ..;$(MAKE) objs)
+	$(CC) $^ $(LDLIBS) -o $@
 
 test_jb: test_jb.o ../jb.o
 	(cd ..;$(MAKE) objs)
-	$(CC) test_jb.o ../jb.o $(LDLIBS) -o test_jb
+	$(CC) $^ $(LDLIBS) -o $@
 
 test_jb_table: test_jb_table.o ../jb.o ../jb_table.o
 	(cd ..;$(MAKE) objs)
-	$(CC) test_jb_table.o ../jb.o ../jb_table.o $(LDLIBS) -o test_jb_table
-
-capture.o: capture.c ../audio.h
-
-playback.o: playback.c ../audio.h 
-
-test_jb.o: test_jb.c ../jb.h ../ ../bits.h
-
-test_jb_table.o: test_jb_table.c ../jb_table.h
+	$(CC) $^ $(LDLIBS) -o $@
 
 clean:
 	rm -f *.o $(EXECS)
 
 mrproper: clean
 	rm -f *~ #*
+
+# FIXME: Manual dependencies
+
+capture.o: capture.c ../audio.h
+
+playback.o: playback.c ../audio.h 
+
+sender.o: sender.c ../network_receiver.h
+
+receiver.o: receiver.c ../network_receiver.h
+
+test_jb.o: test_jb.c ../jb.h ../ ../bits.h
+
+test_jb_table.o: test_jb_table.c ../jb_table.h
