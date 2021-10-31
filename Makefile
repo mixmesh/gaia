@@ -1,20 +1,22 @@
 CFLAGS=-std=c18 -pedantic -Wall -Werror -D_POSIX_C_SOURCE=200809L $(shell pkg-config --cflags alsa)
-LDLIBS=$(shell pkg-config --libs alsa) -lm
+LDLIBS=$(shell pkg-config --libs alsa) -lm -lpthread
 DEPDIR:=.deps
 DEPFLAGS=-MT $@ -MMD -MP -MF $(DEPDIR)/$*.d
 COMPILE.c=$(CC) $(DEPFLAGS) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c
 
-EXECS=receiver sender
-SRCS=receiver.c sender.c audio.c scheduling.c timing.c jb.c jb_table.c
+EXECS=gaia receiver sender
+SRCS=audio.c gaia.c jb.c jb_table.c network_receiver.c network_sender.c receiver.c sender.c timing.c
 OBJS=$(SRCS:%.c=%.o)
 
 all: $(EXECS)
 
 objs: $(OBJS)
 
-receiver: audio.o receiver.o scheduling.o timing.o jb.o jb_table.o
+gaia: audio.o gaia.o jb.o jb_table.o network_receiver.o network_sender.o timing.o
 
-sender: audio.o sender.o scheduling.o timing.o
+receiver: audio.o network_receiver.o jb.o jb_table.o receiver.o timing.o
+
+sender: audio.o network_sender.o sender.o timing.o
 
 test:
 	(cd test; $(MAKE))
