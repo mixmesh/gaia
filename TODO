@@ -1,35 +1,45 @@
-* Merge sender.c and receiver.c into single gaia.c (keep sender.c and receiver.c)
-
-  thread 1: listen on udp and write to speaker
-  thread 2: write from mic and write to udp
-
-  * set scheduling correct in a posix context
-
-  * Measure latency
-
-* Reinstall pi4 and and build a box
-
-* Run sender, receiver and gaia on different machines
-
-  * Measure latency
-
+* Test current setup on two machines and verify latency
+* Reinstall my pi4 and and print a box
 * Update gaia.c
-
   thread 1: listen on udp and write to jitter buffer
   thread 2: read from jitter buffer and write to speaker
             NOTE: Here we start to use the jitter buffer
   thread 3: write from mic and write to udp
-
+  * Test jitter buffer with kernel tc tool
+  * Use mutexes (lock free is the hype, see below)  
 * Update gaia.c
-
   thread 1: listen on udp and write to jitter buffers (many)
   thread 2: read from jitter buffer (many) and write to speaker
   thread 3: write from mic and write to udp (many)
+* UDP hole punching server
+* Extend hole punching server with HLR functionality
+* Encrypt streams
+* Use libopus as as audio codec (variable payload)
 
-* udp hole punching server
+Look into:
 
-* extend hole punching server with hlr functionality
+* Adaptive jitter buffer
+  * Lock free jitter buffer?
+  * Memory pool needed?
 
-* encrypt
+Hype:
 
-* Use libopus as codec (variable payload)
+* No tech
+* Real-time communication
+* Gaia
+* PinePhone without screen
+* Spotify merging
+* Video feed (glasses/3ps)
+* HLR/GPS routing ala Tony
+* Speech pattern recognition
+  * Beep when connected
+* Fabulous Five concept
+* The concept og love
+* Take message if user is occupied
+* Weeks of battery time:
+  * Wake on LAN
+  * Wake on speech
+* Settings
+  * Web based
+  * Different access for different users
+  * Group listings
