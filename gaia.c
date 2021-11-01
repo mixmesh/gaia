@@ -21,7 +21,8 @@ void usage(char *argv[]) {
   fprintf(stderr, "Usage: %s [-s addr[:port]] [-d addr[:port]] userid\n",
           argv[0]);
   fprintf(stderr, "  Note: addr and port default to 127.0.0.1 and 2305\n");
-  fprintf(stderr, "  Example: %s -s 172.16.0.116:2305 -d 172.16.0.95 4711\n",
+  fprintf(stderr,
+          "  Example: sudo %s -s 172.16.0.116:2305 -d 172.16.0.95 4711\n",
           argv[0]);
   exit(ARG_ERROR);
 }
