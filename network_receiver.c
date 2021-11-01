@@ -10,14 +10,9 @@
 
 // |userid:4|timestamp:8| = 12 bytes
 #define HEADER_SIZE (4 + 8)
-
 #define SOCKET_ERROR -202
-#define AUDIO_ERROR -203
-
 #define FOUR_SECONDS_IN_US (4 * 1000000)
-
 #define DRAIN_BUF_SIZE 32768
-
 #define MAX_JITTER_BUFFER_SIZE 20
 
 void *network_receiver(void *arg) {

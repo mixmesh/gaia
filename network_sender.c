@@ -7,7 +7,6 @@
 
 // |userid:4|timestamp:8| = 12 bytes
 #define HEADER_SIZE (4 + 8)
-
 #define SOCKET_ERROR -102
 #define AUDIO_ERROR -103
 
