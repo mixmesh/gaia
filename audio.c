@@ -63,8 +63,9 @@ int audio_new(char *pcm_name,
     return err;
   }
   if (desired_period_size_in_frames != period_size_in_frames) {
-    printf("NOTE: Desired period size was %ld bytes but it was set to %ld\n",
-           desired_period_size_in_frames, period_size_in_frames);
+    fprintf(stderr,
+            "NOTE: Desired period size was %ld bytes but it was set to %ld\n",
+            desired_period_size_in_frames, period_size_in_frames);
   }
   
   snd_pcm_uframes_t desired_buffer_size_in_frames =
@@ -77,8 +78,9 @@ int audio_new(char *pcm_name,
     return err;
   }
   if (desired_buffer_size_in_frames != buffer_size_in_frames) {
-    printf("NOTE: Desired buffer size was %ld bytes but it was set to %ld\n",
-           desired_buffer_size_in_frames, buffer_size_in_frames);
+    fprintf(stderr,
+            "NOTE: Desired buffer size was %ld bytes but it was set to %ld\n",
+            desired_buffer_size_in_frames, buffer_size_in_frames);
   }
 
   if ((err = snd_pcm_hw_params(pcm, hw_params)) < 0) {

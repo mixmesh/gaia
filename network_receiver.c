@@ -39,13 +39,13 @@ void *network_receiver(void *arg) {
   uint8_t sample_size_in_bytes = 2;
   uint8_t frame_size_in_bytes = channels * sample_size_in_bytes;
   uint32_t rate_in_hz = 48000;
-  snd_pcm_uframes_t period_size_in_frames = 256;
+  snd_pcm_uframes_t period_size_in_frames = 128;
   uint32_t period_size_in_bytes = period_size_in_frames * frame_size_in_bytes;
   uint8_t buffer_multiplicator = 10;
   
   // Create and bind socket
   if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-    perror("Socket creation failed");
+    perror("socket: Socket creation failed");
     exit(SOCKET_ERROR);
   }
   
@@ -55,7 +55,7 @@ void *network_receiver(void *arg) {
   src_addr.sin_addr.s_addr = htonl(INADDR_ANY);
   
   if (bind(sockfd, (struct sockaddr *)&src_addr, sizeof(src_addr)) < 0) {
-    perror("Binding of socket failed");
+    perror("bind: Binding of socket failed");
     exit(SOCKET_ERROR);
   }
   
@@ -73,7 +73,7 @@ void *network_receiver(void *arg) {
     FD_ZERO(&readfds);
     FD_SET(sockfd, &readfds);
     if (select(sockfd + 1, &readfds, 0, 0, NULL) < 0) {
-      perror("Failed to wait for incoming audio");
+      perror("select: Failed to wait for incoming audio");
       break;
     }
     
@@ -81,7 +81,8 @@ void *network_receiver(void *arg) {
     if ((err = audio_new(pcm_name, stream, mode, format, channels, rate_in_hz,
                          sample_size_in_bytes, period_size_in_frames,
                          buffer_multiplicator, &audio_info)) < 0) {
-      fprintf(stderr, "Could not initialize audio: %s\n", snd_strerror(err));
+      fprintf(stderr, "audio_new: Could not initialize audio: %s\n",
+              snd_strerror(err));
       break;
     }
     audio_print_parameters(audio_info);
@@ -93,14 +94,14 @@ void *network_receiver(void *arg) {
       struct timeval timeout = zero_timeout;
       int nfds = select(sockfd + 1, &readfds, 0, 0, &timeout);
       if (nfds < 0) {
-        perror("Failed to drain socket receive buffer\n");
+        perror("select: Failed to drain socket receive buffer\n");
         give_up = true;
         break;
       } else if (nfds == 0) {
         break;
       }
       if (recvfrom(sockfd, drain_buf, DRAIN_BUF_SIZE, 0, NULL, NULL) < 0) {
-        perror("Failed to drain socket receive buffer\n");
+        perror("recvfrom: Failed to drain socket receive buffer\n");
         give_up = true;
         break;
       }
@@ -128,17 +129,17 @@ void *network_receiver(void *arg) {
       struct timeval timeout = one_second_timeout;
       int nfds = select(sockfd + 1, &readfds, 0, 0, &timeout);
       if (nfds < 0) {
-        perror("Failed to wait for incoming socket data");
+        perror("select: Failed to wait for incoming socket data");
         give_up = true;
         break;
       } else if (nfds == 0) {
         break;
       }
       
-      // Peek into the into socket and extract userid
+      // Peek into socket and extract userid
       uint32_t new_userid;
       if (recvfrom(sockfd, &new_userid, sizeof(uint32_t), MSG_PEEK, NULL, NULL) < 0) {
-        perror("Failed to peek into socket and extract userid");
+        perror("recvfrom: Failed to peek into socket and extract userid");
         give_up = true;
         break;
       }
@@ -163,7 +164,7 @@ void *network_receiver(void *arg) {
       // Read from socket
       int n;
       if ((n = recvfrom(sockfd, jb_entry->data, udp_buf_size, 0, NULL, NULL)) < 0) {
-        perror("Failed to read from socket");
+        perror("recvfrom: Failed to read from socket");
         give_up = true;
         break;
       }
@@ -195,16 +196,24 @@ void *network_receiver(void *arg) {
                                          written_frames * frame_size_in_bytes],
                          period_size_in_frames - written_frames);
         if (frames == -EAGAIN) {
-          printf("Failed to write to audio device: %s\n", snd_strerror(err));
+          fprintf(stderr,
+                  "snd_pcm_writei: Failed to write to audio device: %s\n",
+                  snd_strerror(err));
           break;
         } else if (frames == -EPIPE) {
-          printf("Failed to write to audio device: %s\n", snd_strerror(err));
+          fprintf(stderr,
+                  "snd_pcm_writei: Failed to write to audio device: %s\n",
+                  snd_strerror(err));
           if ((err = snd_pcm_prepare(audio_info->pcm)) < 0) {
-            printf("Failed to prepare audio device: %s\n", snd_strerror(err));
+            fprintf(stderr,
+                    "snd_pcm_prepare: Failed to prepare audio device: %s\n",
+                    snd_strerror(err));
           }
           break;
         } else if (frames < 0) {
-          printf("Failed to prepare audio device: %s\n", snd_strerror(err));
+          fprintf(stderr,
+                  "snd_pcm_writei: Failed to write to audio device: %s\n",
+                  snd_strerror(err));
           break;
         } else {
           written_frames += frames;

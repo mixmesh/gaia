@@ -32,22 +32,22 @@ void *network_sender(void *arg) {
   uint8_t sample_size_in_bytes = 2;
   uint8_t frame_size_in_bytes = channels * sample_size_in_bytes;
   uint32_t rate_in_hz = 48000;
-  snd_pcm_uframes_t period_size_in_frames = 256;
+  snd_pcm_uframes_t period_size_in_frames = 128;
   uint32_t period_size_in_bytes = period_size_in_frames * frame_size_in_bytes;
   uint8_t buffer_multiplicator = 4;
   
   // Create non-blocking socket
   if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-    perror("Socket creation failed");
+    perror("socket: Socket creation failed");
     exit(SOCKET_ERROR);
   }
   int flags = fcntl(sockfd, F_GETFL, 0);
   if (flags < 0) {
-    perror("Socket could not be made non-blocking");
+    perror("fcntl: Socket could not be made non-blocking");
     exit(SOCKET_ERROR);
   }
   if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) < 0) {
-    perror("Socket could not be made non-blocking");
+    perror("fcntl: Socket could not be made non-blocking");
     exit(SOCKET_ERROR);
   }
   
@@ -60,7 +60,8 @@ void *network_sender(void *arg) {
   if ((err = audio_new(pcm_name, stream, mode, format, channels, rate_in_hz,
                        sample_size_in_bytes, period_size_in_frames,
                        buffer_multiplicator, &audio_info)) < 0) {
-    fprintf(stderr, "Could not initialize audio: %s\n", snd_strerror(err));
+    fprintf(stderr, "audio_new: Could not initialize audio: %s\n",
+            snd_strerror(err));
     exit(AUDIO_ERROR);
   }
   audio_print_parameters(audio_info);
@@ -68,8 +69,8 @@ void *network_sender(void *arg) {
   
   double period_size_in_ms =
     (double)period_size_in_frames / (rate_in_hz / 1000);
-  fprintf(stderr, "Period size is %d bytes (%fms)\n", period_size_in_bytes,
-          period_size_in_ms);
+  printf("Period size is %d bytes (%fms)\n", period_size_in_bytes,
+        period_size_in_ms);
 
   uint32_t udp_buf_size = HEADER_SIZE + period_size_in_bytes;
   udp_buf = malloc(udp_buf_size);
@@ -78,7 +79,7 @@ void *network_sender(void *arg) {
   memcpy(udp_buf, &userid, sizeof(userid));
   
   // Read from audio device and write to non blocking socket
-  fprintf(stderr, "Sending audio...\n");
+  printf("Sending audio...\n");
 
   while (true) {
     bool give_up = false;
@@ -91,19 +92,21 @@ void *network_sender(void *arg) {
     snd_pcm_uframes_t frames =
       snd_pcm_readi(audio_info->pcm, &udp_buf[HEADER_SIZE], period_size_in_frames);
     if (frames == -EPIPE || frames == -ESTRPIPE) {
-      printf("Failed to read from audio device: %s\n", snd_strerror(frames));
+      fprintf(stderr, "snd_pcm_readi: Failed to read from audio device: %s\n",
+              snd_strerror(frames));
       if (snd_pcm_recover(audio_info->pcm, frames, 0) < 0) {
-        printf("Failed to recover audio device: %s\n", snd_strerror(frames));
+        fprintf(stderr, "snd_pcm_readi: Failed to recover audio device: %s\n",
+                snd_strerror(frames));
         continue;
       }
     } else if (frames < 0) {
-      fprintf(stderr, "Failed to read from audio device: %s\n",
+      fprintf(stderr, "snd_pcm_readi: Failed to read from audio device: %s\n",
               snd_strerror(frames));
       break;
     } else if (frames != period_size_in_frames) {
       fprintf(stderr,
-              "Expected to read %ld frames from audio device but only read \
-%ld\n",
+              "snd_pcm_readi Expected to read %ld frames from audio device \
+but only read %ld\n",
               period_size_in_frames, frames);
       break;
     }
@@ -118,7 +121,7 @@ void *network_sender(void *arg) {
         if (errno == EWOULDBLOCK) {
           n = 0;
         } else {
-          perror("Failed to write to socket");
+          perror("sendto: Failed to write to socket");
           give_up = true;
           break;
         }

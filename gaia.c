@@ -121,12 +121,16 @@ int main (int argc, char *argv[]) {
     };
   pthread_attr_t sender_attr;
   if ((err = set_fifo_scheduling(&sender_attr)) != 0) {
-    fprintf(stderr, "Scheduling could not be configured (%d)\n", err);
+    fprintf(stderr,
+            "set_fifo_scheduling: Scheduling could not be configured (%d)\n",
+            err);
     exit(SCHED_ERROR);
   }
   if ((err = pthread_create(&sender_thread, &sender_attr, network_sender,
                             (void *)&sender_params)) < 0) {
-    fprintf(stderr, "Failed to start network sender thread (%d)\n", err);
+    fprintf(stderr,
+            "pthread_create: Failed to start network sender thread (%d)\n",
+            err);
     exit(THREAD_ERROR);
   }
 
@@ -138,13 +142,17 @@ int main (int argc, char *argv[]) {
      .port = src_port
     };
   pthread_attr_t receiver_attr;
-  if ((err = set_fifo_scheduling(&receiver_attr)) != 0) {
-    fprintf(stderr, "Scheduling could not be configured (%d)\n", err);
+  if ((err = set_fifo_scheduling
+       (&receiver_attr)) != 0) {
+    fprintf(stderr, "pthread_create: Scheduling could not be configured (%d)\n",
+            err);
     exit(SCHED_ERROR);
   }
   if ((err = pthread_create(&receiver_thread, &receiver_attr, network_receiver,
                             (void *)&receiver_params)) < 0) {
-    fprintf(stderr, "Failed to start network receiver thread (%d)\n", err);
+    fprintf(stderr,
+            "pthread_create: Failed to start network receiver thread (%d)\n",
+            err);
     exit(THREAD_ERROR);
   }
   
