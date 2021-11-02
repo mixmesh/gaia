@@ -21,6 +21,6 @@ int audio_new(char *pcm_name,
               uint8_t buffer_multiplicator,
               audio_info_t **audio_info);
 void audio_free(audio_info_t *audio_info);
-void audio_print_parameters(audio_info_t *audio_info);
+void audio_print_parameters(audio_info_t *audio_info, char *who);
 
 #endif

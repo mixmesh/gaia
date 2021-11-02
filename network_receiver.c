@@ -66,7 +66,7 @@ void *network_receiver(void *arg) {
               snd_strerror(err));
       break;
     }
-    audio_print_parameters(audio_info);
+    audio_print_parameters(audio_info, "receiver");
     assert(RECEIVER_PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
     
     // Drain socket receive buffer
@@ -184,9 +184,8 @@ void *network_receiver(void *arg) {
           break;
         } else if (frames == -EPIPE) {
           // NOTE: Underrun! Period size seems to be too small!!
-          fprintf(stderr,
-                  "snd_pcm_writei: Underrun! Failed to write to audio device: %s\n",
-                  snd_strerror(frames));
+          printf("snd_pcm_writei: Underrun! Failed to write to audio device: %s\n",
+                snd_strerror(frames));
           if ((err = snd_pcm_prepare(audio_info->pcm)) < 0) {
             fprintf(stderr,
                     "snd_pcm_prepare: Could not recover from underrun! Failed \

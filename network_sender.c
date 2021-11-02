@@ -47,7 +47,7 @@ void *network_sender(void *arg) {
             snd_strerror(err));
     exit(AUDIO_ERROR);
   }
-  audio_print_parameters(audio_info);
+  audio_print_parameters(audio_info, "sender");
   assert(SENDER_PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
   
   double period_size_in_ms =
