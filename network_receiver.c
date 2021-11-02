@@ -34,7 +34,7 @@ void *network_receiver(void *arg) {
   uint8_t sample_size_in_bytes = 2;
   uint8_t frame_size_in_bytes = channels * sample_size_in_bytes;
   uint32_t rate_in_hz = 48000;
-  snd_pcm_uframes_t period_size_in_frames = 128;
+  snd_pcm_uframes_t period_size_in_frames = 256;
   uint32_t period_size_in_bytes = period_size_in_frames * frame_size_in_bytes;
   uint8_t buffer_multiplicator = 10;
   
@@ -193,22 +193,24 @@ void *network_receiver(void *arg) {
         if (frames == -EAGAIN) {
           fprintf(stderr,
                   "snd_pcm_writei: Failed to write to audio device: %s\n",
-                  snd_strerror(err));
+                  snd_strerror(frames));
           break;
         } else if (frames == -EPIPE) {
+          // NOTE: Underrun! Period size seems to be too small!!
           fprintf(stderr,
-                  "snd_pcm_writei: Failed to write to audio device: %s\n",
-                  snd_strerror(err));
+                  "snd_pcm_writei: Underrun! Failed to write to audio device: %s\n",
+                  snd_strerror(frames));
           if ((err = snd_pcm_prepare(audio_info->pcm)) < 0) {
             fprintf(stderr,
-                    "snd_pcm_prepare: Failed to prepare audio device: %s\n",
-                    snd_strerror(err));
+                    "snd_pcm_prepare: Could not recover from underrun! Failed \
+to prepare audio device: %s\n",
+                    snd_strerror(frames));
           }
           break;
         } else if (frames < 0) {
           fprintf(stderr,
                   "snd_pcm_writei: Failed to write to audio device: %s\n",
-                  snd_strerror(err));
+                  snd_strerror(frames));
           break;
         } else {
           written_frames += frames;
@@ -218,7 +220,7 @@ void *network_receiver(void *arg) {
         break;
       }
     }
-
+    
     printf("No longer receiving audio!\n");
 
     audio_free(audio_info);

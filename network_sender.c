@@ -31,7 +31,7 @@ void *network_sender(void *arg) {
   uint8_t sample_size_in_bytes = 2;
   uint8_t frame_size_in_bytes = channels * sample_size_in_bytes;
   uint32_t rate_in_hz = 48000;
-  snd_pcm_uframes_t period_size_in_frames = 128;
+  snd_pcm_uframes_t period_size_in_frames = 256;
   uint32_t period_size_in_bytes = period_size_in_frames * frame_size_in_bytes;
   uint8_t buffer_multiplicator = 4;
   
