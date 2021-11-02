@@ -4,11 +4,7 @@
 #include "audio.h"
 #include "network_sender.h"
 #include "timing.h"
-
-// |userid:4|timestamp:8| = 12 bytes
-#define HEADER_SIZE (4 + 8)
-#define SOCKET_ERROR -102
-#define AUDIO_ERROR -103
+#include "globals.h"
 
 void *network_sender(void *arg) {
   int err;
@@ -21,19 +17,6 @@ void *network_sender(void *arg) {
   uint32_t userid = sender_params->userid;
   in_addr_t addr = sender_params->addr;
   uint16_t port = sender_params->port;
-
-  // Hardwired audio parameters
-  char *pcm_name = "hw:0,0";
-  snd_pcm_stream_t stream = SND_PCM_STREAM_CAPTURE;
-  int mode = 0;
-  snd_pcm_format_t format = SND_PCM_FORMAT_S16_LE;
-  uint8_t channels = 2;
-  uint8_t sample_size_in_bytes = 2;
-  uint8_t frame_size_in_bytes = channels * sample_size_in_bytes;
-  uint32_t rate_in_hz = 48000;
-  snd_pcm_uframes_t period_size_in_frames = 256;
-  uint32_t period_size_in_bytes = period_size_in_frames * frame_size_in_bytes;
-  uint8_t buffer_multiplicator = 4;
   
   // Create non-blocking socket
   if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -56,22 +39,23 @@ void *network_sender(void *arg) {
   dest_addr.sin_addr.s_addr = addr;
   
   // Open audio device
-  if ((err = audio_new(pcm_name, stream, mode, format, channels, rate_in_hz,
-                       sample_size_in_bytes, period_size_in_frames,
-                       buffer_multiplicator, &audio_info)) < 0) {
+  if ((err = audio_new(PCM_NAME, SND_PCM_STREAM_CAPTURE, SENDER_MODE, FORMAT,
+                       CHANNELS, RATE_IN_HZ, SAMPLE_SIZE_IN_BYTES,
+                       SENDER_PERIOD_SIZE_IN_FRAMES,
+                       SENDER_BUFFER_MULTIPLICATOR, &audio_info)) < 0) {
     fprintf(stderr, "audio_new: Could not initialize audio: %s\n",
             snd_strerror(err));
     exit(AUDIO_ERROR);
   }
   audio_print_parameters(audio_info);
-  assert(period_size_in_frames == audio_info->period_size_in_frames);
+  assert(SENDER_PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
   
   double period_size_in_ms =
-    (double)period_size_in_frames / (rate_in_hz / 1000);
-  printf("Period size is %d bytes (%fms)\n", period_size_in_bytes,
-        period_size_in_ms);
-
-  uint32_t udp_buf_size = HEADER_SIZE + period_size_in_bytes;
+    (double)SENDER_PERIOD_SIZE_IN_FRAMES / (RATE_IN_HZ / 1000);
+  printf("Period size is %d bytes (%fms)\n", SENDER_PERIOD_SIZE_IN_BYTES,
+         period_size_in_ms);
+  
+  uint32_t udp_buf_size = HEADER_SIZE + PAYLOAD_SIZE_IN_BYTES;
   udp_buf = malloc(udp_buf_size);
 
   // Add userid to buffer header
@@ -89,7 +73,8 @@ void *network_sender(void *arg) {
     
     // Read from audio device
     snd_pcm_uframes_t frames =
-      snd_pcm_readi(audio_info->pcm, &udp_buf[HEADER_SIZE], period_size_in_frames);
+      snd_pcm_readi(audio_info->pcm, &udp_buf[HEADER_SIZE],
+                    SENDER_PERIOD_SIZE_IN_FRAMES);
     if (frames == -EPIPE || frames == -ESTRPIPE) {
       fprintf(stderr, "snd_pcm_readi: Failed to read from audio device: %s\n",
               snd_strerror(frames));
@@ -102,11 +87,11 @@ void *network_sender(void *arg) {
       fprintf(stderr, "snd_pcm_readi: Failed to read from audio device: %s\n",
               snd_strerror(frames));
       break;
-    } else if (frames != period_size_in_frames) {
+    } else if (frames != SENDER_PERIOD_SIZE_IN_FRAMES) {
       fprintf(stderr,
-              "snd_pcm_readi Expected to read %ld frames from audio device \
+              "snd_pcm_readi Expected to read %d frames from audio device \
 but only read %ld\n",
-              period_size_in_frames, frames);
+              SENDER_PERIOD_SIZE_IN_FRAMES, frames);
       break;
     }
     

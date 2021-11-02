@@ -7,10 +7,8 @@
 #include "timing.h"
 #include "jb_table.h"
 #include "network_receiver.h"
+#include "globals.h"
 
-// |userid:4|timestamp:8| = 12 bytes
-#define HEADER_SIZE (4 + 8)
-#define SOCKET_ERROR -202
 #define FOUR_SECONDS_IN_US (4 * 1000000)
 #define DRAIN_BUF_SIZE 32768
 #define MAX_JITTER_BUFFER_SIZE 20
@@ -24,19 +22,6 @@ void *network_receiver(void *arg) {
   // Extract parameters
   network_receiver_params_t *receiver_params = (network_receiver_params_t *)arg;
   uint16_t port = receiver_params->port;
-  
-  // Hardwired audio parameters
-  char *pcm_name = "default";
-  snd_pcm_stream_t stream = SND_PCM_STREAM_PLAYBACK;
-  int mode = SND_PCM_NONBLOCK;
-  snd_pcm_format_t format = SND_PCM_FORMAT_S16_LE;
-  uint8_t channels = 2;
-  uint8_t sample_size_in_bytes = 2;
-  uint8_t frame_size_in_bytes = channels * sample_size_in_bytes;
-  uint32_t rate_in_hz = 48000;
-  snd_pcm_uframes_t period_size_in_frames = 256;
-  uint32_t period_size_in_bytes = period_size_in_frames * frame_size_in_bytes;
-  uint8_t buffer_multiplicator = 10;
   
   // Create and bind socket
   if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -56,7 +41,7 @@ void *network_receiver(void *arg) {
   
   struct timeval zero_timeout = {.tv_usec = 0, .tv_sec = 0};
   struct timeval one_second_timeout = {.tv_usec = 0, .tv_sec = 1};
-  uint32_t udp_buf_size = HEADER_SIZE + period_size_in_bytes;
+  uint32_t udp_buf_size = HEADER_SIZE + PAYLOAD_SIZE_IN_BYTES;
   uint8_t drain_buf[DRAIN_BUF_SIZE];
   
   while (true) {
@@ -73,15 +58,17 @@ void *network_receiver(void *arg) {
     }
     
     // Open audio device
-    if ((err = audio_new(pcm_name, stream, mode, format, channels, rate_in_hz,
-                         sample_size_in_bytes, period_size_in_frames,
-                         buffer_multiplicator, &audio_info)) < 0) {
+    if ((err = audio_new(PCM_NAME, SND_PCM_STREAM_PLAYBACK, RECEIVER_MODE,
+                         FORMAT, CHANNELS, RATE_IN_HZ, SAMPLE_SIZE_IN_BYTES,
+                         RECEIVER_PERIOD_SIZE_IN_FRAMES,
+                         RECEIVER_BUFFER_MULTIPLICATOR, &audio_info)) < 0) {
       fprintf(stderr, "audio_new: Could not initialize audio: %s\n",
               snd_strerror(err));
       break;
     }
     audio_print_parameters(audio_info);
-      
+    assert(RECEIVER_PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
+    
     // Drain socket receive buffer
     while (true) {
       FD_ZERO(&readfds);
@@ -184,12 +171,12 @@ void *network_receiver(void *arg) {
       // NOTE: This will later on be done in a separate thread which
       // reads from the jitter buffer and writes to audio device
       uint32_t written_frames = 0;
-      while (written_frames < period_size_in_frames) {
+      while (written_frames < PAYLOAD_SIZE_IN_FRAMES) {
         snd_pcm_uframes_t frames =
           snd_pcm_writei(audio_info->pcm,
                          &jb_entry->data[HEADER_SIZE +
-                                         written_frames * frame_size_in_bytes],
-                         period_size_in_frames - written_frames);
+                                         written_frames * FRAME_SIZE_IN_BYTES],
+                         PAYLOAD_SIZE_IN_FRAMES - written_frames);
         if (frames == -EAGAIN) {
           fprintf(stderr,
                   "snd_pcm_writei: Failed to write to audio device: %s\n",
