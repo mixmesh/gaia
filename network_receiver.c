@@ -177,8 +177,6 @@ void *network_receiver(void *arg) {
       }
       jb_entry->seqnum = seqnum;
       assert(jb_insert(jb, jb_entry) != 0);
-
-
       
       // Write to audio device
       // NOTE: This will later on be done in a separate thread which
