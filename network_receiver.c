@@ -120,7 +120,8 @@ void *network_receiver(void *arg) {
       
       // Peek into socket and extract userid
       uint32_t new_userid;
-      if (recvfrom(sockfd, &new_userid, sizeof(uint32_t), MSG_PEEK, NULL, NULL) < 0) {
+      if (recvfrom(sockfd, &new_userid, sizeof(uint32_t), MSG_PEEK, NULL,
+                   NULL) < 0) {
         perror("recvfrom: Failed to peek into socket and extract userid");
         give_up = true;
         break;
@@ -145,7 +146,8 @@ void *network_receiver(void *arg) {
       
       // Read from socket
       int n;
-      if ((n = recvfrom(sockfd, jb_entry->data, udp_buf_size, 0, NULL, NULL)) < 0) {
+      if ((n = recvfrom(sockfd, jb_entry->data, udp_buf_size, 0, NULL,
+                        NULL)) < 0) {
         perror("recvfrom: Failed to read from socket");
         give_up = true;
         break;
@@ -195,12 +197,11 @@ void *network_receiver(void *arg) {
           break;
         } else if (frames == -EPIPE) {
           // NOTE: Underrun! Period size seems to be too small!!
-          printf("snd_pcm_writei: Underrun! Failed to write to audio device: %s\n",
-                snd_strerror(frames));
+          printf("snd_pcm_writei: Underrun: %s\n",
+                 snd_strerror(frames));
           if ((err = snd_pcm_prepare(audio_info->pcm)) < 0) {
             fprintf(stderr,
-                    "snd_pcm_prepare: Could not recover from underrun! Failed \
-to prepare audio device: %s\n",
+                    "snd_pcm_prepare: Failed to prepare audio device: %s\n",
                     snd_strerror(frames));
           }
           break;
