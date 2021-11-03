@@ -6,7 +6,7 @@
 #include "uthash/uthash.h"
 
 typedef struct jb_entry {
-  uint64_t timestamp;
+  uint32_t seqnum;
   uint8_t *data;
   struct jb_entry *next;
   struct jb_entry *prev;

@@ -46,11 +46,11 @@ uint8_t jb_insert(jb_t *jb, jb_entry_t *new_jb_entry) {
     jb_entry_t *jb_entry = jb->tail;
     while (true) {
       if (jb_entry != NULL &&
-          new_jb_entry->timestamp == jb_entry->timestamp) {
+          new_jb_entry->seqnum == jb_entry->seqnum) {
         SET_FLAG(flags, ALREADY_EXISTS);
         break;
       } else if (jb_entry != NULL &&
-                 new_jb_entry->timestamp < jb_entry->timestamp) {
+                 new_jb_entry->seqnum < jb_entry->seqnum) {
         jb_entry = jb_entry->next;
       } else {
         if (jb_entry == NULL) {

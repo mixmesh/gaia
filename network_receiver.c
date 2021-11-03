@@ -152,20 +152,31 @@ void *network_receiver(void *arg) {
       }
       assert(n == udp_buf_size);
       
-      // Add timestamp to jitter buffer entry and insert it into jitter buffer
-      // NOTE: The jitter buffer is not used for now! See below.
+      // Calculate latency
       uint64_t timestamp;
       memcpy(&timestamp, &jb_entry->data[4], sizeof(uint64_t));
-      jb_entry->timestamp = timestamp;
-      assert(jb_insert(jb, jb_entry) != 0);
-      
-      // Calculate latency
       uint64_t now = utimestamp();
       latency = latency * 0.9 + (now - timestamp) * 0.1;
       if (now - last_latency_printout > FOUR_SECONDS_IN_US) {
         printf("Latency: %fms\n", latency / 1000);
         last_latency_printout = now;
       }
+
+      // Add seqnum to jitter buffer entry and insert it into jitter buffer
+      // NOTE: The jitter buffer is not used for now! See below.
+      uint32_t seqnum;
+      memcpy(&seqnum, &jb_entry->data[12], sizeof(seqnum));
+      if (jb->entries > 0) {
+        if (jb->tail->seqnum == seqnum) {
+          printf("Duplicated UDP packet (%d)\n", seqnum);
+        } else if (jb->tail->seqnum + 1 != seqnum) {
+          printf("Missing UDP packet (%d)\n", jb->tail->seqnum + 1);
+        }
+      }
+      jb_entry->seqnum = seqnum;
+      assert(jb_insert(jb, jb_entry) != 0);
+
+
       
       // Write to audio device
       // NOTE: This will later on be done in a separate thread which

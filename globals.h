@@ -23,8 +23,8 @@
 #define PAYLOAD_SIZE_IN_FRAMES SENDER_PERIOD_SIZE_IN_FRAMES
 #define PAYLOAD_SIZE_IN_BYTES (PAYLOAD_SIZE_IN_FRAMES * FRAME_SIZE_IN_BYTES)
 
-// |userid:4|timestamp:8| = 12 bytes
-#define HEADER_SIZE (4 + 8)
+// |userid:4|timestamp:8|seqnum:4| = 16 bytes
+#define HEADER_SIZE (4 + 8 + 4)
 
 #define SOCKET_ERROR -102
 #define AUDIO_ERROR -103

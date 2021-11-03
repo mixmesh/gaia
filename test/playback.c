@@ -31,7 +31,7 @@ int main() {
     fprintf(stderr, "Could not initialize audio: %s\n", snd_strerror(err));
     exit(AUDIO_ERROR);
   }
-  audio_print_parameters(audio_info);
+  audio_print_parameters(audio_info, "playback");
   
   // Playback 5 seconds of audio data
   unsigned int period_time;

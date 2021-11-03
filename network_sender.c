@@ -57,6 +57,7 @@ void *network_sender(void *arg) {
   
   uint32_t udp_buf_size = HEADER_SIZE + PAYLOAD_SIZE_IN_BYTES;
   udp_buf = malloc(udp_buf_size);
+  uint32_t seqnum = 0;
 
   // Add userid to buffer header
   memcpy(udp_buf, &userid, sizeof(userid));
@@ -70,6 +71,10 @@ void *network_sender(void *arg) {
     // Add timestamp to buffer header
     uint64_t timestamp = utimestamp();
     memcpy(&udp_buf[4], &timestamp, sizeof(timestamp));
+
+    // Add seqnum to buffer header
+    memcpy(&udp_buf[12], &seqnum, sizeof(seqnum));
+    seqnum++;
     
     // Read from audio device
     snd_pcm_uframes_t frames =
