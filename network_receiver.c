@@ -1,5 +1,4 @@
 #include <stdbool.h>
-#include <signal.h>
 #include <arpa/inet.h>
 #include <sys/time.h>
 #include <sched.h>
@@ -11,17 +10,23 @@
 
 #define FOUR_SECONDS_IN_US (4 * 1000000)
 #define DRAIN_BUF_SIZE 32768
-#define MAX_JITTER_BUFFER_SIZE 20
+
+extern jb_t *jb_table;
 
 void *network_receiver(void *arg) {
   int err;
   int sockfd = -1;
   audio_info_t *audio_info = NULL;
-  jb_t *jb_table = NULL;
-  
+
+  printf("Jitter buffer contains %dms of audio data (%d periods, %d bytes)\n",
+         JITTER_BUFFER_SIZE_IN_MS,
+         PERIODS_IN_JITTER_BUFFER,
+         JITTER_BUFFER_SIZE_IN_BYTES);
+
   // Extract parameters
   network_receiver_params_t *receiver_params = (network_receiver_params_t *)arg;
   uint16_t port = receiver_params->port;
+  bool audio_sink = receiver_params->audio_sink;
   
   // Create and bind socket
   if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -43,7 +48,7 @@ void *network_receiver(void *arg) {
   struct timeval one_second_timeout = {.tv_usec = 0, .tv_sec = 1};
   uint32_t udp_buf_size = HEADER_SIZE + PAYLOAD_SIZE_IN_BYTES;
   uint8_t drain_buf[DRAIN_BUF_SIZE];
-  
+    
   while (true) {
     bool give_up = false;
 
@@ -58,17 +63,19 @@ void *network_receiver(void *arg) {
     }
     
     // Open audio device
-    if ((err = audio_new(PCM_NAME, SND_PCM_STREAM_PLAYBACK, RECEIVER_MODE,
-                         FORMAT, CHANNELS, RATE_IN_HZ, SAMPLE_SIZE_IN_BYTES,
-                         RECEIVER_PERIOD_SIZE_IN_FRAMES,
-                         RECEIVER_BUFFER_MULTIPLICATOR, &audio_info)) < 0) {
-      fprintf(stderr, "audio_new: Could not initialize audio: %s\n",
-              snd_strerror(err));
-      break;
+    if (audio_sink) {
+      if ((err = audio_new(PCM_NAME, SND_PCM_STREAM_PLAYBACK, RECEIVER_MODE,
+                           FORMAT, CHANNELS, RATE_IN_HZ, SAMPLE_SIZE_IN_BYTES,
+                           RECEIVER_PERIOD_SIZE_IN_FRAMES,
+                           RECEIVER_BUFFER_MULTIPLICATOR, &audio_info)) < 0) {
+        fprintf(stderr, "audio_new: Could not initialize audio: %s\n",
+                snd_strerror(err));
+        break;
+      }
     }
     audio_print_parameters(audio_info, "receiver");
     assert(RECEIVER_PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
-    
+
     // Drain socket receive buffer
     while (true) {
       FD_ZERO(&readfds);
@@ -102,7 +109,7 @@ void *network_receiver(void *arg) {
     uint64_t userid = 0;
     jb_t *jb = NULL;
     double latency = 0;
-    uint64_t last_latency_printout = 0;
+    uint64_t last_latency_printout = 0;    
     
     while (true) {
       // Wait for incoming socket data (or timeout)
@@ -138,7 +145,7 @@ void *network_receiver(void *arg) {
       
       // Prepare new jitter buffer entry
       jb_entry_t *jb_entry;
-      if (jb->entries > MAX_JITTER_BUFFER_SIZE) {
+      if (jb->entries > PERIODS_IN_JITTER_BUFFER) {
         jb_entry = jb_pop(jb);
       } else {
         jb_entry = jb_entry_new(udp_buf_size);
@@ -158,14 +165,14 @@ void *network_receiver(void *arg) {
       uint64_t timestamp;
       memcpy(&timestamp, &jb_entry->data[4], sizeof(uint64_t));
       uint64_t now = utimestamp();
+      assert(now > timestamp);
       latency = latency * 0.9 + (now - timestamp) * 0.1;
       if (now - last_latency_printout > FOUR_SECONDS_IN_US) {
         printf("Latency: %fms\n", latency / 1000);
         last_latency_printout = now;
       }
-
+      
       // Add seqnum to jitter buffer entry and insert it into jitter buffer
-      // NOTE: The jitter buffer is not used for now! See below.
       uint32_t seqnum;
       memcpy(&seqnum, &jb_entry->data[12], sizeof(seqnum));
       if (jb->entries > 0) {
@@ -179,41 +186,11 @@ void *network_receiver(void *arg) {
       assert(jb_insert(jb, jb_entry) != 0);
       
       // Write to audio device
-      // NOTE: This will later on be done in a separate thread which
-      // reads from the jitter buffer and writes to audio device
-      uint32_t written_frames = 0;
-      while (written_frames < PAYLOAD_SIZE_IN_FRAMES) {
-        snd_pcm_uframes_t frames =
-          snd_pcm_writei(audio_info->pcm,
-                         &jb_entry->data[HEADER_SIZE +
-                                         written_frames * FRAME_SIZE_IN_BYTES],
-                         PAYLOAD_SIZE_IN_FRAMES - written_frames);
-        if (frames == -EAGAIN) {
-          fprintf(stderr,
-                  "snd_pcm_writei: Failed to write to audio device: %s\n",
-                  snd_strerror(frames));
+      if (audio_sink) {
+        if (audio_nb_write(audio_info, &jb_entry->data[HEADER_SIZE],
+                           PAYLOAD_SIZE_IN_FRAMES, FRAME_SIZE_IN_BYTES) < 0) {
           break;
-        } else if (frames == -EPIPE) {
-          // NOTE: Underrun! Period size seems to be too small!!
-          printf("snd_pcm_writei: Underrun: %s\n",
-                 snd_strerror(frames));
-          if ((err = snd_pcm_prepare(audio_info->pcm)) < 0) {
-            fprintf(stderr,
-                    "snd_pcm_prepare: Failed to prepare audio device: %s\n",
-                    snd_strerror(frames));
-          }
-          break;
-        } else if (frames < 0) {
-          fprintf(stderr,
-                  "snd_pcm_writei: Failed to write to audio device: %s\n",
-                  snd_strerror(frames));
-          break;
-        } else {
-          written_frames += frames;
         }
-      }
-      if (give_up) {
-        break;
       }
     }
     

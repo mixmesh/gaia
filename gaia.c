@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include "network_sender.h"
 #include "network_receiver.h"
+#include "jb_table.h"
 
 #define SRC_ADDR "127.0.0.1"
 #define SRC_PORT 2305
@@ -16,6 +17,8 @@
 #define ARG_ERROR -1
 #define SCHED_ERROR -2
 #define THREAD_ERROR -3
+
+jb_t *jb_table = NULL;
 
 void usage(char *argv[]) {
   fprintf(stderr, "Usage: %s [-s addr[:port]] [-d addr[:port]] userid\n",
@@ -140,7 +143,8 @@ int main (int argc, char *argv[]) {
   network_receiver_params_t receiver_params =
     {
      .addr = src_addr,
-     .port = src_port
+     .port = src_port,
+     .audio_sink = true
     };
   pthread_attr_t receiver_attr;
   if ((err = set_fifo_scheduling

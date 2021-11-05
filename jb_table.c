@@ -18,9 +18,7 @@ void jb_table_free(jb_t *jb_table) {
 }
 
 int8_t jb_table_add(jb_t **jb_table, jb_t *jb) {
-  jb_t *existing_jb;
-  HASH_FIND_UINT32(*jb_table, &(jb->userid), existing_jb);
-  if (existing_jb != NULL) {
+  if (jb_table_find(jb_table, jb->userid) != NULL) {
     return JB_TABLE_ALREADY_EXISTS;
   }
   HASH_ADD_UINT32(*jb_table, userid, jb);
@@ -44,4 +42,11 @@ void jb_table_delete(jb_t **jb_table, uint32_t userid) {
  
 uint16_t jb_table_count(jb_t **jb_table) {
   return HASH_COUNT(*jb_table);
+}
+
+void jb_table_foreach(jb_t *jb_table, void (*callback)(jb_t *t)) {
+  jb_t *jb, *tmp;
+  HASH_ITER(hh, jb_table, jb, tmp) {
+    callback(jb);
+  }
 }

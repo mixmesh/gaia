@@ -5,6 +5,7 @@
 #include "network_sender.h"
 #include "timing.h"
 #include "globals.h"
+#include "audio.h"
 
 void *network_sender(void *arg) {
   int err;
@@ -78,25 +79,12 @@ void *network_sender(void *arg) {
     
     // Read from audio device
     snd_pcm_uframes_t frames =
-      snd_pcm_readi(audio_info->pcm, &udp_buf[HEADER_SIZE],
-                    SENDER_PERIOD_SIZE_IN_FRAMES);
-    if (frames == -EPIPE || frames == -ESTRPIPE) {
-      fprintf(stderr, "snd_pcm_readi: Failed to read from audio device: %s\n",
-              snd_strerror(frames));
-      if (snd_pcm_recover(audio_info->pcm, frames, 0) < 0) {
-        fprintf(stderr, "snd_pcm_readi: Failed to recover audio device: %s\n",
-                snd_strerror(frames));
-        continue;
-      }
+      audio_read(audio_info, &udp_buf[HEADER_SIZE],
+                 SENDER_PERIOD_SIZE_IN_FRAMES);
+    if (frames == AUDIO_NOT_RECOVERED) {
+      continue;
     } else if (frames < 0) {
-      fprintf(stderr, "snd_pcm_readi: Failed to read from audio device: %s\n",
-              snd_strerror(frames));
-      break;
-    } else if (frames != SENDER_PERIOD_SIZE_IN_FRAMES) {
-      fprintf(stderr,
-              "snd_pcm_readi Expected to read %d frames from audio device \
-but only read %ld\n",
-              SENDER_PERIOD_SIZE_IN_FRAMES, frames);
+      give_up = true;
       break;
     }
     

@@ -153,3 +153,62 @@ void audio_print_parameters(audio_info_t *audio_info, char *who) {
   snd_pcm_dump_setup(audio_info->pcm, output);
   snd_output_close(output);
 }
+
+int audio_nb_write(audio_info_t *audio_info, uint8_t *data, uint32_t nframes,
+                   uint8_t frame_size_in_bytes) {
+  uint32_t written_frames = 0;
+  while (written_frames < nframes) {
+    snd_pcm_uframes_t frames =
+      snd_pcm_writei(audio_info->pcm,
+                     &data[written_frames * frame_size_in_bytes],
+                     nframes - written_frames);
+    if (frames == -EAGAIN) {
+      fprintf(stderr,
+              "snd_pcm_writei: Failed to write to audio device: %s\n",
+              snd_strerror(frames));
+      return frames;
+    } else if (frames == -EPIPE) {
+      // NOTE: Underrun! Period size seems to be too small!!
+      printf("snd_pcm_writei: Underrun: %s\n",
+             snd_strerror(frames));
+      int err;
+      if ((err = snd_pcm_prepare(audio_info->pcm)) < 0) {
+        fprintf(stderr,
+                "snd_pcm_prepare: Failed to prepare audio device: %s\n",
+                snd_strerror(err));
+      }
+      return frames;
+    } else if (frames < 0) {
+      fprintf(stderr,
+              "snd_pcm_writei: Failed to write to audio device: %s\n",
+              snd_strerror(frames));
+      return frames;
+    } else {
+      written_frames += frames;
+    }
+  }
+  return 0;
+}
+
+int audio_read(audio_info_t *audio_info, uint8_t *data, uint32_t nframes) {
+  snd_pcm_uframes_t frames =
+    snd_pcm_readi(audio_info->pcm, data, nframes);
+  if (frames == -EPIPE || frames == -ESTRPIPE) {
+    fprintf(stderr, "snd_pcm_readi: Failed to read from audio device: %s\n",
+            snd_strerror(frames));
+    if (snd_pcm_recover(audio_info->pcm, frames, 0) < 0) {
+      fprintf(stderr, "snd_pcm_readi: Failed to recover audio device: %s\n",
+              snd_strerror(frames));
+      return AUDIO_NOT_RECOVERED;
+    }
+  } else if (frames < 0) {
+    fprintf(stderr, "snd_pcm_readi: Failed to read from audio device: %s\n",
+            snd_strerror(frames));
+  } else if (frames != nframes) {
+    fprintf(stderr,
+            "snd_pcm_readi Expected to read %d frames from audio device \
+but only read %ld\n",
+            nframes, frames);
+  }
+  return frames;
+}

@@ -3,11 +3,14 @@
 #include <string.h>
 #include <sched.h>
 #include "../network_receiver.h"
+#include "../jb_table.h"
 
 #define DEFAULT_PORT 2305
 
 #define SCHED_ERROR -1
 #define ARG_ERROR -2
+
+jb_t *jb_table = NULL;
 
 void usage(char *argv[]) {
   fprintf(stderr, "Usage: %s [port]\n", argv[0]);
@@ -45,7 +48,8 @@ int main (int argc, char *argv[]) {
   network_receiver_params_t receiver_params =
     {
      .addr = -1, // not used yet
-     .port = port
+     .port = port,
+     .audio_sink = true
     };
   network_receiver((void *)&receiver_params);
   
