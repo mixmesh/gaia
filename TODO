@@ -1,26 +1,16 @@
+* Print a box
 * Test current setup on two machines and verify latency
-* Reinstall my pi4 and and print a box
-* Update gaia.c
-  thread 1: listen on udp and write to jitter buffer
-  thread 2: read from jitter buffer and write to speaker
-            NOTE: Here we start to use the jitter buffer
-  thread 3: write from mic and write to udp
-  * Test jitter buffer with kernel tc tool
-  * Use mutexes (lock free is the hype, see below)  
-* Update gaia.c
-  thread 1: listen on udp and write to jitter buffers (many)
-  thread 2: read from jitter buffer (many) and write to speaker
-  thread 3: write from mic and write to udp (many)
+  * What happens with the jitter buffer?
+* Test jitter buffer with kernel tc tool
+* Add mixing to audio_sink.c and test with several users
+
+* Adaptive jitter buffer
+  * Look at the 94 paper and work with pitch scaling
+
 * UDP hole punching server
 * Extend hole punching server with HLR functionality
 * Encrypt streams
 * Use libopus as as audio codec (variable payload)
-
-Look into:
-
-* Adaptive jitter buffer
-  * Lock free jitter buffer?
-  * Memory pool needed?
 
 Hype:
 
