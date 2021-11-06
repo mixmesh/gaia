@@ -30,6 +30,7 @@ clean:
 	rm -f *.o gaia
 
 mrproper: clean
+	(cd test; $(MAKE) mrproper)
 	rm -f *~ #* 
 
 include $(wildcard $(DEPFILES))
