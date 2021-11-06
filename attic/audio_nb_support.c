@@ -3,11 +3,16 @@
 
 // Read https://www.alsa-project.org/wiki/FramesPeriods carefully
 
-int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
-              snd_pcm_format_t format, uint8_t channels, uint32_t rate_in_hz,
+int audio_new(char *pcm_name,
+              snd_pcm_stream_t stream,
+              int mode,
+              snd_pcm_format_t format,
+              uint8_t channels,
+              uint32_t rate_in_hz,
               uint8_t sample_size_in_bytes,
               snd_pcm_uframes_t period_size_in_frames,
-              uint8_t buffer_multiplicator, audio_info_t **audio_info) {
+              uint8_t buffer_multiplicator,
+              audio_info_t **audio_info) {
   int err;
   
   // Open audio device
@@ -18,7 +23,7 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
   
   // Set hardware parameters
   snd_pcm_hw_params_t *hw_params;
-  
+
   if ((err = snd_pcm_hw_params_malloc(&hw_params)) < 0) {
     return err;
   }
@@ -170,6 +175,41 @@ but only wrote %ld\n",
             nframes, frames);
   }
   return frames;
+}
+
+int audio_nb_write(audio_info_t *audio_info, uint8_t *data, uint32_t nframes,
+                   uint8_t frame_size_in_bytes) {
+  uint32_t written_frames = 0;
+  while (written_frames < nframes) {
+    snd_pcm_uframes_t frames =
+      snd_pcm_writei(audio_info->pcm,
+                     &data[written_frames * frame_size_in_bytes],
+                     nframes - written_frames);
+    if (frames == -EAGAIN) {
+      fprintf(stderr,
+              "snd_pcm_writei: Failed to write to audio device: %s\n",
+              snd_strerror(frames));
+      return frames;
+    } else if (frames == -EPIPE) {
+      // NOTE: Underrun! Period size seems to be too small!!
+      printf("snd_pcm_writei: Underrun: %s\n", snd_strerror(frames));
+      int err;
+      if ((err = snd_pcm_prepare(audio_info->pcm)) < 0) {
+        fprintf(stderr,
+                "snd_pcm_prepare: Failed to prepare audio device: %s\n",
+                snd_strerror(err));
+      }
+      return frames;
+    } else if (frames < 0) {
+      fprintf(stderr,
+              "snd_pcm_writei: Failed to write to audio device: %s\n",
+              snd_strerror(frames));
+      return frames;
+    } else {
+      written_frames += frames;
+    }
+  }
+  return 0;
 }
 
 int audio_read(audio_info_t *audio_info, uint8_t *data, uint32_t nframes) {

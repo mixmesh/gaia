@@ -40,30 +40,28 @@ void *network_sender(void *arg) {
   dest_addr.sin_addr.s_addr = addr;
   
   // Open audio device
-  if ((err = audio_new(PCM_NAME, SND_PCM_STREAM_CAPTURE, SENDER_MODE, FORMAT,
+  if ((err = audio_new(PCM_NAME, SND_PCM_STREAM_CAPTURE, 0, FORMAT,
                        CHANNELS, RATE_IN_HZ, SAMPLE_SIZE_IN_BYTES,
-                       SENDER_PERIOD_SIZE_IN_FRAMES,
-                       SENDER_BUFFER_MULTIPLICATOR, &audio_info)) < 0) {
+                       PERIOD_SIZE_IN_FRAMES, BUFFER_MULTIPLICATOR,
+                       &audio_info)) < 0) {
     fprintf(stderr, "audio_new: Could not initialize audio: %s\n",
             snd_strerror(err));
     exit(AUDIO_ERROR);
   }
   audio_print_parameters(audio_info, "sender");
-  assert(SENDER_PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
+  assert(PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
   
-  double period_size_in_ms =
-    (double)SENDER_PERIOD_SIZE_IN_FRAMES / (RATE_IN_HZ / 1000);
-  printf("Period size is %d bytes (%fms)\n", SENDER_PERIOD_SIZE_IN_BYTES,
+  double period_size_in_ms = (double)PERIOD_SIZE_IN_FRAMES / (RATE_IN_HZ / 1000);
+  printf("Period size is %d bytes (%fms)\n", PERIOD_SIZE_IN_BYTES,
          period_size_in_ms);
   
   uint32_t udp_buf_size = HEADER_SIZE + PAYLOAD_SIZE_IN_BYTES;
   udp_buf = malloc(udp_buf_size);
-  uint32_t seqnum = 0;
+  uint32_t seqnum = 1;
 
   // Add userid to buffer header
   memcpy(udp_buf, &userid, sizeof(userid));
   
-  // Read from audio device and write to non blocking socket
   printf("Sending audio...\n");
 
   while (true) {
@@ -79,8 +77,7 @@ void *network_sender(void *arg) {
     
     // Read from audio device
     snd_pcm_uframes_t frames =
-      audio_read(audio_info, &udp_buf[HEADER_SIZE],
-                 SENDER_PERIOD_SIZE_IN_FRAMES);
+      audio_read(audio_info, &udp_buf[HEADER_SIZE], PERIOD_SIZE_IN_FRAMES);
     if (frames == AUDIO_NOT_RECOVERED) {
       continue;
     } else if (frames < 0) {

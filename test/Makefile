@@ -1,7 +1,7 @@
-CFLAGS=-std=c18 -pedantic -Wall -Werror -D_POSIX_C_SOURCE=200809L $(shell pkg-config --cflags alsa)
-LDLIBS=$(shell pkg-config --libs alsa) -lm
+CFLAGS=-std=c18 -Wall -Werror -D_POSIX_C_SOURCE=200809L $(shell pkg-config --cflags alsa)
+LDLIBS=$(shell pkg-config --libs alsa) -lm -lpthread
 
-EXECS=capture display playback receiver sender test_jb test_jb_table
+EXECS=capture display playback test_jb test_jb_table
 
 all: $(EXECS)
 
@@ -14,14 +14,6 @@ capture: capture.o ../audio.o
 	$(CC) $^ $(LDLIBS) -o $@
 
 playback: playback.o ../audio.o
-	(cd ..;$(MAKE) objs)
-	$(CC) $^ $(LDLIBS) -o $@
-
-receiver: receiver.o ../audio.o ../network_receiver.o ../jb.o ../jb_table.o ../timing.o
-	(cd ..;$(MAKE) objs)
-	$(CC) $^ $(LDLIBS) -o $@
-
-sender: sender.o ../audio.o ../network_sender.o ../timing.o
 	(cd ..;$(MAKE) objs)
 	$(CC) $^ $(LDLIBS) -o $@
 
@@ -44,10 +36,6 @@ mrproper: clean
 capture.o: capture.c ../audio.h
 
 playback.o: playback.c ../audio.h 
-
-sender.o: sender.c ../network_receiver.h
-
-receiver.o: receiver.c ../network_receiver.h
 
 test_jb.o: test_jb.c ../jb.h ../ ../bits.h
 

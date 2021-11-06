@@ -10,7 +10,7 @@
 #define SCHED_ERROR -1
 #define ARG_ERROR -2
 
-jb_t *jb_table = NULL;
+jb_table_t *jb_table;
 
 void usage(char *argv[]) {
   fprintf(stderr, "Usage: %s [port]\n", argv[0]);
@@ -44,6 +44,8 @@ int main (int argc, char *argv[]) {
     return err;
   }
 
+  jb_table = jb_table_new();
+  
   // Start network receiver
   network_receiver_params_t receiver_params =
     {
@@ -52,6 +54,8 @@ int main (int argc, char *argv[]) {
      .audio_sink = true
     };
   network_receiver((void *)&receiver_params);
+
+  jb_table_free(jb_table, false);
   
   return 0;
 }

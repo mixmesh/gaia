@@ -1,8 +1,10 @@
+#include <stdio.h>
 #include <stdbool.h>
+#include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/time.h>
+#include <assert.h>
 #include <sched.h>
-#include "audio.h"
 #include "timing.h"
 #include "jb_table.h"
 #include "network_receiver.h"
@@ -11,12 +13,10 @@
 #define FOUR_SECONDS_IN_US (4 * 1000000)
 #define DRAIN_BUF_SIZE 32768
 
-extern jb_t *jb_table;
+extern jb_table_t *jb_table;
 
 void *network_receiver(void *arg) {
-  int err;
   int sockfd = -1;
-  audio_info_t *audio_info = NULL;
 
   printf("Jitter buffer contains %dms of audio data (%d periods, %d bytes)\n",
          JITTER_BUFFER_SIZE_IN_MS,
@@ -26,7 +26,6 @@ void *network_receiver(void *arg) {
   // Extract parameters
   network_receiver_params_t *receiver_params = (network_receiver_params_t *)arg;
   uint16_t port = receiver_params->port;
-  bool audio_sink = receiver_params->audio_sink;
   
   // Create and bind socket
   if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -62,20 +61,6 @@ void *network_receiver(void *arg) {
       break;
     }
     
-    // Open audio device
-    if (audio_sink) {
-      if ((err = audio_new(PCM_NAME, SND_PCM_STREAM_PLAYBACK, RECEIVER_MODE,
-                           FORMAT, CHANNELS, RATE_IN_HZ, SAMPLE_SIZE_IN_BYTES,
-                           RECEIVER_PERIOD_SIZE_IN_FRAMES,
-                           RECEIVER_BUFFER_MULTIPLICATOR, &audio_info)) < 0) {
-        fprintf(stderr, "audio_new: Could not initialize audio: %s\n",
-                snd_strerror(err));
-        break;
-      }
-    }
-    audio_print_parameters(audio_info, "receiver");
-    assert(RECEIVER_PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
-
     // Drain socket receive buffer
     while (true) {
       FD_ZERO(&readfds);
@@ -87,6 +72,7 @@ void *network_receiver(void *arg) {
         give_up = true;
         break;
       } else if (nfds == 0) {
+        // Socket receiver buffer has been drained!
         break;
       }
       if (recvfrom(sockfd, drain_buf, DRAIN_BUF_SIZE, 0, NULL, NULL) < 0) {
@@ -102,10 +88,10 @@ void *network_receiver(void *arg) {
     } else {
       printf("Socket receive buffer has been drained\n");
     }
-
-    // Read from socket and write to non-blocking audio device
+    
+    // Read from socket and write to jitter buffer
     printf("Receiving audio...\n");
-    jb_table = jb_table_new();
+
     uint64_t userid = 0;
     jb_t *jb = NULL;
     double latency = 0;
@@ -122,6 +108,8 @@ void *network_receiver(void *arg) {
         give_up = true;
         break;
       } else if (nfds == 0) {
+        // Timeout
+        printf("No longer receiving audio!\n");
         break;
       }
       
@@ -136,17 +124,22 @@ void *network_receiver(void *arg) {
       
       // Get jitter buffer
       if (userid != new_userid) {
-        if ((jb = jb_table_find(&jb_table, new_userid)) == NULL) {
+        jb_table_take_rdlock(jb_table);
+        if ((jb = jb_table_find(jb_table, new_userid)) == NULL) {
           jb = jb_new(new_userid);
-          assert(jb_table_add(&jb_table, jb) == JB_TABLE_SUCCESS);
+          assert(jb_table_add(jb_table, jb) == JB_TABLE_SUCCESS);
         }
+        jb_table_release_lock(jb_table);
         userid = new_userid;
       }
       
       // Prepare new jitter buffer entry
       jb_entry_t *jb_entry;
       if (jb->entries > PERIODS_IN_JITTER_BUFFER) {
+        jb_take_wrlock(jb);
         jb_entry = jb_pop(jb);
+        jb_release_lock(jb);
+        jb_entry->seqnum = 0;
       } else {
         jb_entry = jb_entry_new(udp_buf_size);
       }            
@@ -168,11 +161,11 @@ void *network_receiver(void *arg) {
       assert(now > timestamp);
       latency = latency * 0.9 + (now - timestamp) * 0.1;
       if (now - last_latency_printout > FOUR_SECONDS_IN_US) {
-        printf("Latency: %fms\n", latency / 1000);
+        //printf("Latency: %fms\n", latency / 1000);
         last_latency_printout = now;
       }
       
-      // Add seqnum to jitter buffer entry and insert it into jitter buffer
+      // Add seqnum to jitter buffer entry and insert entry
       uint32_t seqnum;
       memcpy(&seqnum, &jb_entry->data[12], sizeof(seqnum));
       if (jb->entries > 0) {
@@ -183,34 +176,18 @@ void *network_receiver(void *arg) {
         }
       }
       jb_entry->seqnum = seqnum;
+
+      jb_take_wrlock(jb);
       assert(jb_insert(jb, jb_entry) != 0);
-      
-      // Write to audio device
-      if (audio_sink) {
-        if (audio_nb_write(audio_info, &jb_entry->data[HEADER_SIZE],
-                           PAYLOAD_SIZE_IN_FRAMES, FRAME_SIZE_IN_BYTES) < 0) {
-          break;
-        }
-      }
+      jb_release_lock(jb);      
     }
-    
-    printf("No longer receiving audio!\n");
 
-    audio_free(audio_info);
-    audio_info = NULL;
-    jb_table_free(jb_table);
-    jb_table = NULL;
+    jb_table_free(jb_table, true);
   }
 
-  if (jb_table != NULL) {
-    jb_table_free(jb_table);
-  }
-  if (audio_info != NULL) {
-    audio_free(audio_info);
-  }
   if (sockfd != -1) {
     close(sockfd);
   }
-
+  
   return NULL;
 }

@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include "network_sender.h"
 #include "network_receiver.h"
+#include "audio_sink.h"
 #include "jb_table.h"
 
 #define SRC_ADDR "127.0.0.1"
@@ -18,7 +19,7 @@
 #define SCHED_ERROR -2
 #define THREAD_ERROR -3
 
-jb_t *jb_table = NULL;
+jb_table_t *jb_table;
 
 void usage(char *argv[]) {
   fprintf(stderr, "Usage: %s [-s addr[:port]] [-d addr[:port]] userid\n",
@@ -114,6 +115,8 @@ int main (int argc, char *argv[]) {
   if (userid == 0) {
     usage(argv);
   }
+
+  jb_table = jb_table_new();
   
   // Start sender thread
   pthread_t sender_thread;
@@ -144,11 +147,9 @@ int main (int argc, char *argv[]) {
     {
      .addr = src_addr,
      .port = src_port,
-     .audio_sink = true
     };
   pthread_attr_t receiver_attr;
-  if ((err = set_fifo_scheduling
-       (&receiver_attr)) != 0) {
+  if ((err = set_fifo_scheduling(&receiver_attr)) != 0) {
     fprintf(stderr, "pthread_create: Scheduling could not be configured (%d)\n",
             err);
     exit(SCHED_ERROR);
@@ -160,8 +161,29 @@ int main (int argc, char *argv[]) {
             err);
     exit(THREAD_ERROR);
   }
-  
-  pthread_exit(0); // This will block until all threads have terminated
 
+  // Start audio sink thread
+  pthread_t audio_sink_thread;
+  audio_sink_params_t audio_sink_params;
+  pthread_attr_t audio_sink_attr;
+  if ((err = set_fifo_scheduling(&audio_sink_attr)) != 0) {
+    fprintf(stderr, "pthread_create: Scheduling could not be configured (%d)\n",
+            err);
+    exit(SCHED_ERROR);
+  }
+  if ((err = pthread_create(&audio_sink_thread, &audio_sink_attr, audio_sink,
+                            (void *)&audio_sink_params)) < 0) {
+    fprintf(stderr,
+            "pthread_create: Failed to start network audio sink thread (%d)\n",
+            err);
+    exit(THREAD_ERROR);
+  }
+
+  // This will block until all threads have terminated or until any thread
+  // thread calls exit(3)
+  pthread_exit(0);
+
+  jb_table_free(jb_table, false);
+  
   return 0;
 }

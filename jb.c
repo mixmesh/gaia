@@ -1,12 +1,22 @@
 #include <stdio.h>
 #include <stdbool.h>
+#include <assert.h>
+#include <errno.h>
+
+
+
+
 #include "jb.h"
 #include "bits.h"
 
 jb_t *jb_new(uint32_t userid) {
   jb_t *jb = malloc(sizeof(jb_t));
   jb->userid = userid;
+  jb->playback = NULL;
+  jb->seqnum = 0;
   jb->entries = 0;
+  jb->rwlock = malloc(sizeof(pthread_rwlock_t));
+  assert(pthread_rwlock_init(jb->rwlock, NULL) == 0);
   jb->tail = NULL;
   jb->head = NULL;
   return jb;
@@ -19,6 +29,8 @@ void jb_free(jb_t *jb) {
     jb_entry_free(jb_entry);
     jb_entry = next_jb_entry;
   }
+  assert(pthread_rwlock_destroy(jb->rwlock) == 0);
+  free(jb->rwlock);
   free(jb);
 }
 
@@ -90,8 +102,52 @@ uint8_t jb_insert(jb_t *jb, jb_entry_t *new_jb_entry) {
   return flags;
 }
 
+jb_entry_t *jb_get_entry(jb_t *jb, uint32_t index) {
+  jb_entry_t *jb_entry = jb->tail;
+  while (jb_entry != NULL) {
+    if (index-- == 0) {
+      return jb_entry;
+    }
+    jb_entry = jb_entry->next;
+  }
+  return NULL;
+}
+
+void jb_take_rdlock(jb_t *jb) {
+  assert(pthread_rwlock_rdlock(jb->rwlock) == 0);
+}
+
+void jb_take_wrlock(jb_t *jb) {
+  assert(pthread_rwlock_wrlock(jb->rwlock) == 0);
+  
+  /*  
+  if (err == EBUSY) {
+    fprintf(stderr, "The read-write lock could not be acquired for writing because it was already locked for reading or writing");
+  } else if (err == EINVAL) {
+    fprintf(stderr, "The value specified by rwlock does not refer to an initialised read-write lock object");
+  } else if (err == EDEADLK) {
+    fprintf(stderr, "The current thread already owns the read-write lock for writing or reading");
+  } else if (err < 0) {
+    fprintf(stderr, "The current thread already owns the read-write lock for writing or reading: %d", err);
+  }
+  if (err != 0) {
+    fprintf(stderr, "What: %d\n", err);
+  }
+
+
+
+
+  assert(err == 0);
+  */
+}
+
+void jb_release_lock(jb_t *jb) {
+  assert(pthread_rwlock_unlock(jb->rwlock) == 0);
+}
+
 jb_entry_t *jb_entry_new(uint32_t data_size) {
   jb_entry_t *jb_entry = malloc(sizeof(jb_entry_t));
+  jb_entry->seqnum = 0;
   jb_entry->data = malloc(data_size);
   return jb_entry;
 }
