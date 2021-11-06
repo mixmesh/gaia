@@ -1,10 +1,5 @@
 #include <unistd.h>
-#include <stdlib.h>
 #include <stdio.h>
-#include <arpa/inet.h>
-#include <string.h>
-#include <inttypes.h>
-#include <pthread.h>
 #include "network_sender.h"
 #include "network_receiver.h"
 #include "audio_sink.h"

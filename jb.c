@@ -1,11 +1,5 @@
-#include <stdio.h>
 #include <stdbool.h>
 #include <assert.h>
-#include <errno.h>
-
-
-
-
 #include "jb.h"
 #include "bits.h"
 
@@ -119,26 +113,6 @@ void jb_take_rdlock(jb_t *jb) {
 
 void jb_take_wrlock(jb_t *jb) {
   assert(pthread_rwlock_wrlock(jb->rwlock) == 0);
-  
-  /*  
-  if (err == EBUSY) {
-    fprintf(stderr, "The read-write lock could not be acquired for writing because it was already locked for reading or writing");
-  } else if (err == EINVAL) {
-    fprintf(stderr, "The value specified by rwlock does not refer to an initialised read-write lock object");
-  } else if (err == EDEADLK) {
-    fprintf(stderr, "The current thread already owns the read-write lock for writing or reading");
-  } else if (err < 0) {
-    fprintf(stderr, "The current thread already owns the read-write lock for writing or reading: %d", err);
-  }
-  if (err != 0) {
-    fprintf(stderr, "What: %d\n", err);
-  }
-
-
-
-
-  assert(err == 0);
-  */
 }
 
 void jb_release_lock(jb_t *jb) {

@@ -1,6 +1,4 @@
 #include <assert.h>
-#include <errno.h>
-#include <stdio.h>
 #include "uthash/uthash.h"
 #include "jb_table.h"
 

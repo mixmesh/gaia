@@ -1,4 +1,3 @@
-#include <alloca.h>
 #include "audio.h"
 
 // Read https://www.alsa-project.org/wiki/FramesPeriods carefully

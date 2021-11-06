@@ -1,10 +1,8 @@
-#include <unistd.h>
-#include <stdio.h>
 #include <stdbool.h>
 #include "audio.h"
-#include "network_sender.h"
-#include "timing.h"
 #include "globals.h"
+#include "timing.h"
+#include "network_sender.h"
 #include "audio.h"
 
 void *network_sender(void *arg) {

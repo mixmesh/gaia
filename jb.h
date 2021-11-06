@@ -1,8 +1,6 @@
 #ifndef _JB_H_
 #define _JB_H_
 
-#include <stdint.h>
-#include <inttypes.h>
 #include <pthread.h>
 #include "uthash/uthash.h"
 

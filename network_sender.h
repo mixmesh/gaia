@@ -2,7 +2,6 @@
 #define _NETWORK_SENDER_H_
 
 #include <arpa/inet.h>
-#include <inttypes.h>
 
 typedef struct {
   uint32_t userid;
