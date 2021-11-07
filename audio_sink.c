@@ -57,7 +57,7 @@ void *audio_sink(void *arg) {
             } else {
               // Seqnum mismatch. Use the old playback entry again!
               assert(jb->playback->prev->seqnum > next_seqnum);
-              printf("Expected playback entry %d but got %d. Uses %d again!\n",
+              printf("Expected playback entry %d but got %d. Use %d again!\n",
                      next_seqnum, jb->playback->prev->seqnum,
                      jb->playback->seqnum);
               jb->playback->seqnum = next_seqnum;
