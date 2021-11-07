@@ -96,13 +96,15 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
       snd_pcm_sw_params_free(sw_params);
       return err;
     }
-    
+
+    /*
     if ((err = snd_pcm_sw_params_set_start_threshold(pcm, sw_params,
                                                      period_size_in_frames)) < 0) {
       snd_pcm_hw_params_free(hw_params);
       snd_pcm_sw_params_free(sw_params);
       return err;
     }
+    */
     
     if ((err = snd_pcm_sw_params(pcm, sw_params)) < 0) {
       snd_pcm_hw_params_free(hw_params);
