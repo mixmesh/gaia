@@ -57,9 +57,8 @@ void *audio_sink(void *arg) {
             } else {
               // Seqnum mismatch. Use the old playback entry again!
               assert(jb->playback->prev->seqnum > next_seqnum);
-              printf("Expected seqnum %d but got %d. Reuses %d.\n",
-                     next_seqnum, jb->playback->prev->seqnum,
-                     jb->playback->seqnum);
+              printf("Expected seqnum %d but got %d\n",
+                     next_seqnum, jb->playback->prev->seqnum);
               jb->playback->seqnum = next_seqnum;
               jb->playback_seqnum = next_seqnum;
             }
@@ -93,9 +92,7 @@ void *audio_sink(void *arg) {
     jb_table_release_lock(jb_table);
     
     if (data_available) {
-      snd_pcm_uframes_t frames =
-        audio_write(audio_info, mix_buf, PAYLOAD_SIZE_IN_FRAMES);
-      if (frames < 0 && frames != AUDIO_NOT_RECOVERED) {
+      if (audio_write(audio_info, mix_buf, PAYLOAD_SIZE_IN_FRAMES) < 0) {
         break;
       }
     } else {
