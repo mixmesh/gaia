@@ -4,7 +4,6 @@
 #include <alsa/asoundlib.h>
 
 #define AUDIO_NOT_RECOVERED -1000
-#define AUDIO_RECOVERED -1001
 
 typedef struct {
   snd_pcm_t *pcm;
@@ -21,7 +20,8 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
 void audio_free(audio_info_t *audio_info);
 void audio_print_parameters(audio_info_t *audio_info, char *who);
 snd_pcm_uframes_t audio_write(audio_info_t *audio_info, uint8_t *data,
-                              uint32_t nframes);
-int audio_read(audio_info_t *audio_info, uint8_t *data, uint32_t nframes);
+                              snd_pcm_uframes_t nframes);
+int audio_read(audio_info_t *audio_info, uint8_t *data,
+               snd_pcm_uframes_t nframes);
 
 #endif
