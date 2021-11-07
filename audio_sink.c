@@ -39,7 +39,7 @@ void *audio_sink(void *arg) {
           jb->playback_seqnum = jb->playback->seqnum;
           data_available = true;
         } else if (jb->playback->seqnum != jb->playback_seqnum) {
-          printf("Playback entry with seqnum %d has been reused by seqnum %d\n",
+          printf("Playback entry %d has been reused by %d\n",
                  jb->playback_seqnum, jb->playback->seqnum);
           jb->playback =
             jb_get_entry(jb, JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS);
@@ -57,7 +57,7 @@ void *audio_sink(void *arg) {
             } else {
               // Seqnum mismatch. Use the old playback entry again!
               assert(jb->playback->prev->seqnum > next_seqnum);
-              printf("Expected seqnum %d but got %d\n",
+              printf("Expected playback entry with seqnum %d but got %d\n",
                      next_seqnum, jb->playback->prev->seqnum);
               jb->playback->seqnum = next_seqnum;
               jb->playback_seqnum = next_seqnum;
