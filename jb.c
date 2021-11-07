@@ -7,6 +7,7 @@ jb_t *jb_new(uint32_t userid) {
   jb_t *jb = malloc(sizeof(jb_t));
   jb->userid = userid;
   jb->playback = NULL;
+  jb->playback_index = 0;
   jb->seqnum = 0;
   jb->entries = 0;
   jb->rwlock = malloc(sizeof(pthread_rwlock_t));
@@ -105,6 +106,16 @@ jb_entry_t *jb_get_entry(jb_t *jb, uint32_t index) {
     jb_entry = jb_entry->next;
   }
   return NULL;
+}
+
+uint32_t jb_get_index(jb_t *jb, jb_entry_t *jb_entry) {
+  uint32_t index = 0;
+  jb_entry_t *current_jb_entry = jb->tail;
+  while (current_jb_entry != jb_entry && current_jb_entry != NULL) {
+    index++;
+    current_jb_entry = current_jb_entry->next;
+  }
+  return index;
 }
 
 void jb_take_rdlock(jb_t *jb) {

@@ -193,3 +193,34 @@ but only read %ld\n",
   }
   return frames;
 }
+
+/*
+int audio_mix(
+http://www.vttoth.com/CMS/index.php/technical-notes/68
+https://stackoverflow.com/a/25102339
+
+
+
+
+int a = 111; // first sample (-32768..32767)
+int b = 222; // second sample
+int m; // mixed result will go here
+
+// Make both samples unsigned (0..65535)
+a += 32768;
+b += 32768;
+
+// Pick the equation
+if ((a < 32768) || (b < 32768)) {
+    // Viktor's first equation when both sources are "quiet"
+    // (i.e. less than middle of the dynamic range)
+    m = a * b / 32768;
+} else {
+    // Viktor's second equation when one or both sources are loud
+    m = 2 * (a + b) - (a * b) / 32768 - 65536;
+}
+
+// Output is unsigned (0..65536) so convert back to signed (-32768..32767)
+if (m == 65536) m = 65535;
+m -= 32768;
+*/

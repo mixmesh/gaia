@@ -33,7 +33,7 @@ void *audio_sink(void *arg) {
       if (jb->entries > JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS) {
         if (jb->playback == NULL || jb->playback->seqnum != jb->seqnum) {
           // Initialize playback entry
-          printf("Initializes playback entry...");
+          printf("Initializes playback entry...\n");
           jb->playback =
             jb_get_entry(jb, JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS);
           assert(jb->playback != NULL);
@@ -49,16 +49,29 @@ void *audio_sink(void *arg) {
               jb->seqnum = next_seqnum;
             } else {
               // Seqnum mismatch. Use the old playback entry again!
-              printf("Replay playback entry to cover for missing data...");
-              assert(jb->playback->prev->seqnum < next_seqnum);
+              assert(jb->playback->prev->seqnum > next_seqnum);
+              printf("Expected seqnum %d but got %d. Reuses %d.\n",
+                     next_seqnum, jb->playback->prev->seqnum,
+                     jb->playback->seqnum);
               jb->playback->seqnum = next_seqnum;
               jb->seqnum = next_seqnum;
             }
             data_available = true;
           } else {
             // Jitter buffer is exhausted!
-            printf("Jitter buffer has been exhausted");
+            if (jb->playback_index != 0) {
+              printf("Jitter buffer has been exhausted\n");
+            }
           }
+          // NOTE: This index checking is too expensive. Remove ASAP!
+          uint32_t index = jb_get_index(jb, jb->playback);
+          if (!(index == 0 && jb->playback_index == 0) &&
+              (index > jb->playback_index + 1 ||
+               index + 1 < jb->playback_index)) {
+            printf("Playback index now is %d (%d) out of %d total entries\n",
+                   index, jb->playback_index, jb->entries);
+          }
+          jb->playback_index = index;
         }
         // FIXME: Mix
         memcpy(mix_buf, &jb->playback->data[HEADER_SIZE], PAYLOAD_SIZE_IN_BYTES);
@@ -86,30 +99,3 @@ void *audio_sink(void *arg) {
   return NULL;
 }
 
-/*
-http://www.vttoth.com/CMS/index.php/technical-notes/68
-https://stackoverflow.com/a/25102339
-
-
-int a = 111; // first sample (-32768..32767)
-int b = 222; // second sample
-int m; // mixed result will go here
-
-// Make both samples unsigned (0..65535)
-a += 32768;
-b += 32768;
-
-// Pick the equation
-if ((a < 32768) || (b < 32768)) {
-    // Viktor's first equation when both sources are "quiet"
-    // (i.e. less than middle of the dynamic range)
-    m = a * b / 32768;
-} else {
-    // Viktor's second equation when one or both sources are loud
-    m = 2 * (a + b) - (a * b) / 32768 - 65536;
-}
-
-// Output is unsigned (0..65536) so convert back to signed (-32768..32767)
-if (m == 65536) m = 65535;
-m -= 32768;
-*/
