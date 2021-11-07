@@ -186,6 +186,8 @@ void *network_receiver(void *arg) {
   if (sockfd != -1) {
     close(sockfd);
   }
+
+  fprintf(stderr, "network_receiver is shutting down!!!\n");
   
   return NULL;
 }

@@ -4,6 +4,7 @@
 #include "network_receiver.h"
 #include "audio_sink.h"
 #include "jb_table.h"
+#include "timing.h"
 
 #define SRC_ADDR "127.0.0.1"
 #define SRC_PORT 2305
@@ -158,6 +159,8 @@ int main (int argc, char *argv[]) {
     exit(THREAD_ERROR);
   }
 
+  msleep(500);
+  
   // Start audio sink thread
   pthread_t audio_sink_thread;
   audio_sink_params_t audio_sink_params;

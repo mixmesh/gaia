@@ -113,5 +113,7 @@ void *network_sender(void *arg) {
     close(sockfd);
   }
 
+  fprintf(stderr, "network_sender is shutting down!!!\n");
+  
   return NULL;
 }

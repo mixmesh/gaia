@@ -57,8 +57,9 @@ void *audio_sink(void *arg) {
             } else {
               // Seqnum mismatch. Use the old playback entry again!
               assert(jb->playback->prev->seqnum > next_seqnum);
-              printf("Expected playback entry with seqnum %d but got %d\n",
-                     next_seqnum, jb->playback->prev->seqnum);
+              printf("Expected playback entry %d but got %d. Uses %d again!\n",
+                     next_seqnum, jb->playback->prev->seqnum,
+                     jb->playback->seqnum);
               jb->playback->seqnum = next_seqnum;
               jb->playback_seqnum = next_seqnum;
             }
@@ -101,6 +102,8 @@ void *audio_sink(void *arg) {
   }
   
   audio_free(audio_info);
+
+  fprintf(stderr, "audio_sink is shutting down!!!\n");
   
   return NULL;
 }
