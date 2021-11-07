@@ -96,10 +96,24 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
       snd_pcm_sw_params_free(sw_params);
       return err;
     }
+    
+    if ((err = snd_pcm_sw_params_set_start_threshold(pcm, sw_params,
+                                                     period_size_in_frames * 3)) < 0) {
+      snd_pcm_hw_params_free(hw_params);
+      snd_pcm_sw_params_free(sw_params);
+      return err;
+    }
 
     /*
-    if ((err = snd_pcm_sw_params_set_start_threshold(pcm, sw_params,
-                                                     period_size_in_frames)) < 0) {
+    if ((err = snd_pcm_sw_params_set_stop_threshold(pcm, sw_params,
+                                                    period_size_in_frames * 3)) < 0) {
+      snd_pcm_hw_params_free(hw_params);
+      snd_pcm_sw_params_free(sw_params);
+      return err;
+    }
+    
+    if ((err = snd_pcm_sw_params_set_avail_min(pcm, sw_params,
+                                               period_size_in_frames)) < 0) {
       snd_pcm_hw_params_free(hw_params);
       snd_pcm_sw_params_free(sw_params);
       return err;
@@ -160,7 +174,7 @@ snd_pcm_uframes_t audio_write(audio_info_t *audio_info, uint8_t *data,
     if (frames == -EPIPE || frames == -ESTRPIPE) {
       printf("snd_pcm_writei: Failed to write to audio device: %s\n",
              snd_strerror(frames));
-      if (snd_pcm_recover(audio_info->pcm, frames, 1) < 0) {
+      if (snd_pcm_recover(audio_info->pcm, frames, 0) < 0) {
         fprintf(stderr, "snd_pcm_readi: Failed to recover audio device: %s\n",
                 snd_strerror(frames));
         return AUDIO_NOT_RECOVERED;

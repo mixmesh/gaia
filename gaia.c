@@ -52,7 +52,7 @@ int get_addr_port(char *arg, in_addr_t *addr, uint16_t *port) {
   return 0;
 }
 
-int set_fifo_scheduling(pthread_attr_t *attr) {
+int set_fifo_scheduling(pthread_attr_t *attr, int8_t priority_offset) {
   int err;
   if ((err = pthread_attr_init(attr)) != 0) {
     return err;
@@ -67,7 +67,8 @@ int set_fifo_scheduling(pthread_attr_t *attr) {
   if ((err = pthread_attr_setschedpolicy(attr, SCHED_FIFO)) != 0) {
     return err;
   }
-  sched_param.sched_priority = sched_get_priority_max(SCHED_FIFO);  
+  sched_param.sched_priority = sched_get_priority_max(SCHED_FIFO) +
+    priority_offset;  
   if ((err = pthread_attr_setschedparam(attr, &sched_param)) != 0) {
     return err;
   }
@@ -122,7 +123,7 @@ int main (int argc, char *argv[]) {
      .port = dest_port
     };
   pthread_attr_t sender_attr;
-  if ((err = set_fifo_scheduling(&sender_attr)) != 0) {
+  if ((err = set_fifo_scheduling(&sender_attr, -2)) != 0) {
     fprintf(stderr,
             "set_fifo_scheduling: Scheduling could not be configured (%d)\n",
             err);
@@ -144,7 +145,7 @@ int main (int argc, char *argv[]) {
      .port = src_port,
     };
   pthread_attr_t receiver_attr;
-  if ((err = set_fifo_scheduling(&receiver_attr)) != 0) {
+  if ((err = set_fifo_scheduling(&receiver_attr, -1)) != 0) {
     fprintf(stderr, "pthread_create: Scheduling could not be configured (%d)\n",
             err);
     exit(SCHED_ERROR);
@@ -161,7 +162,7 @@ int main (int argc, char *argv[]) {
   pthread_t audio_sink_thread;
   audio_sink_params_t audio_sink_params;
   pthread_attr_t audio_sink_attr;
-  if ((err = set_fifo_scheduling(&audio_sink_attr)) != 0) {
+  if ((err = set_fifo_scheduling(&audio_sink_attr, 0)) != 0) {
     fprintf(stderr, "pthread_create: Scheduling could not be configured (%d)\n",
             err);
     exit(SCHED_ERROR);
