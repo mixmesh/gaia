@@ -15,7 +15,7 @@ typedef struct {
   uint32_t userid;
   jb_entry_t *playback;
   uint32_t playback_index;
-  uint32_t seqnum;
+  uint32_t playback_seqnum;
   uint32_t entries;
   pthread_rwlock_t *rwlock;
   jb_entry_t *tail;

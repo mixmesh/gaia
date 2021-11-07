@@ -31,13 +31,20 @@ void *audio_sink(void *arg) {
     void mix(jb_t *jb) {
       jb_take_wrlock(jb);
       if (jb->entries > JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS) {
-        if (jb->playback == NULL || jb->playback->seqnum != jb->seqnum) {
-          // Initialize playback entry
-          printf("Initializes playback entry...\n");
+        if (jb->playback == NULL) {
+          printf("Initializes playback entry\n");
           jb->playback =
             jb_get_entry(jb, JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS);
           assert(jb->playback != NULL);
-          jb->seqnum = jb->playback->seqnum;
+          jb->playback_seqnum = jb->playback->seqnum;
+          data_available = true;
+        } else if (jb->playback->seqnum != jb->playback_seqnum) {
+          printf("Playback entry with seqnum %d has been reused by seqnum %d\n",
+                 jb->playback_seqnum, jb->playback->seqnum);
+          jb->playback =
+            jb_get_entry(jb, JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS);
+          assert(jb->playback != NULL);
+          jb->playback_seqnum = jb->playback->seqnum;
           data_available = true;
         } else {
           // Step playback entry
@@ -46,7 +53,7 @@ void *audio_sink(void *arg) {
             if (jb->playback->prev->seqnum == next_seqnum) {
               // All is good
               jb->playback = jb->playback->prev;
-              jb->seqnum = next_seqnum;
+              jb->playback_seqnum = next_seqnum;
             } else {
               // Seqnum mismatch. Use the old playback entry again!
               assert(jb->playback->prev->seqnum > next_seqnum);
@@ -54,7 +61,7 @@ void *audio_sink(void *arg) {
                      next_seqnum, jb->playback->prev->seqnum,
                      jb->playback->seqnum);
               jb->playback->seqnum = next_seqnum;
-              jb->seqnum = next_seqnum;
+              jb->playback_seqnum = next_seqnum;
             }
             data_available = true;
           } else {

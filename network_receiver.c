@@ -156,7 +156,7 @@ void *network_receiver(void *arg) {
       uint64_t timestamp;
       memcpy(&timestamp, &jb_entry->data[4], sizeof(uint64_t));
       uint64_t now = utimestamp();
-      assert(now > timestamp);
+      //assert(now > timestamp);
       latency = latency * 0.9 + (now - timestamp) * 0.1;
       if (now - last_latency_printout > FOUR_SECONDS_IN_US) {
         //printf("Latency: %fms\n", latency / 1000);

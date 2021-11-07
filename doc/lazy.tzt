@@ -1,7 +1,14 @@
-https://netbeez.net/blog/how-to-use-the-linux-traffic-control/
-
 Traffic Control
 ---------------
 $ sudo tc qdisc replace dev lo root netem loss 10%
 $ sudo tc qdisc replace dev lo root netem corrupt 5%
 $ sudo tc qdisc replacee dev lo root netem duplicate 10%
+
+NTP
+---
+$ sudo systemctl restart systemd-timesyncd.service
+$ timedatectl status
+$ timedatectl timesync-status
+$ timedatectl set-ntp false
+$ timedatectl set-ntp true
+
