@@ -70,6 +70,7 @@ void *audio_sink(void *arg) {
               printf("Jitter buffer has been exhausted\n");
             }
           }
+          /*
           // NOTE: This index checking is too expensive. Remove ASAP!
           uint32_t index = jb_get_index(jb, jb->playback);
           if (!(index == 0 && jb->playback_index == 0) &&
@@ -79,6 +80,7 @@ void *audio_sink(void *arg) {
                    index, jb->playback_index, jb->entries);
           }
           jb->playback_index = index;
+          */
         }
         // FIXME: Mix
         memcpy(mix_buf, &jb->playback->data[HEADER_SIZE], PAYLOAD_SIZE_IN_BYTES);

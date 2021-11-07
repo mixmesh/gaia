@@ -76,7 +76,7 @@ void *network_sender(void *arg) {
     // Read from audio device
     snd_pcm_uframes_t frames =
       audio_read(audio_info, &udp_buf[HEADER_SIZE], PERIOD_SIZE_IN_FRAMES);
-    if (frames == AUDIO_NOT_RECOVERED) {
+    if (frames == AUDIO_RECOVERED) {
       continue;
     } else if (frames < 0) {
       give_up = true;

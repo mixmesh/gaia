@@ -12,3 +12,8 @@ $ timedatectl timesync-status
 $ timedatectl set-ntp false
 $ timedatectl set-ntp true
 
+Git
+---
+$ git reset --hard origin/main        
+
+                 );

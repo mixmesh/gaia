@@ -4,6 +4,7 @@
 #include <alsa/asoundlib.h>
 
 #define AUDIO_NOT_RECOVERED -1000
+#define AUDIO_RECOVERED -1001
 
 typedef struct {
   snd_pcm_t *pcm;
