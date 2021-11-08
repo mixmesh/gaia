@@ -124,7 +124,7 @@ int main (int argc, char *argv[]) {
      .port = dest_port
     };
   pthread_attr_t sender_attr;
-  if ((err = set_fifo_scheduling(&sender_attr, -2)) != 0) {
+  if ((err = set_fifo_scheduling(&sender_attr, 0)) != 0) {
     fprintf(stderr,
             "set_fifo_scheduling: Scheduling could not be configured (%d)\n",
             err);
@@ -146,7 +146,7 @@ int main (int argc, char *argv[]) {
      .port = src_port,
     };
   pthread_attr_t receiver_attr;
-  if ((err = set_fifo_scheduling(&receiver_attr, -1)) != 0) {
+  if ((err = set_fifo_scheduling(&receiver_attr, 0)) != 0) {
     fprintf(stderr, "pthread_create: Scheduling could not be configured (%d)\n",
             err);
     exit(SCHED_ERROR);
