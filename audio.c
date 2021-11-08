@@ -98,7 +98,7 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
     }
     
     if ((err = snd_pcm_sw_params_set_start_threshold(pcm, sw_params,
-                                                     period_size_in_frames * 3)) < 0) {
+                                                     period_size_in_frames)) < 0) {
       snd_pcm_hw_params_free(hw_params);
       snd_pcm_sw_params_free(sw_params);
       return err;
@@ -106,7 +106,7 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
 
     /*
     if ((err = snd_pcm_sw_params_set_stop_threshold(pcm, sw_params,
-                                                    period_size_in_frames * 3)) < 0) {
+                                                    period_size_in_frames)) < 0) {
       snd_pcm_hw_params_free(hw_params);
       snd_pcm_sw_params_free(sw_params);
       return err;
