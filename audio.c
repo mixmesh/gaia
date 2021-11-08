@@ -187,8 +187,7 @@ snd_pcm_uframes_t audio_write(audio_info_t *audio_info, uint8_t *data,
     }
     written_frames += frames;
     if (written_frames < nframes) {
-      printf("snd_pcm_writei: Still missing %ld frames\n",
-             nframes - written_frames);
+      printf("snd_pcm_writei: %ld frames to go...\n", nframes - written_frames);
     }
   }
   return written_frames;
@@ -216,7 +215,7 @@ int audio_read(audio_info_t *audio_info, uint8_t *data,
     }
     read_frames += frames;
     if (read_frames < nframes) {
-      printf("snd_pcm_readi: Still missing %ld frames\n", nframes - read_frames);
+      printf("snd_pcm_readi: %ld frames to go...\n", nframes - read_frames);
     }
   }
   return read_frames;

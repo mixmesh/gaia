@@ -16,4 +16,7 @@ Git
 ---
 $ git reset --hard origin/main        
 
-                 );
+Pi
+--
+$ iw wlan0 set power_save off
+$ sudo iw wlp2s0 set power_save off
