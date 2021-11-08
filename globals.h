@@ -14,7 +14,7 @@
 #define PERIOD_SIZE_IN_MS ((double)PERIOD_SIZE_IN_FRAMES / (RATE_IN_HZ / 1000))
 #define BUFFER_MULTIPLICATOR 4
 
-#define JITTER_BUFFER_SIZE_IN_MS 200
+#define JITTER_BUFFER_SIZE_IN_MS 400
 #define PERIODS_IN_JITTER_BUFFER                                \
   (uint32_t)(JITTER_BUFFER_SIZE_IN_MS / PERIOD_SIZE_IN_MS)
 #define JITTER_BUFFER_SIZE_IN_BYTES                             \
