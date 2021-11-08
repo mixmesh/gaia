@@ -188,6 +188,7 @@ void *network_receiver(void *arg) {
   }
 
   fprintf(stderr, "network_receiver is shutting down!!!\n");
+  exit(2);
   
   return NULL;
 }

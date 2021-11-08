@@ -114,6 +114,7 @@ void *network_sender(void *arg) {
   }
 
   fprintf(stderr, "network_sender is shutting down!!!\n");
+  exit(1);
   
   return NULL;
 }

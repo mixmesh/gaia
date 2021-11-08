@@ -104,6 +104,7 @@ void *audio_sink(void *arg) {
   audio_free(audio_info);
 
   fprintf(stderr, "audio_sink is shutting down!!!\n");
+  exit(3);
   
   return NULL;
 }
