@@ -167,7 +167,7 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
 }
 
 void audio_free(audio_info_t *audio_info) {
-  snd_pcm_drop(audio_info->pcm);
+  snd_pcm_drain(audio_info->pcm);
   snd_pcm_close(audio_info->pcm);
   snd_pcm_hw_params_free(audio_info->hw_params);
   if (audio_info->sw_params != NULL) {
