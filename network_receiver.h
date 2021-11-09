@@ -3,7 +3,6 @@
 
 #include <arpa/inet.h>
 #include <inttypes.h>
-#include <stdbool.h>
 
 typedef struct {
   in_addr_t addr;

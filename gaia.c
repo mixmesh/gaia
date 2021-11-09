@@ -15,6 +15,8 @@
 #define SCHED_ERROR -2
 #define THREAD_ERROR -3
 
+#define MAX_NETWORK_SENDER_ADDR_PORTS 256
+
 jb_table_t *jb_table;
 
 void usage(char *argv[]) {
@@ -22,7 +24,8 @@ void usage(char *argv[]) {
           argv[0]);
   fprintf(stderr, "  Note: addr and port default to 127.0.0.1 and 2305\n");
   fprintf(stderr,
-          "  Example: sudo %s -s 172.16.0.116:2305 -d 172.16.0.95 4711\n",
+          "  Example: sudo %s -s 172.16.0.116:2305 -d 172.16.0.95 -d \
+172.16.0.95:2356 4711\n",
           argv[0]);
   exit(ARG_ERROR);
 }
@@ -80,10 +83,10 @@ int main (int argc, char *argv[]) {
   int err;
   in_addr_t src_addr = inet_addr(SRC_ADDR);
   uint16_t src_port = SRC_PORT;
-  in_addr_t dest_addr = inet_addr(DEST_ADDR);
-  uint16_t dest_port = DEST_PORT;
-
-  int opt;
+  network_sender_addr_port_t dest_addr_ports[MAX_NETWORK_SENDER_ADDR_PORTS];
+  dest_addr_ports[0].addr = inet_addr(DEST_ADDR);
+  dest_addr_ports[0].port = DEST_PORT;
+  int opt, ndest_addr_ports = 0;
   while ((opt = getopt(argc, argv, "s:d:")) != -1) {
     switch (opt) {
     case 's':
@@ -92,19 +95,25 @@ int main (int argc, char *argv[]) {
       }
       break;
     case 'd':
-      if (get_addr_port(optarg, &dest_addr, &dest_port) < 0) {
+      if (get_addr_port(optarg, &dest_addr_ports[ndest_addr_ports].addr,
+                        &dest_addr_ports[ndest_addr_ports].port) < 0) {
         usage(argv);
       }
+      ndest_addr_ports = (ndest_addr_ports + 1) % MAX_NETWORK_SENDER_ADDR_PORTS;
       break;
     default:
       usage(argv);
     }
   }
-
+  
+  if (ndest_addr_ports == 0) {
+    ndest_addr_ports = 1;
+  }
+  
   if (optind != argc - 1) {
     usage(argv);
   }
-
+  
   uint32_t userid;
   if (string_to_long(argv[optind], (long *)&userid) < 0) {
     usage(argv);
@@ -120,8 +129,8 @@ int main (int argc, char *argv[]) {
   network_sender_params_t sender_params =
     {
      .userid = userid,
-     .addr = dest_addr,
-     .port = dest_port
+     .naddr_ports = ndest_addr_ports,
+     .addr_ports = dest_addr_ports
     };
   pthread_attr_t sender_attr;
   if ((err = set_fifo_scheduling(&sender_attr, 0)) != 0) {
@@ -137,7 +146,7 @@ int main (int argc, char *argv[]) {
             err);
     exit(THREAD_ERROR);
   }
-
+  
   // Start receiver thread
   pthread_t receiver_thread;
   network_receiver_params_t receiver_params =

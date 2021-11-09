@@ -14,8 +14,7 @@ void *network_sender(void *arg) {
   // Extract parameters
   network_sender_params_t *sender_params = (network_sender_params_t *)arg;
   uint32_t userid = sender_params->userid;
-  in_addr_t addr = sender_params->addr;
-  uint16_t port = sender_params->port;
+  network_sender_addr_port_t *addr_ports = sender_params->addr_ports;
   
   // Create socket
   if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -41,8 +40,8 @@ void *network_sender(void *arg) {
   
   struct sockaddr_in dest_addr = {0};
   dest_addr.sin_family = AF_INET;
-  dest_addr.sin_port = htons(port);
-  dest_addr.sin_addr.s_addr = addr;
+  dest_addr.sin_port = htons(addr_ports[0].port);
+  dest_addr.sin_addr.s_addr = addr_ports[0].addr;
   
   // Open audio device
   if ((err = audio_new(PCM_NAME, SND_PCM_STREAM_CAPTURE, 0, FORMAT,
