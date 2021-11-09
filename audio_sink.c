@@ -8,6 +8,13 @@
 
 extern jb_table_t *jb_table;
 
+void reset_playback_delay(jb_t *jb) {
+  jb->playback = jb_get_entry(jb, JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS);
+  assert(jb->playback != NULL);
+  jb->playback_index = JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS;
+  jb->playback_seqnum = jb->playback->seqnum;
+}
+
 void *audio_sink(void *arg) {
   int err;
   audio_info_t *audio_info = NULL;
@@ -20,22 +27,16 @@ void *audio_sink(void *arg) {
       jb_take_wrlock(jb);
       if (jb->entries > JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS) {
         data_available = true;
-        if (jb->playback == NULL ||
-            jb->playback->seqnum != jb->playback_seqnum ||
-            jb->playback_index == 0) {
-          if (jb->playback == NULL) {
-            printf("Initializes playback entry\n");
-          } else if (jb->playback->seqnum != jb->playback_seqnum) {
-            printf("Playback entry %d has been reused by %d. Resets playback entry.\n",
-                   jb->playback_seqnum, jb->playback->seqnum);
-          } else if (jb->playback_index == 0) {
-            printf("Jitter buffer has been exhausted. Resets playback entry.\n");
-          }
-          jb->playback =
-            jb_get_entry(jb, JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS);
-          assert(jb->playback != NULL);
-          jb->playback_index = JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS;
-          jb->playback_seqnum = jb->playback->seqnum;
+        if (jb->playback == NULL) {
+          printf("Initializes playback entry\n");
+          reset_playback_delay(jb);
+        } else if (jb->playback->seqnum != jb->playback_seqnum) {
+          printf("Playback entry %d has been reused by %d. Resets playback entry.\n",
+                 jb->playback_seqnum, jb->playback->seqnum);
+          reset_playback_delay(jb);
+        } else if (jb->playback_index == 0) {
+          printf("Jitter buffer has been exhausted. Resets playback entry.\n");
+          reset_playback_delay(jb);
         } else {
           // Step playback entry
           uint32_t next_seqnum = jb->playback->seqnum + 1;
