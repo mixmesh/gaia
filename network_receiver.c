@@ -176,6 +176,7 @@ void *network_receiver(void *arg) {
       jb_release_lock(jb);      
     }
 
+    printf("Erase all jitter buffers\n");
     jb_table_free(jb_table, true);
   }
 

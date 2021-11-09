@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <assert.h>
 #include "uthash/uthash.h"
 #include "jb_table.h"
