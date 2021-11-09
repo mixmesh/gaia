@@ -88,7 +88,7 @@ void *network_sender(void *arg) {
                        (struct sockaddr *)&dest_addr, sizeof(dest_addr));
     if (n < 0) {
       if (errno == EWOULDBLOCK) {
-        printf("sendto: Send buffer full but!\n");
+        printf("sendto: Send buffer full but continue anyway!\n");
         continue;
       } else {
         perror("sendto: Failed to write to socket");

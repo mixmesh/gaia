@@ -89,7 +89,7 @@ void *audio_sink(void *arg) {
                              &audio_info)) < 0) {
           fprintf(stderr, "audio_new: Could not initialize audio: %s\n",
                   snd_strerror(err));
-          break;
+          exit(AUDIO_ERROR);
         }
         audio_print_parameters(audio_info, "sink");
         assert(PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
