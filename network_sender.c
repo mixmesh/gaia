@@ -23,8 +23,8 @@ void *network_sender(void *arg) {
     exit(SOCKET_ERROR);
   }
 
-  // Resize socket send buffer to eight periods
-  //  int snd_buf_size = PERIOD_SIZE_IN_BYTES * 8;
+  //Resize socket send buffer to eight periods
+  //int snd_buf_size = PERIOD_SIZE_IN_BYTES * 8;
   //assert(setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &snd_buf_size,
   //                  sizeof(snd_buf_size)) == 0);
   
@@ -91,13 +91,13 @@ void *network_sender(void *arg) {
         ssize_t n = sendto(sockfd, udp_buf, udp_buf_size - written_bytes, 0,
                            (struct sockaddr *)&dest_addr, sizeof(dest_addr));
         if (n == -1 && errno == EWOULDBLOCK) {
+          // NOTE: It may be a better idea to just do a break here!
+          // The send buffer is exhausted!
           printf("sendto: Send buffer full but continue anyway!\n");
           n = 0;
         } else if (n < 0) {
           perror("sendto: Failed to write to socket");
           break;
-        } else {
-          assert(n != 0);
         }
         written_bytes += n;
       }
