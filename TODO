@@ -1,5 +1,7 @@
 * Add mixing to audio_sink.c and test with several users
 
+== STOP! THINK!
+
 * Adaptive jitter buffer
   * Look at the 94 paper and work with pitch scaling
 
