@@ -94,17 +94,19 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
     snd_pcm_hw_params_free(hw_params);
     return err;
   }
+  fprintf(stderr, "4a\n");
   if (desired_buffer_size_in_frames != buffer_size_in_frames) {
     fprintf(stderr,
             "NOTE: Desired buffer size was %ld bytes but it was set to %ld\n",
             desired_buffer_size_in_frames, buffer_size_in_frames);
   }
-
+  fprintf(stderr, "4b\n");
+  
   if ((err = snd_pcm_hw_params(pcm, hw_params)) < 0) {
     snd_pcm_hw_params_free(hw_params);
     return err;
   }
-
+  fprintf(stderr, "4c\n");
   // Set software parameters for playback stream
   snd_pcm_sw_params_t *sw_params = NULL;
 
