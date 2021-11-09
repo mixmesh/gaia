@@ -104,6 +104,7 @@ void *audio_sink(void *arg) {
         audio_free(audio_info);
         audio_info = NULL;
       }
+      fprintf(stderr, "Audio sink sleeps for %dms\n", WAIT_IN_MS);
       msleep(WAIT_IN_MS);
     }
   }
