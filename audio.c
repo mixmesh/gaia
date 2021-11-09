@@ -1,4 +1,5 @@
 #include "audio.h"
+#include "globals.h"
 
 // Read https://www.alsa-project.org/wiki/FramesPeriods carefully
 
@@ -97,28 +98,13 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
       return err;
     }
     
-    if ((err = snd_pcm_sw_params_set_start_threshold(pcm, sw_params,
-                                                     period_size_in_frames)) < 0) {
+    if ((err =
+         snd_pcm_sw_params_set_start_threshold(pcm, sw_params,
+                                               PLAYBACK_START_THRESHOLD)) < 0) {
       snd_pcm_hw_params_free(hw_params);
       snd_pcm_sw_params_free(sw_params);
       return err;
     }
-
-    /*
-    if ((err = snd_pcm_sw_params_set_stop_threshold(pcm, sw_params,
-                                                    period_size_in_frames)) < 0) {
-      snd_pcm_hw_params_free(hw_params);
-      snd_pcm_sw_params_free(sw_params);
-      return err;
-    }
-    
-    if ((err = snd_pcm_sw_params_set_avail_min(pcm, sw_params,
-                                               period_size_in_frames)) < 0) {
-      snd_pcm_hw_params_free(hw_params);
-      snd_pcm_sw_params_free(sw_params);
-      return err;
-    }
-    */
     
     if ((err = snd_pcm_sw_params(pcm, sw_params)) < 0) {
       snd_pcm_hw_params_free(hw_params);

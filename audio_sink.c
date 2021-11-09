@@ -4,26 +4,14 @@
 #include "globals.h"
 #include "timing.h"
 
-#define WAIT_IN_MS 100
+#define WAIT_IN_MS 500
 
 extern jb_table_t *jb_table;
 
 void *audio_sink(void *arg) {
   int err;
-
-  // Open audio device
   audio_info_t *audio_info = NULL;
-  if ((err = audio_new(PCM_NAME, SND_PCM_STREAM_PLAYBACK, 0,
-                       FORMAT, CHANNELS, RATE_IN_HZ, SAMPLE_SIZE_IN_BYTES,
-                       PERIOD_SIZE_IN_FRAMES, BUFFER_MULTIPLICATOR * 2,
-                       &audio_info)) < 0) {
-    fprintf(stderr, "audio_new: Could not initialize audio: %s\n",
-            snd_strerror(err));
-    return NULL;
-  }
-  audio_print_parameters(audio_info, "sink");
-  assert(PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
-
+  
   // Read from jitter buffer, mix and write to audio device
   uint8_t mix_buf[PAYLOAD_SIZE_IN_BYTES];  
   while (true) {
@@ -71,7 +59,7 @@ void *audio_sink(void *arg) {
             }
           }
           /*
-          // NOTE: This index checking is too expensive. Remove ASAP!
+          // NOTE: This index checking is too expensive.
           uint32_t index = jb_get_index(jb, jb->playback);
           if (!(index == 0 && jb->playback_index == 0) &&
               (index > jb->playback_index + 1 ||
@@ -87,25 +75,41 @@ void *audio_sink(void *arg) {
       }
       jb_release_lock(jb);
     };
-    
+
     jb_table_take_rdlock(jb_table);    
     jb_table_foreach(jb_table, mix);
     jb_table_release_lock(jb_table);
     
     if (data_available) {
+      // Open audio device (if needed)
+      if (audio_info == NULL) {
+        if ((err = audio_new(PCM_NAME, SND_PCM_STREAM_PLAYBACK, 0,
+                             FORMAT, CHANNELS, RATE_IN_HZ, SAMPLE_SIZE_IN_BYTES,
+                             PERIOD_SIZE_IN_FRAMES, BUFFER_MULTIPLICATOR,
+                             &audio_info)) < 0) {
+          fprintf(stderr, "audio_new: Could not initialize audio: %s\n",
+                  snd_strerror(err));
+          break;
+        }
+        audio_print_parameters(audio_info, "sink");
+        assert(PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
+        printf("Audio device has been opened for playback\n");
+      }
       if (audio_write(audio_info, mix_buf, PAYLOAD_SIZE_IN_FRAMES) < 0) {
         break;
       }
     } else {
+      // Close audio device and wait a bit
+      if (audio_info != NULL) {
+        audio_free(audio_info);
+        audio_info = NULL;
+      }
       msleep(WAIT_IN_MS);
     }
   }
   
-  audio_free(audio_info);
-
   fprintf(stderr, "audio_sink is shutting down!!!\n");
-  exit(3);
-  
+  audio_free(audio_info);
+  exit(AUDIO_SINK_EXIT_STATUS);  
   return NULL;
 }
-

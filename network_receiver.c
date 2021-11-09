@@ -9,7 +9,7 @@
 #include "globals.h"
 
 #define FOUR_SECONDS_IN_US (4 * 1000000)
-#define DRAIN_BUF_SIZE 32768
+#define DRAIN_BUF_SIZE 1
 
 extern jb_table_t *jb_table;
 
@@ -47,8 +47,6 @@ void *network_receiver(void *arg) {
   uint8_t drain_buf[DRAIN_BUF_SIZE];
     
   while (true) {
-    bool give_up = false;
-
     // Waiting for incoming audio
     printf("Waiting for incoming audio...\n");
     fd_set readfds;
@@ -67,34 +65,26 @@ void *network_receiver(void *arg) {
       int nfds = select(sockfd + 1, &readfds, 0, 0, &timeout);
       if (nfds < 0) {
         perror("select: Failed to drain socket receive buffer\n");
-        give_up = true;
-        break;
+        goto bail_out;
       } else if (nfds == 0) {
         // Socket receiver buffer has been drained!
         break;
       }
       if (recvfrom(sockfd, drain_buf, DRAIN_BUF_SIZE, 0, NULL, NULL) < 0) {
         perror("recvfrom: Failed to drain socket receive buffer\n");
-        give_up = true;
-        break;
+        goto bail_out;
       }
       FD_ZERO(&readfds);
       FD_SET(sockfd, &readfds);
     }
-    if (give_up) {
-      break;
-    } else {
-      printf("Socket receive buffer has been drained\n");
-    }
+    printf("Socket receive buffer has been drained\n");
     
     // Read from socket and write to jitter buffer
     printf("Receiving audio...\n");
-
     uint64_t userid = 0;
     jb_t *jb = NULL;
     double latency = 0;
-    uint64_t last_latency_printout = 0;    
-    
+    uint64_t last_latency_printout = 0;        
     while (true) {
       // Wait for incoming socket data (or timeout)
       FD_ZERO(&readfds);
@@ -103,8 +93,7 @@ void *network_receiver(void *arg) {
       int nfds = select(sockfd + 1, &readfds, 0, 0, &timeout);
       if (nfds < 0) {
         perror("select: Failed to wait for incoming socket data");
-        give_up = true;
-        break;
+        goto bail_out;
       } else if (nfds == 0) {
         // Timeout
         printf("No longer receiving audio!\n");
@@ -113,10 +102,13 @@ void *network_receiver(void *arg) {
       
       // Peek into socket and extract userid
       uint32_t new_userid;
-      if (recvfrom(sockfd, &new_userid, sizeof(uint32_t), MSG_PEEK, NULL,
-                   NULL) < 0) {
+      int n;
+      if ((n = recvfrom(sockfd, &new_userid, sizeof(uint32_t), MSG_PEEK, NULL,
+                        NULL)) < 0) {
         perror("recvfrom: Failed to peek into socket and extract userid");
-        give_up = true;
+        goto bail_out;
+      } else if (n != sizeof(uint32_t)) {
+        printf("Ignored truncated UDP packet!\n");
         break;
       }
       
@@ -143,22 +135,24 @@ void *network_receiver(void *arg) {
       }            
       
       // Read from socket
-      int n;
       if ((n = recvfrom(sockfd, jb_entry->data, udp_buf_size, 0, NULL,
                         NULL)) < 0) {
         perror("recvfrom: Failed to read from socket");
-        give_up = true;
+        goto bail_out;
+      } else if (n != udp_buf_size) {
+        printf("Ignored truncated UDP packet!\n");
         break;
       }
-      assert(n == udp_buf_size);
       
-      // Calculate latency
+      // Calculate latency (for developement debugging only)
       uint64_t timestamp;
       memcpy(&timestamp, &jb_entry->data[4], sizeof(uint64_t));
       uint64_t now = utimestamp();
+      // NOTE: Disable to allow development machines without NTP client
       //assert(now > timestamp);
       latency = latency * 0.9 + (now - timestamp) * 0.1;
       if (now - last_latency_printout > FOUR_SECONDS_IN_US) {
+        // NOTE: Disable to remove noise on stdout
         //printf("Latency: %fms\n", latency / 1000);
         last_latency_printout = now;
       }
@@ -183,12 +177,9 @@ void *network_receiver(void *arg) {
     jb_table_free(jb_table, true);
   }
 
-  if (sockfd != -1) {
-    close(sockfd);
-  }
-
+ bail_out:
   fprintf(stderr, "network_receiver is shutting down!!!\n");
-  exit(2);
-  
+  close(sockfd);
+  exit(NETWORK_RECEIVER_EXIT_STATUS);
   return NULL;
 }
