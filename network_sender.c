@@ -24,9 +24,9 @@ void *network_sender(void *arg) {
   }
 
   // Resize socket send buffer to eight periods
-  int snd_buf_size = PERIOD_SIZE_IN_BYTES * 8;
-  assert(setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &snd_buf_size,
-                    sizeof(snd_buf_size)) == 0);
+  //  int snd_buf_size = PERIOD_SIZE_IN_BYTES * 8;
+  //assert(setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &snd_buf_size,
+  //                  sizeof(snd_buf_size)) == 0);
   
   // Make socket non-blocking
   int flags = fcntl(sockfd, F_GETFL, 0);
