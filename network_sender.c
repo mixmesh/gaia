@@ -29,15 +29,15 @@ void *network_sender(void *arg) {
   //                  sizeof(snd_buf_size)) == 0);
   
   // Make socket non-blocking
-  int flags = fcntl(sockfd, F_GETFL, 0);
-  if (flags < 0) {
-    perror("fcntl: Socket could not be made non-blocking");
-    exit(SOCKET_ERROR);
-  }
-  if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) < 0) {
-    perror("fcntl: Socket could not be made non-blocking");
-    exit(SOCKET_ERROR);
-  }
+  //int flags = fcntl(sockfd, F_GETFL, 0);
+  //if (flags < 0) {
+  //  perror("fcntl: Socket could not be made non-blocking");
+  //  exit(SOCKET_ERROR);
+  //}
+  //if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) < 0) {
+  //  perror("fcntl: Socket could not be made non-blocking");
+  //  exit(SOCKET_ERROR);
+  //}
   
   struct sockaddr_in dest_addr = {0};
   dest_addr.sin_family = AF_INET;
