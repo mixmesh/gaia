@@ -86,18 +86,15 @@ void *network_sender(void *arg) {
     
     // Write to non-blocking socket
     if (frames == PERIOD_SIZE_IN_FRAMES) {
-      uint32_t written_bytes = 0;
-      while (written_bytes < udp_buf_size) {
-        ssize_t n = sendto(sockfd, udp_buf, udp_buf_size - written_bytes, 0,
-                           (struct sockaddr *)&dest_addr, sizeof(dest_addr));
-        if (n < 0) {
-          perror("sendto: Failed to write to socket");
-          break;
-        }
-        written_bytes += n;
+      ssize_t n  = sendto(sockfd, udp_buf, udp_buf_size, 0,
+                          (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+      if (n < 0) {
+        perror("sendto: Failed to write to socket");
+      } else if (n != udp_buf_size) {
+        printf("Too few bytes written to socket!\n");
       }
     } else {
-      printf("Too few frames read from audio device. Ignore them!\n");
+      printf("Too few frames read from audio device!\n");
     }
   }
   
