@@ -14,7 +14,6 @@ typedef struct jb_entry {
 typedef struct {
   uint32_t userid;
   jb_entry_t *playback;
-  uint32_t playback_index;
   uint32_t playback_seqnum;
   uint32_t entries;
   pthread_rwlock_t *rwlock;

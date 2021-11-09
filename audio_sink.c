@@ -11,7 +11,6 @@ extern jb_table_t *jb_table;
 void reset_playback_delay(jb_t *jb) {
   jb->playback = jb_get_entry(jb, JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS);
   assert(jb->playback != NULL);
-  jb->playback_index = JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS;
   jb->playback_seqnum = jb->playback->seqnum;
 }
 
@@ -34,7 +33,7 @@ void *audio_sink(void *arg) {
           printf("Playback entry %d has been reused by %d. Reset playback entry.\n",
                  jb->playback_seqnum, jb->playback->seqnum);
           reset_playback_delay(jb);
-        } else if (jb->playback_index == 0) {
+        } else if (jb->playback == jb->tail) {
           printf("Jitter buffer has been exhausted. Reset playback entry.\n");
           reset_playback_delay(jb);
         } else {
@@ -58,15 +57,11 @@ void *audio_sink(void *arg) {
           }
         }
         /*
-        // NOTE: This debug printout is too expensive.
+        // NOTE: This debug printout is too expensive
         uint32_t index = jb_get_index(jb, jb->playback);
-        if (!(index == 0 && jb->playback_index == 0) &&
-            (index > jb->playback_index + 1 ||
-             index + 1 < jb->playback_index)) {
-          printf("Playback index now is %d (%d) out of %d total entries\n",
-                 index, jb->playback_index, jb->entries);
+        printf("Playback index now is %d out of %d total entries\n",
+               index, jb->entries);
         }
-        jb->playback_index = index;
         */
         // FIXME: Mix!
         memcpy(mix_buf, &jb->playback->data[HEADER_SIZE], PAYLOAD_SIZE_IN_BYTES);

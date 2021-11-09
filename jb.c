@@ -7,7 +7,6 @@ jb_t *jb_new(uint32_t userid) {
   jb_t *jb = malloc(sizeof(jb_t));
   jb->userid = userid;
   jb->playback = NULL;
-  jb->playback_index = 0;
   jb->playback_seqnum = 0;
   jb->entries = 0;
   jb->rwlock = malloc(sizeof(pthread_rwlock_t));
