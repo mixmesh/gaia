@@ -46,9 +46,9 @@ void *audio_sink(void *arg) {
               // Seqnum mismatch. Use the old playback entry again!
               assert(jb->playback->prev->seqnum > next_seqnum);
               // NOTE: Disable to remove noise on stdout
-              //printf("Expected playback entry %d but got %d. Use %d again!\n",
-              //       next_seqnum, jb->playback->prev->seqnum,
-              //       jb->playback->seqnum);
+              printf("Expected playback entry %d but got %d. Use %d again!\n",
+                     next_seqnum, jb->playback->prev->seqnum,
+                     jb->playback->seqnum);
               jb->playback->seqnum = next_seqnum;
               jb->playback_seqnum = next_seqnum;
             }
@@ -98,6 +98,7 @@ void *audio_sink(void *arg) {
       }
       audio_write(audio_info, mix_buf, PAYLOAD_SIZE_IN_FRAMES);
     } else {
+      fprintf(stderr, "No data available in jitter buffers\n");
       // Close audio device and wait a bit
       if (audio_info != NULL) {
         audio_free(audio_info);

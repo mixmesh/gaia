@@ -163,10 +163,10 @@ void *network_receiver(void *arg) {
       if (jb->entries > 0) {
         if (jb->tail->seqnum == seqnum) {
           // NOTE: Disable to remove noise on stdout
-          //printf("Duplicated UDP packet (%d)\n", seqnum);
+          printf("Duplicated UDP packet (%d)\n", seqnum);
         } else if (jb->tail->seqnum + 1 != seqnum) {
           // NOTE: Disable to remove noise on stdout
-          //printf("Missing UDP packet (%d)\n", jb->tail->seqnum + 1);
+          printf("Missing UDP packet (%d)\n", jb->tail->seqnum + 1);
         }
       }
       jb_entry->seqnum = seqnum;
