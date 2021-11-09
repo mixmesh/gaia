@@ -66,9 +66,6 @@ void *network_sender(void *arg) {
   // Add userid to buffer header
   memcpy(udp_buf, &userid, sizeof(userid));
 
-  uint64_t m = 1;
-  
-  
   // Read from audio device and write to socket
   printf("Sending audio...\n");  
   while (true) {
@@ -105,22 +102,10 @@ void *network_sender(void *arg) {
         written_bytes += n;
       }
     } else {
-      printf("Too few frames read from audio device\n");
+      printf("Too few frames read from audio device. Ignore them!\n");
     }
-
-
-    
-    if ((m % 100) == 0) {
-      m = 1;
-      fprintf(stderr, ".");
-    } else {
-      m++;
-    }
-    
-    
-    
   }
-
+  
   
   fprintf(stderr, "network_sender is shutting down!!!\n");
   audio_free(audio_info);
