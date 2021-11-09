@@ -28,14 +28,14 @@ void *audio_sink(void *arg) {
       if (jb->entries > JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS) {
         data_available = true;
         if (jb->playback == NULL) {
-          printf("Initializes playback entry\n");
+          printf("Initializes playback entry. Reset playback entry.\n");
           reset_playback_delay(jb);
         } else if (jb->playback->seqnum != jb->playback_seqnum) {
-          printf("Playback entry %d has been reused by %d. Resets playback entry.\n",
+          printf("Playback entry %d has been reused by %d. Reset playback entry.\n",
                  jb->playback_seqnum, jb->playback->seqnum);
           reset_playback_delay(jb);
         } else if (jb->playback_index == 0) {
-          printf("Jitter buffer has been exhausted. Resets playback entry.\n");
+          printf("Jitter buffer has been exhausted. Reset playback entry.\n");
           reset_playback_delay(jb);
         } else {
           // Step playback entry
@@ -57,8 +57,8 @@ void *audio_sink(void *arg) {
             }
           }
         }
-        // NOTE: This index checking is too expensive.
         /*
+        // NOTE: This debug printout is too expensive.
         uint32_t index = jb_get_index(jb, jb->playback);
         if (!(index == 0 && jb->playback_index == 0) &&
             (index > jb->playback_index + 1 ||
@@ -68,13 +68,13 @@ void *audio_sink(void *arg) {
         }
         jb->playback_index = index;
         */
-        // FIXME: Mix
+        // FIXME: Mix!
         memcpy(mix_buf, &jb->playback->data[HEADER_SIZE], PAYLOAD_SIZE_IN_BYTES);
       }
       jb_release_lock(jb);
     };
     
-    jb_table_take_rdlock(jb_table);    
+    jb_table_take_rdlock(jb_table);
     jb_table_foreach(jb_table, mix);
     jb_table_release_lock(jb_table);
     
