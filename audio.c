@@ -9,8 +9,6 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
               snd_pcm_uframes_t period_size_in_frames,
               uint8_t buffer_multiplicator, audio_info_t **audio_info) {
   int err;
-
-  fprintf(stderr, "1\n");
   
   // Open audio device
   snd_pcm_t *pcm;
@@ -18,8 +16,6 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
     return err;
   }
 
-  fprintf(stderr, "2\n");
-  
   // Set hardware parameters
   snd_pcm_hw_params_t *hw_params;
   
@@ -27,44 +23,32 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
     return err;
   }
 
-  fprintf(stderr, "2a\n");
-  
   if ((err = snd_pcm_hw_params_any(pcm, hw_params)) < 0) {
     snd_pcm_hw_params_free(hw_params);
     return err;
   }
 
-  fprintf(stderr, "2b\n");
-  
   if ((err = snd_pcm_hw_params_set_access(pcm, hw_params,
                                           SND_PCM_ACCESS_RW_INTERLEAVED)) < 0) {
     snd_pcm_hw_params_free(hw_params);
     return err;
   }
 
-  fprintf(stderr, "2c\n");
-  
   if ((err = snd_pcm_hw_params_set_format(pcm, hw_params, format)) < 0) {
     snd_pcm_hw_params_free(hw_params);
     return err;
   }
 
-  fprintf(stderr, "2d\n");
-  
   if ((err = snd_pcm_hw_params_set_channels(pcm, hw_params, channels)) < 0) {
     snd_pcm_hw_params_free(hw_params);
     return err;
   }
 
-  fprintf(stderr, "2e\n");
-  
   if ((err = snd_pcm_hw_params_set_rate(pcm, hw_params, rate_in_hz, 0)) < 0) {
     snd_pcm_hw_params_free(hw_params);
     return err;
   }
 
-  fprintf(stderr, "2f\n");
-  
   snd_pcm_uframes_t desired_period_size_in_frames = period_size_in_frames;
   int dir = 0;
   if ((err = snd_pcm_hw_params_set_period_size_near(pcm, hw_params,
@@ -73,18 +57,12 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
     snd_pcm_hw_params_free(hw_params);
     return err;
   }
-
- fprintf(stderr, "2\n");
-
-  
   if (desired_period_size_in_frames != period_size_in_frames) {
     fprintf(stderr,
             "NOTE: Desired period size was %ld bytes but it was set to %ld\n",
             desired_period_size_in_frames, period_size_in_frames);
   }
 
-  fprintf(stderr, "3\n");
-  
   snd_pcm_uframes_t desired_buffer_size_in_frames =
     period_size_in_frames * buffer_multiplicator;
   snd_pcm_uframes_t buffer_size_in_frames = desired_buffer_size_in_frames;
@@ -94,26 +72,20 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
     snd_pcm_hw_params_free(hw_params);
     return err;
   }
-  fprintf(stderr, "4a\n");
   if (desired_buffer_size_in_frames != buffer_size_in_frames) {
     fprintf(stderr,
             "NOTE: Desired buffer size was %ld bytes but it was set to %ld\n",
             desired_buffer_size_in_frames, buffer_size_in_frames);
   }
-  fprintf(stderr, "4b\n");
   
   if ((err = snd_pcm_hw_params(pcm, hw_params)) < 0) {
     snd_pcm_hw_params_free(hw_params);
     return err;
   }
-  fprintf(stderr, "4c\n");
   // Set software parameters for playback stream
   snd_pcm_sw_params_t *sw_params = NULL;
 
-  fprintf(stderr, "4\n");
-  
   if (stream == SND_PCM_STREAM_PLAYBACK) {
-  fprintf(stderr, "5\n");
     if ((err = snd_pcm_sw_params_malloc(&sw_params)) < 0) {
       snd_pcm_hw_params_free(hw_params);
       return err;
@@ -138,11 +110,8 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
       snd_pcm_sw_params_free(sw_params);
       return err;
     }
-    fprintf(stderr, "6\n");
   }
 
-  fprintf(stderr, "7\n");
-  
   // Prepare audio device for use
   if ((err = snd_pcm_prepare(pcm)) < 0) {
     snd_pcm_hw_params_free(hw_params);
@@ -152,8 +121,6 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
     return err;
   }
 
-  fprintf(stderr, "8\n");
-  
   // Instantiate audio_info
   *audio_info = malloc(sizeof(audio_info_t));
   (*audio_info)->pcm = pcm;
@@ -161,8 +128,6 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
   (*audio_info)->sw_params = sw_params;
   (*audio_info)->period_size_in_frames = period_size_in_frames;
 
-  fprintf(stderr, "9\n");
-  
   return 0;
 }
 

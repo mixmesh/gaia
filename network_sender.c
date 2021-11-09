@@ -78,10 +78,12 @@ void *network_sender(void *arg) {
     seqnum++;
     
     // Read from audio device
-    if (audio_read(audio_info, &udp_buf[HEADER_SIZE],
-                   PERIOD_SIZE_IN_FRAMES) < 0) {      
+    snd_pcm_uframes_t frames;
+    if ((frames = audio_read(audio_info, &udp_buf[HEADER_SIZE],
+                             PERIOD_SIZE_IN_FRAMES)) < 0) {      
       break;
     }
+    assert(PERIOD_SIZE_IN_FRAMES == frames);
     
     // Write to non-blocking socket
     ssize_t n = sendto(sockfd, udp_buf, udp_buf_size, 0,
@@ -96,7 +98,7 @@ void *network_sender(void *arg) {
       }
     }
   }
-
+  
   fprintf(stderr, "network_sender is shutting down!!!\n");
   audio_free(audio_info);
   free(udp_buf);

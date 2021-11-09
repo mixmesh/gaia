@@ -162,9 +162,11 @@ void *network_receiver(void *arg) {
       memcpy(&seqnum, &jb_entry->data[12], sizeof(seqnum));
       if (jb->entries > 0) {
         if (jb->tail->seqnum == seqnum) {
-          printf("Duplicated UDP packet (%d)\n", seqnum);
+          // NOTE: Disable to remove noise on stdout
+          //printf("Duplicated UDP packet (%d)\n", seqnum);
         } else if (jb->tail->seqnum + 1 != seqnum) {
-          printf("Missing UDP packet (%d)\n", jb->tail->seqnum + 1);
+          // NOTE: Disable to remove noise on stdout
+          //printf("Missing UDP packet (%d)\n", jb->tail->seqnum + 1);
         }
       }
       jb_entry->seqnum = seqnum;
