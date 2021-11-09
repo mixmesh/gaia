@@ -151,59 +151,32 @@ void audio_print_parameters(audio_info_t *audio_info, char *who) {
 
 snd_pcm_uframes_t audio_write(audio_info_t *audio_info, uint8_t *data,
                               snd_pcm_uframes_t nframes) {
-  snd_pcm_uframes_t written_frames = 0;
-  while (written_frames < nframes) {
-    snd_pcm_uframes_t frames =
-      snd_pcm_writei(audio_info->pcm, &data[written_frames],
-                     nframes - written_frames);
-    if (frames == -EPIPE || frames == -ESTRPIPE) {
-      printf("snd_pcm_writei: Failed to write to audio device: %s\n",
-             snd_strerror(frames));
-      if (snd_pcm_recover(audio_info->pcm, frames, 0) < 0) {
-        fprintf(stderr, "snd_pcm_readi: Failed to recover audio device: %s\n",
-                snd_strerror(frames));
-        return AUDIO_NOT_RECOVERED;
-      }
-      frames = 0;
-    } else if (frames < 0) {
-      fprintf(stderr, "snd_pcm_writei: Failed to write to audio device: %s\n",
+  snd_pcm_uframes_t frames = snd_pcm_writei(audio_info->pcm, data, nframes);
+  if (frames < 0) {
+    printf("snd_pcm_readi: Failed to write to audio device: %s\n",
+           snd_strerror(frames));
+    if (snd_pcm_recover(audio_info->pcm, frames, 0) < 0) {
+      fprintf(stderr, "snd_pcm_readi: Failed to recover audio device: %s\n",
               snd_strerror(frames));
-      return frames;
-    }
-    written_frames += frames;
-    if (written_frames < nframes) {
-      printf("snd_pcm_writei: %ld frames to go...\n", nframes - written_frames);
+      return AUDIO_NOT_RECOVERED;
     }
   }
-  return written_frames;
+  return frames;
 }
 
 int audio_read(audio_info_t *audio_info, uint8_t *data,
                snd_pcm_uframes_t nframes) {
-  snd_pcm_uframes_t read_frames = 0;
-  while (read_frames < nframes) {
-    snd_pcm_uframes_t frames =
-      snd_pcm_readi(audio_info->pcm, &data[read_frames], nframes - read_frames);
-    if (frames == -EPIPE || frames == -ESTRPIPE) {
-      printf("snd_pcm_readi: Failed to read from audio device: %s\n",
-             snd_strerror(frames));
-      if (snd_pcm_recover(audio_info->pcm, frames, 0) < 0) {
-        fprintf(stderr, "snd_pcm_readi: Failed to recover audio device: %s\n",
-                snd_strerror(frames));
-        return AUDIO_NOT_RECOVERED;
-      }
-      frames = 0;
-    } else if (frames < 0) {
-      fprintf(stderr, "snd_pcm_readi: Failed to read from audio device: %s\n",
+  snd_pcm_uframes_t frames = snd_pcm_readi(audio_info->pcm, data, nframes);
+  if (frames < 0) {
+    printf("snd_pcm_readi: Failed to read from audio device: %s\n",
+           snd_strerror(frames));
+    if (snd_pcm_recover(audio_info->pcm, frames, 0) < 0) {
+      fprintf(stderr, "snd_pcm_readi: Failed to recover audio device: %s\n",
               snd_strerror(frames));
-      return frames;
-    }
-    read_frames += frames;
-    if (read_frames < nframes) {
-      printf("snd_pcm_readi: %ld frames to go...\n", nframes - read_frames);
+      return AUDIO_NOT_RECOVERED;
     }
   }
-  return read_frames;
+  return frames;
 }
 
 /*

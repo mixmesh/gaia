@@ -29,15 +29,15 @@ void *network_sender(void *arg) {
   //                  sizeof(snd_buf_size)) == 0);
   
   // Make socket non-blocking
-  //int flags = fcntl(sockfd, F_GETFL, 0);
-  //if (flags < 0) {
-  //  perror("fcntl: Socket could not be made non-blocking");
-  //  exit(SOCKET_ERROR);
-  //}
-  //if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) < 0) {
-  //  perror("fcntl: Socket could not be made non-blocking");
-  //  exit(SOCKET_ERROR);
-  //}
+  int flags = fcntl(sockfd, F_GETFL, 0);
+  if (flags < 0) {
+    perror("fcntl: Socket could not be made non-blocking");
+    exit(SOCKET_ERROR);
+  }
+  if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) < 0) {
+    perror("fcntl: Socket could not be made non-blocking");
+    exit(SOCKET_ERROR);
+  }
   
   struct sockaddr_in dest_addr = {0};
   dest_addr.sin_family = AF_INET;
@@ -81,20 +81,23 @@ void *network_sender(void *arg) {
     snd_pcm_uframes_t frames;
     if ((frames = audio_read(audio_info, &udp_buf[HEADER_SIZE],
                              PERIOD_SIZE_IN_FRAMES)) < 0) {      
-      break;
+      continue;
     }
-    assert(PERIOD_SIZE_IN_FRAMES == frames);
     
     // Write to non-blocking socket
-    ssize_t n = sendto(sockfd, udp_buf, udp_buf_size, 0,
-                       (struct sockaddr *)&dest_addr, sizeof(dest_addr));
-    if (n < 0) {
-      if (errno == EWOULDBLOCK) {
-        printf("sendto: Send buffer full but continue anyway!\n");
-        continue;
-      } else {
-        perror("sendto: Failed to write to socket");
-        break;
+    if (frames == PERIOD_SIZE_IN_FRAMES) {
+      uint32_t written_bytes = 0;
+      while (written_bytes < udp_buf_size) {
+        ssize_t n = sendto(sockfd, udp_buf, udp_buf_size - written_bytes, 0,
+                           (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+        if (n == -1 && errno == EWOULDBLOCK) {
+          printf("sendto: Send buffer full but continue anyway!\n");
+          n = 0;
+        } else if (n < 0) {
+          perror("sendto: Failed to write to socket");
+          break;
+        }
+        written_bytes += n;
       }
     }
   }

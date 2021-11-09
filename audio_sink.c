@@ -96,9 +96,7 @@ void *audio_sink(void *arg) {
         assert(PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
         printf("Audio device has been opened for playback\n");
       }
-      if (audio_write(audio_info, mix_buf, PAYLOAD_SIZE_IN_FRAMES) < 0) {
-        break;
-      }
+      audio_write(audio_info, mix_buf, PAYLOAD_SIZE_IN_FRAMES);
     } else {
       // Close audio device and wait a bit
       if (audio_info != NULL) {
