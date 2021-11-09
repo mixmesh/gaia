@@ -29,12 +29,13 @@ void *audio_sink(void *arg) {
         if (jb->playback == NULL) {
           printf("Initializes playback entry. Reset playback entry.\n");
           reset_playback_delay(jb);
-        } else if (jb->playback->seqnum != jb->playback_seqnum) {
-          printf("Playback entry %d has been reused by %d. Reset playback entry.\n",
-                 jb->playback_seqnum, jb->playback->seqnum);
-          reset_playback_delay(jb);
         } else if (jb->playback == jb->tail) {
           printf("Jitter buffer has been exhausted. Reset playback entry.\n");
+          reset_playback_delay(jb);
+        } else if (jb->playback->seqnum != jb->playback_seqnum) {
+          printf("Playback entry %d has been reused by %d. Reset playback \
+entry.\n",
+                 jb->playback_seqnum, jb->playback->seqnum);
           reset_playback_delay(jb);
         } else {
           // Step playback entry
