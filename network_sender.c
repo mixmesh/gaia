@@ -79,7 +79,7 @@ void *network_sender(void *arg) {
     
     // Read from audio device
     if (audio_read(audio_info, &udp_buf[HEADER_SIZE],
-                   PERIOD_SIZE_IN_FRAMES) < 0) {
+                   PERIOD_SIZE_IN_FRAMES) < 0) {      
       break;
     }
     

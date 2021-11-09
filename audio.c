@@ -26,33 +26,45 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
   if ((err = snd_pcm_hw_params_malloc(&hw_params)) < 0) {
     return err;
   }
+
+  fprintf(stderr, "2a\n");
   
   if ((err = snd_pcm_hw_params_any(pcm, hw_params)) < 0) {
     snd_pcm_hw_params_free(hw_params);
     return err;
   }
+
+  fprintf(stderr, "2b\n");
   
   if ((err = snd_pcm_hw_params_set_access(pcm, hw_params,
                                           SND_PCM_ACCESS_RW_INTERLEAVED)) < 0) {
     snd_pcm_hw_params_free(hw_params);
     return err;
   }
+
+  fprintf(stderr, "2c\n");
   
   if ((err = snd_pcm_hw_params_set_format(pcm, hw_params, format)) < 0) {
     snd_pcm_hw_params_free(hw_params);
     return err;
   }
+
+  fprintf(stderr, "2d\n");
   
   if ((err = snd_pcm_hw_params_set_channels(pcm, hw_params, channels)) < 0) {
     snd_pcm_hw_params_free(hw_params);
     return err;
   }
+
+  fprintf(stderr, "2e\n");
   
   if ((err = snd_pcm_hw_params_set_rate(pcm, hw_params, rate_in_hz, 0)) < 0) {
     snd_pcm_hw_params_free(hw_params);
     return err;
   }
 
+  fprintf(stderr, "2f\n");
+  
   snd_pcm_uframes_t desired_period_size_in_frames = period_size_in_frames;
   int dir = 0;
   if ((err = snd_pcm_hw_params_set_period_size_near(pcm, hw_params,
@@ -61,6 +73,10 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
     snd_pcm_hw_params_free(hw_params);
     return err;
   }
+
+ fprintf(stderr, "2\n");
+
+  
   if (desired_period_size_in_frames != period_size_in_frames) {
     fprintf(stderr,
             "NOTE: Desired period size was %ld bytes but it was set to %ld\n",
