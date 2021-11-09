@@ -4,7 +4,7 @@
 #include "globals.h"
 #include "timing.h"
 
-#define WAIT_IN_MS 500
+#define WAIT_IN_MS 2000
 
 extern jb_table_t *jb_table;
 
