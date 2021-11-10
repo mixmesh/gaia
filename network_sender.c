@@ -21,8 +21,8 @@ void *network_sender(void *arg) {
     exit(SOCKET_ERROR);
   }
   
-  // Resize socket send buffer to eight periods
-  int snd_buf_size = PERIOD_SIZE_IN_BYTES * 8;
+  // Resize socket send buffer
+  int snd_buf_size = PERIOD_SIZE_IN_BYTES * BUFFER_MULTIPLICATOR;
   assert(setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &snd_buf_size,
                     sizeof(snd_buf_size)) == 0);
   
