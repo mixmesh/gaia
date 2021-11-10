@@ -180,9 +180,10 @@ int audio_read(audio_info_t *audio_info, uint8_t *data,
 }
 
 // http://www.vttoth.com/CMS/index.php/technical-notes/68
-int audio_mix(uint16_t *data[], uint8_t n, uint16_t *mixed_data) {
+int audio_mix_unsigned(uint16_t *data[], uint8_t n, uint16_t *mixed_data) {
+  assert(SAMPLE_SIZE_IN_BYTES == 2);
   if (n == 2) {
-    for (int i = 0; i < PERIOD_SIZE_IN_BYTES; i++) {
+    for (int i = 0; i < PERIOD_SIZE_IN_FRAMES * SAMPLE_SIZE_IN_BYTES; i++) {
       if (data[0][i] < 32768 && data[1][i] < 32768) {
         mixed_data[i] = data[0][i] * data[1][i] / 32768;
       } else {

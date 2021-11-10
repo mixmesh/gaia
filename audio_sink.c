@@ -19,13 +19,13 @@ void *audio_sink(void *arg) {
   audio_info_t *audio_info = NULL;
   
   // Read from jitter buffer, mix and write to audio device
-  uint8_t mix_buf[PAYLOAD_SIZE_IN_BYTES];  
   while (true) {
-    bool data_available = false;
+    uint8_t *data[256];
+    uint8_t ndata = 0;
+    
     void mix(jb_t *jb) {
       jb_take_wrlock(jb);
       if (jb->entries > JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS) {
-        data_available = true;
         if (jb->playback == NULL) {
           printf("Initializes playback entry. Reset playback entry.\n");
           reset_playback_delay(jb);
@@ -64,17 +64,16 @@ entry.\n",
                index, jb->entries);
         }
         */
-        // FIXME: Mix!
-        memcpy(mix_buf, &jb->playback->data[HEADER_SIZE], PAYLOAD_SIZE_IN_BYTES);
+        data[ndata++] = &jb->playback->data[HEADER_SIZE];
       }
       jb_release_lock(jb);
     };
-    
+                  
     jb_table_take_rdlock(jb_table);
     jb_table_foreach(jb_table, mix);
     jb_table_release_lock(jb_table);
     
-    if (data_available) {
+    if (ndata > 0) {
       // Open audio device (if needed)
       if (audio_info == NULL) {
         if ((err = audio_new(PCM_NAME, SND_PCM_STREAM_PLAYBACK, 0,
@@ -89,7 +88,14 @@ entry.\n",
         assert(PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
         printf("Audio device has been opened for playback\n");
       }
-      audio_write(audio_info, mix_buf, PAYLOAD_SIZE_IN_FRAMES);
+      if (ndata == 1) {
+        audio_write(audio_info, data[0], PAYLOAD_SIZE_IN_FRAMES);
+      } else {
+        //uint8_t mix_buf[PERIOD_SIZE_IN_BYTES];  
+        //memcpy(mix_buf, data[0], PAYLOAD_SIZE_IN_BYTES);
+        assert(false);
+      }
+      
     } else {
       fprintf(stderr, "No data available in jitter buffers\n");
       // Close audio device and wait a bit
