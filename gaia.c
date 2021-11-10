@@ -46,9 +46,11 @@ int get_addr_port(char *arg, in_addr_t *addr, uint16_t *port) {
     return -1;
   }
   if ((token = strtok(NULL, ":")) != NULL) {
-    if (string_to_long(token, (long *)port) < 0) {
+    long value;
+    if (string_to_long(token, &value) < 0) {
       return -1;
     }
+    *port = value;
   }
   if (strtok(NULL, ":") != NULL) {
     return -1;
@@ -81,12 +83,16 @@ int set_fifo_scheduling(pthread_attr_t *attr, int8_t priority_offset) {
 
 int main (int argc, char *argv[]) {
   int err;
+
   in_addr_t src_addr = inet_addr(SRC_ADDR);
   uint16_t src_port = SRC_PORT;
+
   network_sender_addr_port_t dest_addr_ports[MAX_NETWORK_SENDER_ADDR_PORTS];
   dest_addr_ports[0].addr = inet_addr(DEST_ADDR);
   dest_addr_ports[0].port = DEST_PORT;
+
   int opt, ndest_addr_ports = 0;
+
   while ((opt = getopt(argc, argv, "s:d:")) != -1) {
     switch (opt) {
     case 's':
@@ -105,23 +111,26 @@ int main (int argc, char *argv[]) {
       usage(argv);
     }
   }
-  
+
   if (ndest_addr_ports == 0) {
     ndest_addr_ports = 1;
   }
-  
+
   if (optind != argc - 1) {
     usage(argv);
   }
-  
+
   uint32_t userid;
-  if (string_to_long(argv[optind], (long *)&userid) < 0) {
+  long value;
+  if (string_to_long(argv[optind], &value) < 0) {
     usage(argv);
   }
+  userid = value;
+  
   if (userid == 0) {
     usage(argv);
   }
-
+  
   jb_table = jb_table_new();
   
   // Start sender thread

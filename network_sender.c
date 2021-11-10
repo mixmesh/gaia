@@ -7,21 +7,20 @@
 
 void *network_sender(void *arg) {
   int err;
-  int sockfd = -1;
-  uint8_t *udp_buf = NULL;
-  audio_info_t *audio_info = NULL;
   
   // Extract parameters
   network_sender_params_t *sender_params = (network_sender_params_t *)arg;
   uint32_t userid = sender_params->userid;
+  uint8_t naddr_ports = sender_params->naddr_ports;
   network_sender_addr_port_t *addr_ports = sender_params->addr_ports;
   
   // Create socket
+  int sockfd = -1;
   if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
     perror("socket: Socket creation failed");
     exit(SOCKET_ERROR);
   }
-
+  
   // Resize socket send buffer to eight periods
   int snd_buf_size = PERIOD_SIZE_IN_BYTES * 8;
   assert(setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &snd_buf_size,
@@ -38,12 +37,17 @@ void *network_sender(void *arg) {
     exit(SOCKET_ERROR);
   }
   
-  struct sockaddr_in dest_addr = {0};
-  dest_addr.sin_family = AF_INET;
-  dest_addr.sin_port = htons(addr_ports[0].port);
-  dest_addr.sin_addr.s_addr = addr_ports[0].addr;
+  // Create destination addresses
+  struct sockaddr_in dest_addrs[naddr_ports];
+  for (int i = 0; i < naddr_ports; i++) {
+    memset(&dest_addrs[i], 0, sizeof(dest_addrs[i]));
+    dest_addrs[i].sin_family = AF_INET;
+    dest_addrs[i].sin_addr.s_addr = addr_ports[i].addr;
+    dest_addrs[i].sin_port = htons(addr_ports[i].port);
+  }
   
   // Open audio device
+  audio_info_t *audio_info;
   if ((err = audio_new(PCM_NAME, SND_PCM_STREAM_CAPTURE, 0, FORMAT,
                        CHANNELS, RATE_IN_HZ, SAMPLE_SIZE_IN_BYTES,
                        PERIOD_SIZE_IN_FRAMES, BUFFER_MULTIPLICATOR,
@@ -59,7 +63,8 @@ void *network_sender(void *arg) {
          PERIOD_SIZE_IN_MS);
   
   uint32_t udp_buf_size = HEADER_SIZE + PAYLOAD_SIZE_IN_BYTES;
-  udp_buf = malloc(udp_buf_size);
+
+  uint8_t *udp_buf = malloc(udp_buf_size);
   uint32_t seqnum = 1;
   
   // Add userid to buffer header
@@ -85,12 +90,14 @@ void *network_sender(void *arg) {
     
     // Write to non-blocking socket
     if (frames == PERIOD_SIZE_IN_FRAMES) {
-      ssize_t n  = sendto(sockfd, udp_buf, udp_buf_size, 0,
-                          (struct sockaddr *)&dest_addr, sizeof(dest_addr));
-      if (n < 0) {
-        perror("sendto: Failed to write to socket");
-      } else if (n != udp_buf_size) {
-        printf("Too few bytes written to socket!\n");
+      for (int i = 0; i < naddr_ports; i++) {
+        ssize_t n  = sendto(sockfd, udp_buf, udp_buf_size, 0,
+                            (struct sockaddr *)&dest_addrs[i], sizeof(dest_addrs[i]));
+        if (n < 0) {
+          perror("sendto: Failed to write to socket");
+        } else if (n != udp_buf_size) {
+          printf("Too few bytes written to socket!\n");
+        }
       }
     } else {
       printf("Too few frames read from audio device!\n");

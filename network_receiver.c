@@ -31,10 +31,11 @@ void *network_receiver(void *arg) {
     exit(SOCKET_ERROR);
   }
   
-  struct sockaddr_in src_addr = {0};
+  struct sockaddr_in src_addr;
+  memset(&src_addr, 0, sizeof(src_addr));
   src_addr.sin_family = AF_INET;
-  src_addr.sin_port = htons(port);
   src_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+  src_addr.sin_port = htons(port);
   
   if (bind(sockfd, (struct sockaddr *)&src_addr, sizeof(src_addr)) < 0) {
     perror("bind: Binding of socket failed");
