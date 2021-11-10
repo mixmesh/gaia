@@ -23,6 +23,6 @@ snd_pcm_uframes_t audio_write(audio_info_t *audio_info, uint8_t *data,
                               snd_pcm_uframes_t nframes);
 int audio_read(audio_info_t *audio_info, uint8_t *data,
                snd_pcm_uframes_t nframes);
-int audio_mix_unsigned(uint16_t *data[], uint8_t n, uint16_t *mixed_data);
+int audio_umix16(uint16_t *data[], uint8_t n, uint16_t *mixed_data);
 
 #endif

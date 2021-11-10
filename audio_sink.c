@@ -90,12 +90,14 @@ entry.\n",
       }
       if (ndata == 1) {
         audio_write(audio_info, data[0], PAYLOAD_SIZE_IN_FRAMES);
+      } else if (ndata == 2) {
+        assert(SAMPLE_SIZE_IN_BYTES == 2 && FORMAT == SND_PCM_FORMAT_U16_LE);
+        uint16_t mix_buf[PERIOD_SIZE_IN_BYTES / SAMPLE_SIZE_IN_BYTES];
+        assert(audio_umix16((uint16_t **)data, ndata, mix_buf) == 0);
+        audio_write(audio_info, (uint8_t *)mix_buf, PAYLOAD_SIZE_IN_FRAMES);
       } else {
-        //uint8_t mix_buf[PERIOD_SIZE_IN_BYTES];  
-        //memcpy(mix_buf, data[0], PAYLOAD_SIZE_IN_BYTES);
-        assert(false);
+        assert(ndata < 3);
       }
-      
     } else {
       fprintf(stderr, "No data available in jitter buffers\n");
       // Close audio device and wait a bit
