@@ -179,33 +179,19 @@ int audio_read(audio_info_t *audio_info, uint8_t *data,
   return frames;
 }
 
-/*
-int audio_mix(
-http://www.vttoth.com/CMS/index.php/technical-notes/68
-https://stackoverflow.com/a/25102339
-
-
-
-
-int a = 111; // first sample (-32768..32767)
-int b = 222; // second sample
-int m; // mixed result will go here
-
-// Make both samples unsigned (0..65535)
-a += 32768;
-b += 32768;
-
-// Pick the equation
-if ((a < 32768) || (b < 32768)) {
-    // Viktor's first equation when both sources are "quiet"
-    // (i.e. less than middle of the dynamic range)
-    m = a * b / 32768;
-} else {
-    // Viktor's second equation when one or both sources are loud
-    m = 2 * (a + b) - (a * b) / 32768 - 65536;
+// http://www.vttoth.com/CMS/index.php/technical-notes/68
+int audio_mix(uint16_t *data[], uint8_t n, uint16_t *mixed_data) {
+  if (n == 2) {
+    for (int i = 0; i < PERIOD_SIZE_IN_BYTES; i++) {
+      if (data[0][i] < 32768 && data[1][i] < 32768) {
+        mixed_data[i] = data[0][i] * data[1][i] / 32768;
+      } else {
+        mixed_data[i] =
+          2 * (data[0][i] + data[1][i]) -
+          (data[0][i] * data[1][i]) / 32768 - 65536;
+      }
+    }
+    return 0;
+  }
+  return -1;
 }
-
-// Output is unsigned (0..65536) so convert back to signed (-32768..32767)
-if (m == 65536) m = 65535;
-m -= 32768;
-*/

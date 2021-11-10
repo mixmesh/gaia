@@ -2,3 +2,4 @@ https://www.embedded.com/effective-use-of-pthreads-in-embedded-linux-designs-par
 https://lup.lub.lu.se/luur/download?func=downloadFile&recordOId=9021527&fileOId=9021534
 https://github.com/amurzeau/waveOverUDP/tree/master/unix
 https://netbeez.net/blog/how-to-use-the-linux-traffic-control/
+https://signal.org/blog/client-side-audio-quality/
