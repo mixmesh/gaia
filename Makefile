@@ -5,12 +5,16 @@ DEPDIR:=.deps
 DEPFLAGS=-MT $@ -MMD -MP -MF $(DEPDIR)/$*.d
 COMPILE.c=$(CC) $(DEPFLAGS) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c
 
-SRCS=audio.c audio_sink.c gaia.c jb.c jb_table.c network_receiver.c network_sender.c timing.c
+SRCS=audio.c audio_sink.c file_sender.c gaia.c gaia_file_sender.c gaia_utils.c jb.c jb_table.c network_receiver.c network_sender.c timing.c
 OBJS=$(SRCS:%.c=%.o)
 
-all: gaia
+EXECS=gaia gail_file_sender
 
-gaia: audio.o audio_sink.o gaia.o jb.o jb_table.o network_receiver.o network_sender.o timing.o
+all: $(EXECS)
+
+gaia: audio.o audio_sink.o gaia.o gaia_utils.o jb.o jb_table.o network_receiver.o network_sender.o timing.o
+
+gaia_file_sender: file_sender.o gaia_file_sender.o gaia_utils.o timing.o
 
 objs: $(OBJS)
 
@@ -26,8 +30,8 @@ $(DEPDIR): ; @mkdir -p $@
 DEPFILES := $(SRCS:%.c=$(DEPDIR)/%.d)
 $(DEPFILES):
 
-clean:
-	rm -f *.o gaia
+clean:	
+	rm -f *.o $(EXECS)
 
 mrproper: clean
 	(cd test; $(MAKE) mrproper)
