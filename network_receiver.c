@@ -153,8 +153,8 @@ void *network_receiver(void *arg) {
       //assert(now > timestamp);
       latency = latency * 0.9 + (now - timestamp) * 0.1;
       if (now - last_latency_printout > FOUR_SECONDS_IN_US) {
-        // NOTE: Disable to remove noise on stdout
-        //printf("Latency: %fms\n", latency / 1000);
+	// NOTE: Disable to remove noise on stdout
+	printf("Latency: %fms\n", latency / 1000);
         last_latency_printout = now;
       }
       

@@ -5,15 +5,16 @@
 #include "audio_sink.h"
 #include "jb_table.h"
 #include "timing.h"
+#include "globals.h"
 
 #define SRC_ADDR "127.0.0.1"
 #define SRC_PORT 2305
 #define DEST_ADDR "127.0.0.1"
 #define DEST_PORT 2305
 
-#define ARG_ERROR -1
-#define SCHED_ERROR -2
-#define THREAD_ERROR -3
+#define ARG_ERROR     1
+#define SCHED_ERROR   2
+#define THREAD_ERROR  3
 
 #define MAX_NETWORK_SENDER_ADDR_PORTS 256
 
@@ -60,9 +61,7 @@ int get_addr_port(char *arg, in_addr_t *addr, uint16_t *port) {
 
 int set_fifo_scheduling(pthread_attr_t *attr, int8_t priority_offset) {
   int err;
-  if ((err = pthread_attr_init(attr)) != 0) {
-    return err;
-  }
+
   struct sched_param sched_param;
   if ((err = pthread_attr_getschedparam(attr, &sched_param)) != 0) {
     return err;
@@ -83,9 +82,9 @@ int set_fifo_scheduling(pthread_attr_t *attr, int8_t priority_offset) {
 
 int main (int argc, char *argv[]) {
   int err;
-
   in_addr_t src_addr = inet_addr(SRC_ADDR);
   uint16_t src_port = SRC_PORT;
+  char* audio_device_name = PCM_NAME;
 
   network_sender_addr_port_t dest_addr_ports[MAX_NETWORK_SENDER_ADDR_PORTS];
   dest_addr_ports[0].addr = inet_addr(DEST_ADDR);
@@ -93,7 +92,7 @@ int main (int argc, char *argv[]) {
 
   int opt, ndest_addr_ports = 0;
 
-  while ((opt = getopt(argc, argv, "s:d:")) != -1) {
+  while ((opt = getopt(argc, argv, "s:d:D:")) != -1) {
     switch (opt) {
     case 's':
       if (get_addr_port(optarg, &src_addr, &src_port) < 0) {
@@ -106,6 +105,9 @@ int main (int argc, char *argv[]) {
         usage(argv);
       }
       ndest_addr_ports = (ndest_addr_ports + 1) % MAX_NETWORK_SENDER_ADDR_PORTS;
+      break;
+    case 'D':
+      audio_device_name = strdup(optarg);
       break;
     default:
       usage(argv);
@@ -139,15 +141,30 @@ int main (int argc, char *argv[]) {
     {
      .userid = userid,
      .naddr_ports = ndest_addr_ports,
-     .addr_ports = dest_addr_ports
+     .addr_ports = dest_addr_ports,
+     .pcm_name = audio_device_name
     };
   pthread_attr_t sender_attr;
-  if ((err = set_fifo_scheduling(&sender_attr, 0)) != 0) {
-    fprintf(stderr,
-            "set_fifo_scheduling: Scheduling could not be configured (%d)\n",
-            err);
-    exit(SCHED_ERROR);
+
+  if ((err = pthread_attr_init(&sender_attr)) != 0) {
+      fprintf(stderr, "pthread_attr_init: sender_attr could not be initialized (%d)\n",
+	      err);
+      exit(THREAD_ERROR);      
+  }  
+
+  if (geteuid() == 0) {
+      if ((err = set_fifo_scheduling(&sender_attr, 0)) != 0) {
+	  fprintf(stderr,
+		  "set_fifo_scheduling: Scheduling could not be configured (%d)\n",
+		  err);
+	  exit(SCHED_ERROR);
+      }
   }
+  else {
+	  fprintf(stderr,
+		  "euid not root, set_fifo_scheduling not used\n");
+  }
+
   if ((err = pthread_create(&sender_thread, &sender_attr, network_sender,
                             (void *)&sender_params)) < 0) {
     fprintf(stderr,
@@ -164,11 +181,25 @@ int main (int argc, char *argv[]) {
      .port = src_port,
     };
   pthread_attr_t receiver_attr;
-  if ((err = set_fifo_scheduling(&receiver_attr, 0)) != 0) {
-    fprintf(stderr, "pthread_create: Scheduling could not be configured (%d)\n",
-            err);
-    exit(SCHED_ERROR);
+
+  if ((err = pthread_attr_init(&receiver_attr)) != 0) {
+      fprintf(stderr, "pthread_attr_init: receiver_attr could not be initialized (%d)\n",
+	      err);
+      exit(THREAD_ERROR);      
+  }  
+
+  if (geteuid() == 0) {
+      if ((err = set_fifo_scheduling(&receiver_attr, 0)) != 0) {
+	  fprintf(stderr, "pthread_create: Scheduling could not be configured (%d)\n",
+		  err);
+	  exit(SCHED_ERROR);
+      }
   }
+  else {
+      fprintf(stderr,
+	      "euid not root, set_fifo_scheduling not used\n");
+  }
+  
   if ((err = pthread_create(&receiver_thread, &receiver_attr, network_receiver,
                             (void *)&receiver_params)) < 0) {
     fprintf(stderr,
@@ -181,13 +212,30 @@ int main (int argc, char *argv[]) {
   
   // Start audio sink thread
   pthread_t audio_sink_thread;
-  audio_sink_params_t audio_sink_params;
+  audio_sink_params_t audio_sink_params =
+  {
+      .pcm_name = audio_device_name
+  };
   pthread_attr_t audio_sink_attr;
-  if ((err = set_fifo_scheduling(&audio_sink_attr, 0)) != 0) {
-    fprintf(stderr, "pthread_create: Scheduling could not be configured (%d)\n",
-            err);
-    exit(SCHED_ERROR);
+
+  if ((err = pthread_attr_init(&audio_sink_attr)) != 0) {
+      fprintf(stderr, "pthread_attr_init: audio_sink_attr could not be initialized (%d)\n",
+	      err);
+      exit(THREAD_ERROR);
   }
+
+  if (geteuid() == 0) {  
+      if ((err = set_fifo_scheduling(&audio_sink_attr, 0)) != 0) {
+	  fprintf(stderr, "pthread_create: Scheduling could not be configured (%d)\n",
+		  err);
+	  exit(SCHED_ERROR);
+      }
+  }
+  else {
+      fprintf(stderr,
+	      "euid not root, set_fifo_scheduling not used\n");
+  }
+
   if ((err = pthread_create(&audio_sink_thread, &audio_sink_attr, audio_sink,
                             (void *)&audio_sink_params)) < 0) {
     fprintf(stderr,
@@ -200,6 +248,7 @@ int main (int argc, char *argv[]) {
   // thread calls exit(3)
   pthread_exit(0);
 
+  fprintf(stderr, "terminating\n");
   jb_table_free(jb_table, false);
   
   return 0;

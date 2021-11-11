@@ -12,7 +12,8 @@ typedef struct {
 typedef struct {
   uint32_t userid;
   uint8_t naddr_ports;
-  network_sender_addr_port_t *addr_ports;  
+  network_sender_addr_port_t *addr_ports;
+  char* pcm_name;
 } network_sender_params_t;
 
 void *network_sender(void *arg);
