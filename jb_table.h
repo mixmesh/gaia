@@ -9,8 +9,8 @@
 #define JB_TABLE_ALREADY_EXISTS -1
 
 typedef struct {
-  jb_t *jb;
-  pthread_rwlock_t *rwlock;
+    jb_t *jb;
+    pthread_rwlock_t *rwlock;
 } jb_table_t;
 
 jb_table_t *jb_table_new(void);

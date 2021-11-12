@@ -22,8 +22,8 @@ void msleep(uint32_t ms) {
 }
 
 uint64_t utimestamp() {
-  struct timespec now;
-  assert(clock_gettime(CLOCK_REALTIME, &now) == 0);
-  return (uint64_t)(now.tv_sec - SECONDS_BETWEEN_1970_and_2021) * 1000000 +
-    now.tv_nsec / 1000;
+    struct timespec now;
+    assert(clock_gettime(CLOCK_REALTIME, &now) == 0);
+    return (uint64_t)(now.tv_sec - SECONDS_BETWEEN_1970_and_2021) * 1000000 +
+        now.tv_nsec / 1000;
 }

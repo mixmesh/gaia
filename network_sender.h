@@ -5,15 +5,15 @@
 #include <inttypes.h>
 
 typedef struct {
-  in_addr_t addr;
-  uint16_t port;
+    in_addr_t addr;
+    uint16_t port;
 } network_sender_addr_port_t;
 
 typedef struct {
-  uint32_t userid;
-  uint8_t naddr_ports;
-  network_sender_addr_port_t *addr_ports;
-  char* pcm_name;
+    uint32_t userid;
+    uint8_t naddr_ports;
+    network_sender_addr_port_t *addr_ports;
+    char* pcm_name;
 } network_sender_params_t;
 
 void *network_sender(void *arg);

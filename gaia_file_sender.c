@@ -6,15 +6,14 @@
 #include "gaia_utils.h"
 #include "globals.h"
 
-#define ADDR "127.0.0.1"
-#define PORT 2305
-
 #define MAX_FILE_SENDER_ADDR_PORTS 256
 
 void usage(char *argv[]) {
     fprintf(stderr, "Usage: %s [-d addr[:port]] userid filename\n",
             argv[0]);
-    fprintf(stderr, "  Note: addr and port default to 127.0.0.1 and 2305\n");
+    fprintf(stderr,
+            "Note: addr and port default respectively defaults to %s and %d\n",
+            DEFAULT_ADDR, DEFAULT_PORT);
     fprintf(stderr,
             "  Example: sudo %s -d 172.16.0.95 -d 172.16.0.95:2356 4711 \
 sound.u16\n",
@@ -26,8 +25,8 @@ int main (int argc, char *argv[]) {
     int err;
     
     file_sender_addr_port_t addr_ports[MAX_FILE_SENDER_ADDR_PORTS];
-    addr_ports[0].addr = inet_addr(ADDR);
-    addr_ports[0].port = PORT;
+    addr_ports[0].addr = inet_addr(DEFAULT_ADDR);
+    addr_ports[0].port = DEFAULT_PORT;
     
     int opt, naddr_ports = 0;
 
@@ -111,6 +110,5 @@ root!\n");
     }
     
     pthread_join(sender_thread, NULL);
-    
     return 0;
 }

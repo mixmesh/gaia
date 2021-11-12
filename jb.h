@@ -5,21 +5,21 @@
 #include "uthash/uthash.h"
 
 typedef struct jb_entry {
-  uint32_t seqnum;
-  uint8_t *data;
-  struct jb_entry *next;
-  struct jb_entry *prev;
+    uint32_t seqnum;
+    uint8_t *data;
+    struct jb_entry *next;
+    struct jb_entry *prev;
 } jb_entry_t;
 
 typedef struct {
-  uint32_t userid;
-  jb_entry_t *playback;
-  uint32_t playback_seqnum;
-  uint32_t entries;
-  pthread_rwlock_t *rwlock;
-  jb_entry_t *tail;
-  jb_entry_t *head;
-  UT_hash_handle hh;
+    uint32_t userid;
+    jb_entry_t *playback;
+    uint32_t playback_seqnum;
+    uint32_t entries;
+    pthread_rwlock_t *rwlock;
+    jb_entry_t *tail;
+    jb_entry_t *head;
+    UT_hash_handle hh;
 } jb_t;
 
 #define ALREADY_EXISTS        (1 << 0)
