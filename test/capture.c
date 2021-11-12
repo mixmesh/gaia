@@ -11,7 +11,7 @@
 audio_info_t *audio_info = NULL;
 FILE *fd = NULL;
 
-void signal_handler() {
+void stop() {
     if (fd != NULL) {
         fclose(fd);
     }
@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
         exit(ARG_ERROR);
     }
 
-    if (signal(SIGINT, signal_handler) == SIG_ERR) {
+    if (signal(SIGINT, stop) == SIG_ERR) {
         perror("signal");
         exit(INTERNAL_ERROR);
     }
@@ -61,5 +61,5 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    signal_handler();
+    stop();
 }
