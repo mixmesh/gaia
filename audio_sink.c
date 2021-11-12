@@ -6,6 +6,7 @@
 
 #define WAIT_IN_MS 2000
 
+
 extern jb_table_t *jb_table;
 
 void reset_playback_delay(jb_t *jb) {
@@ -112,6 +113,5 @@ entry.\n",
   
   fprintf(stderr, "audio_sink is shutting down!!!\n");
   audio_free(audio_info);
-  exit(AUDIO_SINK_EXIT_STATUS);  
-  return NULL;
+  exit(AUDIO_SINK_DIED);  
 }

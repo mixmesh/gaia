@@ -8,7 +8,7 @@ COMPILE.c=$(CC) $(DEPFLAGS) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c
 SRCS=audio.c audio_sink.c file_sender.c gaia.c gaia_file_sender.c gaia_utils.c jb.c jb_table.c network_receiver.c network_sender.c timing.c
 OBJS=$(SRCS:%.c=%.o)
 
-EXECS=gaia gail_file_sender
+EXECS=gaia gaia_file_sender
 
 all: $(EXECS)
 

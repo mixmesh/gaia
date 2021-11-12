@@ -66,8 +66,8 @@ void *network_sender(void *arg) {
          PERIOD_SIZE_IN_MS);
   
   uint32_t udp_buf_size = HEADER_SIZE + PAYLOAD_SIZE_IN_BYTES;
-
   uint8_t *udp_buf = malloc(udp_buf_size);
+
   uint32_t seqnum = 1;
   
   // Add userid to buffer header
@@ -111,6 +111,5 @@ void *network_sender(void *arg) {
   audio_free(audio_info);
   free(udp_buf);
   close(sockfd);
-  exit(NETWORK_SENDER_EXIT_STATUS);
-  return NULL;
+  exit(NETWORK_SENDER_DIED);
 }

@@ -13,10 +13,6 @@
 #define DEST_ADDR "127.0.0.1"
 #define DEST_PORT 2305
 
-#define ARG_ERROR     1
-#define SCHED_ERROR   2
-#define THREAD_ERROR  3
-
 #define MAX_NETWORK_SENDER_ADDR_PORTS 256
 
 jb_table_t *jb_table;

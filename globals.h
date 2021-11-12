@@ -30,11 +30,15 @@
 // |userid:4|timestamp:8|seqnum:4| = 16 bytes
 #define HEADER_SIZE (4 + 8 + 4)
 
-#define SOCKET_ERROR -102
-#define AUDIO_ERROR -103
+#define ARG_ERROR                 1
+#define SCHED_ERROR               2
+#define THREAD_ERROR              3
+#define SOCKET_ERROR              4
+#define AUDIO_ERROR               5
+#define FILE_ERROR                6
+#define AUDIO_SINK_DIED           7
+#define FILE_SENDER_DIED          8
+#define NETWORK_RECEIVER_DIED     9
+#define NETWORK_SENDER_DIED      10
 
-#define NETWORK_SENDER_EXIT_STATUS 1
-#define NETWORK_RECEIVER_EXIT_STATUS 2
-#define AUDIO_SINK_EXIT_STATUS 3
-  
 #endif

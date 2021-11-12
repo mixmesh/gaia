@@ -148,14 +148,14 @@ void *network_receiver(void *arg) {
       // Calculate latency (for developement debugging only)
       uint64_t timestamp;
       memcpy(&timestamp, &jb_entry->data[4], sizeof(uint64_t));
-      uint64_t now = utimestamp();
+      uint64_t current_timestamp = utimestamp();
       // NOTE: Disable to allow development machines without NTP client
-      //assert(now > timestamp);
-      latency = latency * 0.9 + (now - timestamp) * 0.1;
-      if (now - last_latency_printout > FOUR_SECONDS_IN_US) {
+      //assert(current_timestamp > timestamp);
+      latency = latency * 0.9 + (current_timestamp - timestamp) * 0.1;
+      if (current_timestamp - last_latency_printout > FOUR_SECONDS_IN_US) {
 	// NOTE: Disable to remove noise on stdout
 	printf("Latency: %fms\n", latency / 1000);
-        last_latency_printout = now;
+        last_latency_printout = current_timestamp;
       }
       
       // Add seqnum to jitter buffer entry and insert entry
@@ -184,6 +184,5 @@ void *network_receiver(void *arg) {
  bail_out:
   fprintf(stderr, "network_receiver is shutting down!!!\n");
   close(sockfd);
-  exit(NETWORK_RECEIVER_EXIT_STATUS);
-  return NULL;
+  exit(NETWORK_RECEIVER_DIED);
 }
