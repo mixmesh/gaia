@@ -8,15 +8,21 @@
 // $ ./capture test.dat
 // $ ./playback test.dat
 
-#define MAX_SAMPLES 3
+#define MAX_FILES 128
+
+typedef struct {
+    FILE *fd;
+    bool activated;
+} file_t;
+
+file_t files[MAX_FILES];
+uint8_t nfiles = 0;
 
 audio_info_t *audio_info = NULL;
-FILE *fds[MAX_SAMPLES];
-uint8_t nfds = 0;
 
 void stop() {
-    for (uint8_t i = 0; i < nfds; i++) {
-        fclose(fds[i]);
+    for (uint8_t i = 0; i < nfiles; i++) {
+        fclose(files[i].fd);
     }
     if (audio_info != NULL) {
         audio_free(audio_info);
@@ -25,11 +31,11 @@ void stop() {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 2 || argc > 4) {
+    if (argc < 2) {
         exit(ARG_ERROR);
     }
 
-    nfds = argc - 1;
+    nfiles = argc - 1;
 
     if (signal(SIGINT, stop) == SIG_ERR) {
         perror("signal");
@@ -48,44 +54,38 @@ int main(int argc, char *argv[]) {
     audio_print_parameters(audio_info, "playback");
     assert(PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
 
-    for (uint8_t i = 0; i < nfds; i++) {
-        if ((fds[i] = fopen(argv[i + 1], "r")) == NULL) {
+    for (uint8_t i = 0; i < nfiles; i++) {
+        if ((files[i].fd = fopen(argv[i + 1], "r")) == NULL) {
             perror(argv[i + 1]);
             exit(FILE_ERROR);
         }
+        files[i].activated = true;
     }
 
-    uint8_t bufs[nfds][PERIOD_SIZE_IN_BYTES];
+    uint16_t *data[nfiles];
 
     while (true) {
-        uint8_t nbufs = 0;
-        bool active_bufs[nfds];
-        uint8_t active_buf;
-        for (uint8_t i = 0; i < nfds; i++) {
-            if (fread(bufs[i], 1, PERIOD_SIZE_IN_BYTES, fds[i]) ==
+        uint8_t nactive = 0;
+        for (uint8_t i = 0; i < nfiles; i++) {
+            if (!files[i].activated) {
+                continue;
+            }
+            if (fread(data[nactive], 1, PERIOD_SIZE_IN_BYTES, files[i].fd) !=
                 PERIOD_SIZE_IN_BYTES) {
-                nbufs++;
-                active_bufs[i] = true;
-                active_buf = i;
+                files[i].activated = false;
             } else {
-                active_bufs[i] = false;
+                nactive++;
             }
         }
 
         uint8_t *buf;
-        if (nbufs == 0) {
+        uint16_t mixed_data[PERIOD_SIZE_IN_BYTES];
+        if (nactive == 0) {
             break;
-        } else if (nbufs == 1) {
-            buf = bufs[active_buf];
+        } else if (nactive == 1) {
+            buf = (uint8_t *)data[0];
         } else {
-            uint16_t *data[nfds], mixed_data[PERIOD_SIZE_IN_BYTES];
-            uint8_t nactive_bufs = 0;
-            for (uint8_t i = 0; i < nfds; i++) {
-                if (active_bufs[i]) {
-                    data[nactive_bufs++] = (uint16_t *)bufs[i];
-                }
-            }
-            assert(audio_umix16(data, nactive_bufs, mixed_data) == 0);
+            assert(audio_umix16(data, nactive, mixed_data) == 0);
             buf = (uint8_t *)mixed_data;
         }
 
