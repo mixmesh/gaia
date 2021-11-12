@@ -23,11 +23,11 @@ sound.u16\n",
 
 int main (int argc, char *argv[]) {
     int err;
-    
+
     file_sender_addr_port_t addr_ports[MAX_FILE_SENDER_ADDR_PORTS];
     addr_ports[0].addr = inet_addr(DEFAULT_ADDR);
     addr_ports[0].port = DEFAULT_PORT;
-    
+
     int opt, naddr_ports = 0;
 
     while ((opt = getopt(argc, argv, "d:")) != -1) {
@@ -57,7 +57,7 @@ int main (int argc, char *argv[]) {
     if (string_to_long(argv[optind], &value) < 0) {
         usage(argv);
     }
-    userid = value;  
+    userid = value;
     if (userid == 0) {
         usage(argv);
     }
@@ -67,7 +67,7 @@ int main (int argc, char *argv[]) {
     if (stat(filename,&buffer) != 0) {
         usage(argv);
     }
-  
+
     // Start sender thread
     pthread_t sender_thread;
     file_sender_params_t sender_params =
@@ -84,10 +84,10 @@ int main (int argc, char *argv[]) {
                 "pthread_attr_init: Failed to initialize sender thread \
 attribute (%d)\n",
                 err);
-        exit(THREAD_ERROR);      
+        exit(THREAD_ERROR);
     }
 
-    if (geteuid() == 0) {  
+    if (geteuid() == 0) {
         pthread_attr_t sender_attr;
         if ((err = set_fifo_scheduling(&sender_attr, 0)) != 0) {
             fprintf(stderr,
@@ -100,7 +100,7 @@ attribute (%d)\n",
                 "WARNING: Failed to set FIFO scheduling, i.e. euid not \
 root!\n");
     }
-  
+
     if ((err = pthread_create(&sender_thread, &sender_attr, file_sender,
                               (void *)&sender_params)) < 0) {
         fprintf(stderr,
@@ -108,7 +108,7 @@ root!\n");
                 err);
         exit(THREAD_ERROR);
     }
-    
+
     pthread_join(sender_thread, NULL);
     return 0;
 }

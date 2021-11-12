@@ -59,28 +59,28 @@ int main (int argc, char *argv[]) {
             usage(argv);
         }
     }
-  
+
     if (ndest_addr_ports == 0) {
         ndest_addr_ports = 1;
     }
-    
+
     if (optind != argc - 1) {
         usage(argv);
     }
-    
+
     uint32_t userid;
     long value;
     if (string_to_long(argv[optind], &value) < 0) {
         usage(argv);
     }
     userid = value;
-  
+
     if (userid == 0) {
         usage(argv);
     }
-  
+
     jb_table = jb_table_new();
-  
+
     // Start sender thread
     pthread_t sender_thread;
     network_sender_params_t sender_params =
@@ -97,9 +97,9 @@ int main (int argc, char *argv[]) {
                 "pthread_attr_init: Failed to initialize sender thread \
 attribute (%d)\n",
                 err);
-        exit(THREAD_ERROR);      
+        exit(THREAD_ERROR);
     }
-  
+
     if (geteuid() == 0) {
         if ((err = set_fifo_scheduling(&sender_attr, 0)) != 0) {
             fprintf(stderr,
@@ -112,14 +112,14 @@ attribute (%d)\n",
                 "WARNING: Failed to set FIFO scheduling, i.e. euid not \
 root!\n");
     }
-  
+
     if ((err = pthread_create(&sender_thread, &sender_attr, network_sender,
                               (void *)&sender_params)) < 0) {
         fprintf(stderr, "pthread_create: Failed to start sender thread (%d)\n",
                 err);
         exit(THREAD_ERROR);
     }
-  
+
     // Start receiver thread
     pthread_t receiver_thread;
     network_receiver_params_t receiver_params =
@@ -132,11 +132,11 @@ root!\n");
     if ((err = pthread_attr_init(&receiver_attr)) != 0) {
         fprintf(stderr,
                 "pthread_attr_init: Failed to initialize receiver thread attribute \
-(%d)\n",            
+(%d)\n",
                 err);
-        exit(THREAD_ERROR);      
-    }  
-  
+        exit(THREAD_ERROR);
+    }
+
     if (geteuid() == 0) {
         if ((err = set_fifo_scheduling(&receiver_attr, 0)) != 0) {
             fprintf(stderr,
@@ -149,7 +149,7 @@ root!\n");
                 "WARNING: Failed to set FIFO scheduling, i.e. euid not \
 root!\n");
     }
-  
+
     if ((err = pthread_create(&receiver_thread, &receiver_attr, network_receiver,
                               (void *)&receiver_params)) < 0) {
         fprintf(stderr, "pthread_create: Failed to start receiver thread \
@@ -159,14 +159,14 @@ root!\n");
     }
 
     msleep(500);
-  
+
     // Start audio sink thread
     pthread_t audio_sink_thread;
     audio_sink_params_t audio_sink_params =
         {
          .pcm_name = audio_device_name
         };
-  
+
     pthread_attr_t audio_sink_attr;
     if ((err = pthread_attr_init(&audio_sink_attr)) != 0) {
         fprintf(stderr,
@@ -175,8 +175,8 @@ attribute (%d)\n",
                 err);
         exit(THREAD_ERROR);
     }
-  
-    if (geteuid() == 0) {  
+
+    if (geteuid() == 0) {
         if ((err = set_fifo_scheduling(&audio_sink_attr, 0)) != 0) {
             fprintf(stderr,
                     "set_fifo_scheduling: Failed to set FIFO scheduling (%d)\n",
@@ -188,7 +188,7 @@ attribute (%d)\n",
                 "WARNING: Failed to set FIFO scheduling, i.e. euid not \
 root!\n");
     }
-  
+
     if ((err = pthread_create(&audio_sink_thread, &audio_sink_attr, audio_sink,
                               (void *)&audio_sink_params)) < 0) {
         fprintf(stderr,
@@ -197,10 +197,10 @@ root!\n");
                 err);
         exit(THREAD_ERROR);
     }
-  
+
     pthread_join(sender_thread, NULL);
     pthread_join(receiver_thread, NULL);
     pthread_join(audio_sink_thread, NULL);
-    jb_table_free(jb_table, false);  
+    jb_table_free(jb_table, false);
     return 0;
 }

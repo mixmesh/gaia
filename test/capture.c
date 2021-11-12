@@ -30,8 +30,8 @@ int main(int argc, char *argv[]) {
         perror("signal");
         exit(INTERNAL_ERROR);
     }
-    
-    int err;    
+
+    int err;
     if ((err = audio_new(PCM_NAME, SND_PCM_STREAM_CAPTURE, 0, FORMAT,
                          CHANNELS, RATE_IN_HZ, SAMPLE_SIZE_IN_BYTES,
                          PERIOD_SIZE_IN_FRAMES, BUFFER_MULTIPLICATOR,
@@ -47,21 +47,19 @@ int main(int argc, char *argv[]) {
         perror("fopen: Could not open filename");
         exit(FILE_ERROR);
     }
-    
+
     uint8_t buf[PERIOD_SIZE_IN_BYTES];
-    
+
     while (true) {
-        snd_pcm_uframes_t frames;
-        if ((frames = audio_read(audio_info, buf,
-                                 PERIOD_SIZE_IN_FRAMES)) < 0) {      
+        if (audio_read(audio_info, buf, PERIOD_SIZE_IN_FRAMES) < 0) {
             break;
         }
-        
+
         if (fwrite(&buf, 1, PERIOD_SIZE_IN_BYTES, fd) != PERIOD_SIZE_IN_BYTES) {
             perror("fwrite");
             break;
         }
     }
-    
+
     signal_handler();
 }

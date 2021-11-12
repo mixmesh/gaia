@@ -9,7 +9,7 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
               snd_pcm_uframes_t period_size_in_frames,
               uint8_t buffer_multiplicator, audio_info_t **audio_info) {
     int err;
-  
+
     // Open audio device
     snd_pcm_t *pcm;
     if ((err = snd_pcm_open(&pcm, pcm_name, stream, mode)) < 0) {
@@ -18,7 +18,7 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
 
     // Set hardware parameters
     snd_pcm_hw_params_t *hw_params;
-  
+
     if ((err = snd_pcm_hw_params_malloc(&hw_params)) < 0) {
         return err;
     }
@@ -80,7 +80,7 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
 %ld\n",
                 desired_buffer_size_in_frames, buffer_size_in_frames);
     }
-  
+
     if ((err = snd_pcm_hw_params(pcm, hw_params)) < 0) {
         snd_pcm_hw_params_free(hw_params);
         return err;
@@ -93,13 +93,13 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
             snd_pcm_hw_params_free(hw_params);
             return err;
         }
-    
+
         if ((err = snd_pcm_sw_params_current(pcm, sw_params)) < 0) {
             snd_pcm_hw_params_free(hw_params);
             snd_pcm_sw_params_free(sw_params);
             return err;
         }
-        
+
         if ((err =
              snd_pcm_sw_params_set_start_threshold(pcm, sw_params,
                                                    PLAYBACK_START_THRESHOLD)) <
@@ -108,7 +108,7 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
             snd_pcm_sw_params_free(sw_params);
             return err;
         }
-    
+
         if ((err = snd_pcm_sw_params(pcm, sw_params)) < 0) {
             snd_pcm_hw_params_free(hw_params);
             snd_pcm_sw_params_free(sw_params);
@@ -187,6 +187,17 @@ int audio_read(audio_info_t *audio_info, uint8_t *data,
 // http://www.vttoth.com/CMS/index.php/technical-notes/68
 int audio_umix16(uint16_t *data[], uint8_t n, uint16_t *mixed_data) {
     if (n == 2) {
+        for (int i = 0; i < PERIOD_SIZE_IN_FRAMES * SAMPLE_SIZE_IN_BYTES; i++) {
+            if (data[0][i] < 32768 && data[1][i] < 32768) {
+                mixed_data[i] = data[0][i] * data[1][i] / 32768;
+            } else {
+                mixed_data[i] =
+                    2 * (data[0][i] + data[1][i]) -
+                    (data[0][i] * data[1][i]) / 32768 - 65536;
+            }
+        }
+        return 0;
+    } else if (n == 3) {
         for (int i = 0; i < PERIOD_SIZE_IN_FRAMES * SAMPLE_SIZE_IN_BYTES; i++) {
             if (data[0][i] < 32768 && data[1][i] < 32768) {
                 mixed_data[i] = data[0][i] * data[1][i] / 32768;

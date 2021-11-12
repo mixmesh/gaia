@@ -13,7 +13,7 @@ void timespec_diff(struct timespec *start, struct timespec *stop,
 }
 
 void msleep(uint32_t ms) {
-    struct timespec req = 
+    struct timespec req =
         {
          .tv_sec = ms / 1000,
          .tv_nsec = (ms % 1000) * 1000000L

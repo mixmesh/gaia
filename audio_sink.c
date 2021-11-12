@@ -18,12 +18,12 @@ void reset_playback_delay(jb_t *jb) {
 void *audio_sink(void *arg) {
     int err;
     audio_info_t *audio_info = NULL;
-  
+
     // Read from jitter buffer, mix and write to audio device
     while (true) {
         uint8_t *data[256];
         uint8_t ndata = 0;
-    
+
         void mix(jb_t *jb) {
             jb_take_wrlock(jb);
             if (jb->entries > JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS) {
@@ -74,11 +74,11 @@ Use %d again!\n",
             }
             jb_release_lock(jb);
         };
-                  
+
         jb_table_take_rdlock(jb_table);
         jb_table_foreach(jb_table, mix);
         jb_table_release_lock(jb_table);
-    
+
         if (ndata > 0) {
             // Open audio device (if needed)
             if (audio_info == NULL) {
@@ -120,8 +120,8 @@ Use %d again!\n",
             msleep(WAIT_IN_MS);
         }
     }
-  
+
     fprintf(stderr, "audio_sink is shutting down!!!\n");
     audio_free(audio_info);
-    exit(AUDIO_SINK_DIED);  
+    exit(AUDIO_SINK_DIED);
 }

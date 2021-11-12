@@ -45,7 +45,7 @@ int set_fifo_scheduling(pthread_attr_t *attr, int8_t priority_offset) {
         return err;
     }
     sched_param.sched_priority = sched_get_priority_max(SCHED_FIFO) +
-        priority_offset;  
+        priority_offset;
     if ((err = pthread_attr_setschedparam(attr, &sched_param)) != 0) {
         return err;
     }

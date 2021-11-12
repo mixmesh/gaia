@@ -28,15 +28,15 @@ int main(int argc, char *argv[]) {
     if (argc < 2 || argc > 4) {
         exit(ARG_ERROR);
     }
-    
+
     nfds = argc - 1;
-    
+
     if (signal(SIGINT, signal_handler) == SIG_ERR) {
         perror("signal");
         exit(INTERNAL_ERROR);
     }
-    
-    int err;    
+
+    int err;
     if ((err = audio_new(PCM_NAME, SND_PCM_STREAM_PLAYBACK, 0, FORMAT,
                          CHANNELS, RATE_IN_HZ, SAMPLE_SIZE_IN_BYTES,
                          PERIOD_SIZE_IN_FRAMES, BUFFER_MULTIPLICATOR,
@@ -47,17 +47,16 @@ int main(int argc, char *argv[]) {
     }
     audio_print_parameters(audio_info, "playback");
     assert(PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
-    
+
     for (uint8_t i = 0; i < nfds; i++) {
         if ((fds[i] = fopen(argv[i + 1], "r")) == NULL) {
             perror(argv[i + 1]);
             exit(FILE_ERROR);
         }
     }
-    
+
     uint8_t bufs[MAX_SAMPLES][PERIOD_SIZE_IN_BYTES];
-    snd_pcm_uframes_t frames;
-    
+
     while (true) {
         uint8_t nbufs = 0;
         for (uint8_t i = 0; i < nfds; i++) {
@@ -66,27 +65,25 @@ int main(int argc, char *argv[]) {
                 nbufs++;
             }
         }
-        
-        uint8_t *write_buf;
-            
+
+        uint8_t *buf;
         if (nbufs == 0) {
             break;
         } else if (nbufs == 1) {
-            write_buf = bufs[0];
+            buf = bufs[0];
         } else {
-            uint16_t *mix_data[MAX_SAMPLES], mix_buf[PERIOD_SIZE_IN_BYTES];
+            uint16_t *data[MAX_SAMPLES], mixed_data[PERIOD_SIZE_IN_BYTES];
             for (uint8_t i; i < nbufs; i++) {
-                mix_data[i] = (uint16_t *)bufs[i];
+                data[i] = (uint16_t *)bufs[i];
             }
-            assert(audio_umix16(mix_data, nbufs, mix_buf) == 0);
-            write_buf = (uint8_t *)mix_buf;
+            assert(audio_umix16(data, nbufs, mixed_data) == 0);
+            buf = (uint8_t *)mixed_data;
         }
-        
-        if ((frames = audio_write(audio_info, write_buf,
-                                  PERIOD_SIZE_IN_FRAMES)) < 0) {      
+
+        if (audio_write(audio_info, buf, PERIOD_SIZE_IN_FRAMES) < 0) {
             break;
         }
     }
-    
+
     signal_handler();
 }
