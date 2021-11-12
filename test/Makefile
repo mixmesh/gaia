@@ -35,7 +35,7 @@ mrproper: clean
 
 capture.o: capture.c ../audio.h
 
-playback.o: playback.c ../audio.h 
+playback.o: playback.c ../audio.h
 
 test_jb.o: test_jb.c ../jb.h ../ ../bits.h
 

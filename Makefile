@@ -30,11 +30,11 @@ $(DEPDIR): ; @mkdir -p $@
 DEPFILES := $(SRCS:%.c=$(DEPDIR)/%.d)
 $(DEPFILES):
 
-clean:	
+clean:
 	rm -f *.o $(EXECS)
 
 mrproper: clean
 	(cd test; $(MAKE) mrproper)
-	rm -f *~ #* 
+	rm -f *~ #*
 
 include $(wildcard $(DEPFILES))

@@ -10,7 +10,7 @@ int main (int argc, char *argv[]) {
   jb_table_t *jb_table = jb_table_new();
   jb_t *jb;
   int8_t res;
-  
+
   jb = jb_new(1);
   res = jb_table_add(jb_table, jb);
   assert(res == JB_TABLE_SUCCESS && jb_table_count(jb_table) == 1);
@@ -28,7 +28,7 @@ int main (int argc, char *argv[]) {
   for (jb = jb_table->jb; jb != NULL; jb = jb->hh.next) {
     printf("Jitter buffer %d (%d)\n", jb->userid, jb->entries);
   }
-  
+
   jb_table_delete(jb_table, 1);
   assert(jb_table_count(jb_table) == 1);
   jb = jb_table_find(jb_table, 1);

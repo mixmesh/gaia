@@ -31,11 +31,11 @@ int main (int argc, char *argv[]) {
   fprintf(stderr, "========================================================================\n");
   fprintf(stderr, "jb_test\n");
   fprintf(stderr, "========================================================================\n");
-  
+
   jb_t *jb = jb_new(1);
   jb_entry_t *jb_entry;
   uint8_t result;
-  
+
   fprintf(stderr, "* Add 2:2\n");
   jb_entry = jb_entry_new(DATA_SIZE);
   jb_entry->seqnum = 2;
