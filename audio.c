@@ -185,29 +185,23 @@ int audio_read(audio_info_t *audio_info, uint8_t *data,
 }
 
 // http://www.vttoth.com/CMS/index.php/technical-notes/68
-int audio_umix16(uint16_t *data[], uint8_t n, uint16_t *mixed_data) {
-    if (n == 2) {
-        for (int i = 0; i < PERIOD_SIZE_IN_FRAMES * SAMPLE_SIZE_IN_BYTES; i++) {
-            if (data[0][i] < 32768 && data[1][i] < 32768) {
-                mixed_data[i] = data[0][i] * data[1][i] / 32768;
-            } else {
-                mixed_data[i] =
-                    2 * (data[0][i] + data[1][i]) -
-                    (data[0][i] * data[1][i]) / 32768 - 65536;
-            }
-        }
-        return 0;
-    } else if (n == 3) {
-        for (int i = 0; i < PERIOD_SIZE_IN_FRAMES * SAMPLE_SIZE_IN_BYTES; i++) {
-            if (data[0][i] < 32768 && data[1][i] < 32768) {
-                mixed_data[i] = data[0][i] * data[1][i] / 32768;
-            } else {
-                mixed_data[i] =
-                    2 * (data[0][i] + data[1][i]) -
-                    (data[0][i] * data[1][i]) / 32768 - 65536;
-            }
-        }
-        return 0;
+uint16_t mix(uint16_t a, uint16_t b) {
+    if (a < 32768 || b < 32768) {
+        return (uint32_t)a * b / 32768;
+    } else {
+        return 2 * ((uint32_t)a + b) - (uint32_t)a * b / 32768 - 65536;
     }
-    return -1;
+}
+
+int audio_umix16(uint16_t *data[], uint8_t n, uint16_t *mixed_data) {
+    if (n < 2 || n > 3) {
+        return -1;
+    }
+    for (int i = 0; i < PERIOD_SIZE_IN_FRAMES * SAMPLE_SIZE_IN_BYTES; i++) {
+        mixed_data[i] = mix(data[0][i], data[1][i]);
+        if (n == 3) {
+            mixed_data[i] = mix(mixed_data[i], data[2][i]);
+        }
+    }
+    return 0;
 }
