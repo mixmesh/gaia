@@ -14,7 +14,7 @@ audio_info_t *audio_info = NULL;
 FILE *fds[MAX_SAMPLES];
 uint8_t nfds = 0;
 
-void signal_handler() {
+void stop() {
     for (uint8_t i = 0; i < nfds; i++) {
         fclose(fds[i]);
     }
@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
 
     nfds = argc - 1;
 
-    if (signal(SIGINT, signal_handler) == SIG_ERR) {
+    if (signal(SIGINT, stop) == SIG_ERR) {
         perror("signal");
         exit(INTERNAL_ERROR);
     }
@@ -85,5 +85,5 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    signal_handler();
+    stop();
 }
