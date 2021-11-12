@@ -1,84 +1,92 @@
+#include <stdio.h>
+#include <stdbool.h>
+#include <signal.h>
 #include <alsa/asoundlib.h>
 #include "../audio.h"
+#include "../globals.h"
 
-#define AUDIO_ERROR 3
+// $ ./capture test.dat
+// $ ./playback test.dat
 
-// $ ./capture > test.dat
-// $ aplay --format MU_LAW --file-type raw test.dat
-// $ cat test.dat | ./playback
+#define MAX_SAMPLES 3
 
-int main() {
-  int err;
-  
-  // Hardwired audio settings
-  char *pcm_name = "default";
-  snd_pcm_stream_t stream = SND_PCM_STREAM_PLAYBACK;
-  int mode = 0;
-  snd_pcm_format_t format = SND_PCM_FORMAT_MU_LAW;
-  uint8_t channels = 1;
-  uint8_t sample_size_in_bytes = 1;
-  uint8_t frame_size_in_bytes = channels * sample_size_in_bytes;
-  uint32_t rate_in_hz = 8000;
-  snd_pcm_uframes_t period_size_in_frames = 128;
-  uint32_t period_size_in_bytes = period_size_in_frames * frame_size_in_bytes;
-  uint8_t buffer_multiplicator = 3;
-  
-  // Open audio device
-  audio_info_t *audio_info;
-  if ((err = audio_new(pcm_name, stream, mode, format, channels, rate_in_hz,
-                       sample_size_in_bytes, period_size_in_frames,
-                       buffer_multiplicator, &audio_info)) < 0) {
-    fprintf(stderr, "Could not initialize audio: %s\n", snd_strerror(err));
-    exit(AUDIO_ERROR);
-  }
-  audio_print_parameters(audio_info, "playback");
-  
-  // Playback 5 seconds of audio data
-  unsigned int period_time;
-  int dir;
-  if ((err = snd_pcm_hw_params_get_period_time(audio_info->hw_params,
-                                               &period_time, &dir)) < 0) {
-    fprintf(stderr, "Could not get period time: %s\n", snd_strerror(err));
-    exit(1);
-  }
-  long loops = 5000000 / period_time;
-  uint8_t *buf = malloc(period_size_in_bytes);
+audio_info_t *audio_info = NULL;
+FILE *fds[MAX_SAMPLES];
+uint8_t nfds = 0;
 
-  while (loops-- > 0) {
-    ssize_t bytes = read(STDIN_FILENO, buf, period_size_in_bytes);
-    if (bytes == 0) {
-      break;
-    } else if (bytes < 0) {
-      perror("Failed to read from stdout");
-      break;
-    } else if (bytes != period_size_in_bytes) {
-      fprintf(stderr,
-              "Expected to read %d bytes from stdin but only read %ld\n",
-              period_size_in_bytes, bytes);
-      break;
+void signal_handler() {
+    for (uint8_t i = 0; i < nfds; i++) {
+        fclose(fds[i]);
     }
-    snd_pcm_sframes_t frames =
-      snd_pcm_writei(audio_info->pcm, buf, period_size_in_frames);
-    if (frames == -EPIPE || frames == -ESTRPIPE) {
-      fprintf(stderr, "Failed to write to audio device: %s\n",
-              snd_strerror(frames));
-      if (snd_pcm_recover(audio_info->pcm, frames, 0) < 0) {
-        fprintf(stderr, "Failed to recover audio device: %s\n",
-                snd_strerror(frames));
-        break;
-      }
-    } else if (frames < 0) {
-      fprintf(stderr, "Failed to write to audio device: %s\n",
-              snd_strerror(frames));
-      break;
-    } else if (frames != period_size_in_frames) {
-      fprintf(stderr, "Expected to write %ld frames to audio device but only \
-wrote %ld\n",
-              period_size_in_frames, frames);
-      break;
+    if (audio_info != NULL) {
+        audio_free(audio_info);
     }
-  }
-  
-  audio_free(audio_info);
-  return 0;
+    exit(0);
+}
+
+int main(int argc, char *argv[]) {
+    if (argc < 2 || argc > 4) {
+        exit(ARG_ERROR);
+    }
+    
+    nfds = argc - 1;
+    
+    if (signal(SIGINT, signal_handler) == SIG_ERR) {
+        perror("signal");
+        exit(INTERNAL_ERROR);
+    }
+    
+    int err;    
+    if ((err = audio_new(PCM_NAME, SND_PCM_STREAM_PLAYBACK, 0, FORMAT,
+                         CHANNELS, RATE_IN_HZ, SAMPLE_SIZE_IN_BYTES,
+                         PERIOD_SIZE_IN_FRAMES, BUFFER_MULTIPLICATOR,
+                         &audio_info)) < 0) {
+        fprintf(stderr, "audio_new: Could not initialize audio: %s\n",
+                snd_strerror(err));
+        exit(AUDIO_ERROR);
+    }
+    audio_print_parameters(audio_info, "playback");
+    assert(PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
+    
+    for (uint8_t i = 0; i < nfds; i++) {
+        if ((fds[i] = fopen(argv[i + 1], "r")) == NULL) {
+            perror(argv[i + 1]);
+            exit(FILE_ERROR);
+        }
+    }
+    
+    uint8_t bufs[MAX_SAMPLES][PERIOD_SIZE_IN_BYTES];
+    snd_pcm_uframes_t frames;
+    
+    while (true) {
+        uint8_t nbufs = 0;
+        for (uint8_t i = 0; i < nfds; i++) {
+            if (fread(bufs[i], 1, PERIOD_SIZE_IN_BYTES, fds[i]) ==
+                PERIOD_SIZE_IN_BYTES) {
+                nbufs++;
+            }
+        }
+        
+        uint8_t *write_buf;
+            
+        if (nbufs == 0) {
+            break;
+        } else if (nbufs == 1) {
+            write_buf = bufs[0];
+        } else {
+            uint16_t *mix_data[MAX_SAMPLES], mix_buf[PERIOD_SIZE_IN_BYTES];
+            for (uint8_t i; i < nbufs; i++) {
+                mix_data[i] = (uint16_t *)bufs[i];
+            }
+            assert(audio_umix16(mix_data, nbufs, mix_buf) == 0);
+            write_buf = (uint8_t *)mix_buf;
+        }
+        
+        if ((frames = audio_write(audio_info, write_buf,
+                                  PERIOD_SIZE_IN_FRAMES)) < 0) {      
+            break;
+        }
+    }
+    
+    signal_handler();
 }

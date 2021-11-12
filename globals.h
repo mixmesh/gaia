@@ -40,6 +40,7 @@
 #define FILE_SENDER_DIED          8
 #define NETWORK_RECEIVER_DIED     9
 #define NETWORK_SENDER_DIED      10
+#define INTERNAL_ERROR           11
 
 #define DEFAULT_ADDR "127.0.0.1"
 #define DEFAULT_PORT 2305
