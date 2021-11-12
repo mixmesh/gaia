@@ -104,8 +104,7 @@ Use %d again!\n",
                        FORMAT == SND_PCM_FORMAT_U16_LE);
                 uint16_t mix_buf[PERIOD_SIZE_IN_BYTES / SAMPLE_SIZE_IN_BYTES];
                 assert(audio_umix16((uint16_t **)data, ndata, mix_buf) == 0);
-                audio_write(audio_info, (uint8_t *)mix_buf,
-                            PAYLOAD_SIZE_IN_FRAMES);
+                audio_write(audio_info, (uint8_t *)mix_buf, PAYLOAD_SIZE_IN_FRAMES);
             } else {
                 assert(ndata < 3);
             }

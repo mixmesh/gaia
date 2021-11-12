@@ -13,6 +13,7 @@
 typedef struct {
     FILE *fd;
     bool activated;
+    uint8_t *data;
 } file_t;
 
 file_t files[MAX_FILES];
@@ -23,6 +24,7 @@ audio_info_t *audio_info = NULL;
 void stop() {
     for (uint8_t i = 0; i < nfiles; i++) {
         fclose(files[i].fd);
+        free(files[i].data);
     }
     if (audio_info != NULL) {
         audio_free(audio_info);
@@ -60,9 +62,11 @@ int main(int argc, char *argv[]) {
             exit(FILE_ERROR);
         }
         files[i].activated = true;
+        files[i].data = malloc(PERIOD_SIZE_IN_BYTES);
     }
 
-    uint16_t *data[nfiles];
+    uint8_t *data[nfiles];
+    uint8_t mixed_data[PERIOD_SIZE_IN_BYTES];
 
     while (true) {
         uint8_t nactive = 0;
@@ -70,26 +74,26 @@ int main(int argc, char *argv[]) {
             if (!files[i].activated) {
                 continue;
             }
-            if (fread(data[nactive], 1, PERIOD_SIZE_IN_BYTES, files[i].fd) !=
+            if (fread(files[i].data, 1, PERIOD_SIZE_IN_BYTES, files[i].fd) ==
                 PERIOD_SIZE_IN_BYTES) {
-                files[i].activated = false;
+                data[nactive++] = files[i].data;
             } else {
-                nactive++;
+                files[i].activated = false;
             }
         }
 
-        uint8_t *buf;
-        uint16_t mixed_data[PERIOD_SIZE_IN_BYTES];
+        uint8_t *write_buf;
         if (nactive == 0) {
             break;
         } else if (nactive == 1) {
-            buf = (uint8_t *)data[0];
+            write_buf = data[0];
         } else {
-            assert(audio_umix16(data, nactive, mixed_data) == 0);
-            buf = (uint8_t *)mixed_data;
+            assert(audio_umix16((uint16_t **)data, nactive,
+                                (uint16_t *)mixed_data) == 0);
+            write_buf = mixed_data;
         }
 
-        if (audio_write(audio_info, buf, PERIOD_SIZE_IN_FRAMES) < 0) {
+        if (audio_write(audio_info, write_buf, PERIOD_SIZE_IN_FRAMES) < 0) {
             break;
         }
     }

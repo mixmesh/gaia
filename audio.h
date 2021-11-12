@@ -2,6 +2,7 @@
 #define _AUDIO_H_
 
 #include <alsa/asoundlib.h>
+#include "globals.h"
 
 #define AUDIO_NOT_RECOVERED -1000
 
