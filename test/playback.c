@@ -55,14 +55,20 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    uint8_t bufs[MAX_SAMPLES][PERIOD_SIZE_IN_BYTES];
+    uint8_t bufs[nfds][PERIOD_SIZE_IN_BYTES];
 
     while (true) {
         uint8_t nbufs = 0;
+        bool active_bufs[nfds];
+        uint8_t active_buf;
         for (uint8_t i = 0; i < nfds; i++) {
             if (fread(bufs[i], 1, PERIOD_SIZE_IN_BYTES, fds[i]) ==
                 PERIOD_SIZE_IN_BYTES) {
                 nbufs++;
+                active_bufs[i] = true;
+                active_buf = i;
+            } else {
+                active_bufs[i] = false;
             }
         }
 
@@ -70,13 +76,16 @@ int main(int argc, char *argv[]) {
         if (nbufs == 0) {
             break;
         } else if (nbufs == 1) {
-            buf = bufs[0];
+            buf = bufs[active_buf];
         } else {
-            uint16_t *data[MAX_SAMPLES], mixed_data[PERIOD_SIZE_IN_BYTES];
-            for (uint8_t i; i < nbufs; i++) {
-                data[i] = (uint16_t *)bufs[i];
+            uint16_t *data[nfds], mixed_data[PERIOD_SIZE_IN_BYTES];
+            uint8_t nactive_bufs = 0;
+            for (uint8_t i = 0; i < nfds; i++) {
+                if (active_bufs[i]) {
+                    data[nactive_bufs++] = (uint16_t *)bufs[i];
+                }
             }
-            assert(audio_umix16(data, nbufs, mixed_data) == 0);
+            assert(audio_umix16(data, nactive_bufs, mixed_data) == 0);
             buf = (uint8_t *)mixed_data;
         }
 
