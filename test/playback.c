@@ -40,10 +40,10 @@ void stop() {
     exit(0);
 }
 
-uint16_t root_mean_square(uint16_t *values, uint16_t n) {
+uint16_t root_mean_square(uint16_t *peak_values, uint16_t n) {
     double sum = 0.0;
     for(uint16_t i = 0; i < n; i++)
-        sum += (double)values[i] * values[i];
+        sum += (double)peak_values[i] * peak_values[i];
     return sqrt(sum / n);
 }
 
