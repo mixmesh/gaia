@@ -6,7 +6,6 @@
 
 #define WAIT_IN_MS 2000
 
-
 extern jb_table_t *jb_table;
 
 void reset_playback_delay(jb_t *jb) {
@@ -24,11 +23,11 @@ void *audio_sink(void *arg) {
         uint8_t *data[256];
         uint8_t ndata = 0;
 
-        void mix(jb_t *jb) {
+        void step_playback_entry(jb_t *jb) {
             jb_take_wrlock(jb);
-            if (jb->entries > JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS) {
+            if (jb->nentries > JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS) {
                 if (jb->playback == NULL) {
-                    printf("Initializes playback entry. \
+                    printf("Initialize playback entry. \
 Reset playback entry.\n");
                     reset_playback_delay(jb);
                 } else if (jb->playback == jb->tail) {
@@ -37,8 +36,7 @@ Reset playback entry.\n");
                     reset_playback_delay(jb);
                 } else if (jb->playback->seqnum != jb->playback_seqnum) {
                     printf("Playback entry %d has been reused by %d. \
-Reset playback \
-entry.\n",
+Reset playback entry.\n",
                            jb->playback_seqnum, jb->playback->seqnum);
                     reset_playback_delay(jb);
                 } else {
@@ -76,7 +74,7 @@ Use %d again!\n",
         };
 
         jb_table_take_rdlock(jb_table);
-        jb_table_foreach(jb_table, mix);
+        jb_table_foreach(jb_table, step_playback_entry);
         jb_table_release_lock(jb_table);
 
         if (ndata > 0) {
@@ -99,14 +97,12 @@ Use %d again!\n",
             }
             if (ndata == 1) {
                 audio_write(audio_info, data[0], PAYLOAD_SIZE_IN_FRAMES);
-            } else if (ndata == 2) {
-                assert(SAMPLE_SIZE_IN_BYTES == 2 &&
-                       FORMAT == SND_PCM_FORMAT_U16_LE);
-                uint16_t mix_buf[PERIOD_SIZE_IN_BYTES / SAMPLE_SIZE_IN_BYTES];
-                assert(audio_umix16((uint16_t **)data, ndata, mix_buf) == 0);
-                audio_write(audio_info, (uint8_t *)mix_buf, PAYLOAD_SIZE_IN_FRAMES);
             } else {
-                assert(ndata < 3);
+                uint8_t write_buf[PERIOD_SIZE_IN_BYTES];
+                ndata = (ndata < MAX_MIX_STREAMS) ? ndata : MAX_MIX_STREAMS;
+                assert(audio_umix16((uint16_t **)data, ndata,
+                                    (uint16_t *)write_buf) == 0);
+                audio_write(audio_info, write_buf, PAYLOAD_SIZE_IN_FRAMES);
             }
         } else {
             fprintf(stderr, "No data available in jitter buffers\n");

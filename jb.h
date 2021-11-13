@@ -15,8 +15,12 @@ typedef struct {
     uint32_t userid;
     jb_entry_t *playback;
     uint32_t playback_seqnum;
-    uint32_t entries;
+    uint32_t nentries;
     pthread_rwlock_t *rwlock;
+    uint16_t npeak_values;
+    uint16_t *peak_values;
+    uint16_t peak_index;
+    uint16_t peak_average;
     jb_entry_t *tail;
     jb_entry_t *head;
     UT_hash_handle hh;

@@ -64,6 +64,13 @@ void jb_table_foreach(jb_table_t *jb_table, void (*callback)(jb_t *t)) {
     }
 }
 
+void jb_table_sort(jb_table_t *jb_table) {
+    int sort_on_peak_average(jb_t *jb1, jb_t *jb2) {
+        return jb2->peak_average - jb1->peak_average;
+    }
+    HASH_SORT(jb_table->jb, sort_on_peak_average);
+}
+
 void jb_table_take_rdlock(jb_table_t *jb_table) {
     assert(pthread_rwlock_rdlock(jb_table->rwlock) == 0);
 }

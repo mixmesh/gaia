@@ -10,9 +10,10 @@
 // $ ./capture test.dat
 // $ ./playback test.dat
 
+
 #define MAX_FILES 128
-#define FILES_TO_MIX 3
-#define PEAK_PERIOD_IN_MS 200
+#define MAX_MIX_STREAMS 3
+#define PEAK_AVERAGE_PERIOD_IN_MS 200
 
 typedef struct {
     FILE *fd;
@@ -72,7 +73,8 @@ int main(int argc, char *argv[]) {
     audio_print_parameters(audio_info, "playback");
     assert(PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
 
-    uint16_t npeak_values = PEAK_PERIOD_IN_MS / PERIOD_SIZE_IN_MS;
+    uint16_t npeak_values =
+        PEAK_AVERAGE_PERIOD_IN_MS / PERIOD_SIZE_IN_MS;
 
     for (uint8_t i = 0; i < nfiles; i++) {
         if ((files[i].fd = fopen(argv[i + 1], "r")) == NULL) {
@@ -84,6 +86,7 @@ int main(int argc, char *argv[]) {
         files[i].data = malloc(PERIOD_SIZE_IN_BYTES);
         files[i].peak_values = calloc(npeak_values, sizeof(uint16_t));
         files[i].peak_index = 0;
+        files[i].peak_average = 0;
     }
 
     uint8_t *data_to_mix[FILES_TO_MIX];
@@ -99,7 +102,8 @@ int main(int argc, char *argv[]) {
             if (fread(files[i].data, 1, PERIOD_SIZE_IN_BYTES, files[i].fd) ==
                 PERIOD_SIZE_IN_BYTES) {
                 active_files[nactive_files++] = &files[i];
-                // Save the peak value in this period
+
+                // Peak value/average handling
                 uint16_t peak_value = 0;
                 uint16_t *u16data = (uint16_t *)(files[i].data);
                 for (uint16_t j = 0; j < PERIOD_SIZE_IN_FRAMES * CHANNELS;
@@ -122,15 +126,15 @@ int main(int argc, char *argv[]) {
         }
 
         if (nactive_files > 3) {
-            int compar(const void *a, const void *b) {
-                int32_t value1 = (*(file_t **)a)->peak_average;
-                int32_t value2 = (*(file_t **)b)->peak_average;
+            int compar(const void *file1, const void *file2) {
+                int32_t value1 = (*(file_t **)file1)->peak_average;
+                int32_t value2 = (*(file_t **)file2)->peak_average;
                 return value2 - value1;
             };
             qsort(active_files, nactive_files, sizeof(file_t *), compar);
         }
         nactive_files =
-            (nactive_files < FILES_TO_MIX) ? nactive_files : FILES_TO_MIX;
+            (nactive_files < MAX_MIX_STREAMS) ? nactive_files : MAX_MIX_STREAMS;
         for (uint8_t i = 0; i < nactive_files; i++) {
             data_to_mix[i] = active_files[i]->data;
             //fprintf(stderr, "%s (%d) ", active_files[i]->filename, active_files[i]->peak_average);

@@ -26,7 +26,7 @@ int main (int argc, char *argv[]) {
   assert(jb == NULL);
 
   for (jb = jb_table->jb; jb != NULL; jb = jb->hh.next) {
-    printf("Jitter buffer %d (%d)\n", jb->userid, jb->entries);
+    printf("Jitter buffer %d (%d)\n", jb->userid, jb->nentries);
   }
 
   jb_table_delete(jb_table, 1);

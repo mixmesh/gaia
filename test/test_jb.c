@@ -42,7 +42,7 @@ int main (int argc, char *argv[]) {
   strcpy((char *)jb_entry->data, "2");
   result = jb_insert(jb, jb_entry);
   assert(CHK_FLAG(result, FIRST_INSERTED));
-  assert(jb->entries == 1);
+  assert(jb->nentries == 1);
   print_jb(jb);
 
   fprintf(stderr, "* Add 2:2 (again)\n");
@@ -51,7 +51,7 @@ int main (int argc, char *argv[]) {
   strcpy((char *)jb_entry->data, "2");
   result = jb_insert(jb, jb_entry);
   assert(CHK_FLAG(result, ALREADY_EXISTS));
-  assert(jb->entries == 1);
+  assert(jb->nentries == 1);
   jb_entry_free(jb_entry);
   print_jb(jb);
 
@@ -61,7 +61,7 @@ int main (int argc, char *argv[]) {
   strcpy((char *)jb_entry->data, "10");
   result = jb_insert(jb, jb_entry);
   assert(CHK_FLAG(result, TAIL_INSERTED));
-  assert(jb->entries == 2);
+  assert(jb->nentries == 2);
   print_jb(jb);
 
   fprintf(stderr, "* Add 20:20\n");
@@ -70,7 +70,7 @@ int main (int argc, char *argv[]) {
   strcpy((char *)jb_entry->data, "20");
   result = jb_insert(jb, jb_entry);
   assert(CHK_FLAG(result, TAIL_INSERTED));
-  assert(jb->entries == 3);
+  assert(jb->nentries == 3);
   print_jb(jb);
 
   fprintf(stderr, "* Add 15:15\n");
@@ -79,7 +79,7 @@ int main (int argc, char *argv[]) {
   strcpy((char *)jb_entry->data, "15");
   result = jb_insert(jb, jb_entry);
   assert(CHK_FLAG(result, INTERMEDIATE_INSERTED));
-  assert(jb->entries == 4);
+  assert(jb->nentries == 4);
   print_jb(jb);
 
   fprintf(stderr, "* Add 5:5\n");
@@ -88,7 +88,7 @@ int main (int argc, char *argv[]) {
   strcpy((char *)jb_entry->data, "5");
   result = jb_insert(jb, jb_entry);
   assert(CHK_FLAG(result, INTERMEDIATE_INSERTED));
-  assert(jb->entries == 5);
+  assert(jb->nentries == 5);
   print_jb(jb);
 
   fprintf(stderr, "* Add 1:1\n");
@@ -97,7 +97,7 @@ int main (int argc, char *argv[]) {
   strcpy((char *)jb_entry->data, "1");
   result = jb_insert(jb, jb_entry);
   assert(CHK_FLAG(result, HEAD_INSERTED));
-  assert(jb->entries == 6);
+  assert(jb->nentries == 6);
   print_jb(jb);
 
   fprintf(stderr, "* Add 30:30\n");
@@ -106,7 +106,7 @@ int main (int argc, char *argv[]) {
   strcpy((char *)jb_entry->data, "30");
   result = jb_insert(jb, jb_entry);
   assert(CHK_FLAG(result, TAIL_INSERTED));
-  assert(jb->entries == 7);
+  assert(jb->nentries == 7);
   print_jb(jb);
 
   fprintf(stderr, "* Add 40:40\n");
@@ -115,7 +115,7 @@ int main (int argc, char *argv[]) {
   strcpy((char *)jb_entry->data, "40");
   result = jb_insert(jb, jb_entry);
   assert(CHK_FLAG(result, TAIL_INSERTED));
-  assert(jb->entries == 8);
+  assert(jb->nentries == 8);
   print_jb(jb);
 
   fprintf(stderr, "* Add 50:50\n");
@@ -124,7 +124,7 @@ int main (int argc, char *argv[]) {
   strcpy((char *)jb_entry->data, "50");
   result = jb_insert(jb, jb_entry);
   assert(CHK_FLAG(result, TAIL_INSERTED));
-  assert(jb->entries == 8);
+  assert(jb->nentries == 8);
   print_jb(jb);
 
   jb_free(jb);

@@ -20,6 +20,7 @@ jb_t *jb_table_find(jb_table_t *jb_table, uint32_t userid);
 void jb_table_delete(jb_table_t *jb_table, uint32_t userid);
 uint16_t jb_table_count(jb_table_t *jb_table);
 void jb_table_foreach(jb_table_t *jb_table, void (*callback)(jb_t *t));
+void jb_table_sort(jb_table_t *jb_table);
 void jb_table_take_rdlock(jb_table_t *jb_table);
 void jb_table_take_wrlock(jb_table_t *jb_table);
 void jb_table_release_lock(jb_table_t *jb_table);

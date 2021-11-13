@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <sys/time.h>
 #include <assert.h>
+#include <math.h>
 #include "timing.h"
 #include "jb_table.h"
 #include "network_receiver.h"
@@ -12,6 +13,13 @@
 #define DRAIN_BUF_SIZE 1
 
 extern jb_table_t *jb_table;
+
+uint16_t root_mean_square(uint16_t *peak_values, uint16_t n) {
+    double sum = 0.0;
+    for(uint16_t i = 0; i < n; i++)
+        sum += (double)peak_values[i] * peak_values[i];
+    return sqrt(sum / n);
+}
 
 void *network_receiver(void *arg) {
     int sockfd = -1;
@@ -129,7 +137,7 @@ userid");
 
             // Prepare new jitter buffer entry
             jb_entry_t *jb_entry;
-            if (jb->entries > PERIODS_IN_JITTER_BUFFER) {
+            if (jb->nentries > PERIODS_IN_JITTER_BUFFER) {
                 jb_take_wrlock(jb);
                 jb_entry = jb_pop(jb);
                 jb_release_lock(jb);
@@ -165,7 +173,7 @@ userid");
             // Add seqnum to jitter buffer entry and insert entry
             uint32_t seqnum;
             memcpy(&seqnum, &jb_entry->data[12], sizeof(seqnum));
-            if (jb->entries > 0) {
+            if (jb->nentries > 0) {
                 if (jb->tail->seqnum == seqnum) {
                     // NOTE: Disable to remove noise on stdout
                     printf("Duplicated UDP packet (%d)\n", seqnum);
@@ -176,6 +184,27 @@ userid");
             }
             jb_entry->seqnum = seqnum;
 
+            // Peak value/average handling
+            uint16_t peak_value = 0;
+            uint16_t *u16data = (uint16_t *)(&jb_entry->data[HEADER_SIZE]);
+            for (uint16_t i = 0; i < PERIOD_SIZE_IN_FRAMES * CHANNELS; i++) {
+                if (u16data[i] > peak_value) {
+                    peak_value = u16data[i];
+                }
+            }
+            jb->peak_values[jb->peak_index] = peak_value;
+            if (++jb->peak_index % jb->npeak_values == 0) {
+                jb->peak_index = 0;
+                jb->peak_average =
+                    root_mean_square(jb->peak_values, jb->npeak_values);
+                //fprintf(stderr, "%s: %d\n", files[i].filename,
+                //        files[i].peak_average);
+                jb_table_take_wrlock(jb_table);
+                jb_table_sort(jb_table);
+                jb_table_release_lock(jb_table);
+            }
+
+            // Insert buffer entry
             jb_take_wrlock(jb);
             assert(jb_insert(jb, jb_entry) != 0);
             jb_release_lock(jb);

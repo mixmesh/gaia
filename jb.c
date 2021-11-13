@@ -2,15 +2,20 @@
 #include <assert.h>
 #include "jb.h"
 #include "bits.h"
+#include "globals.h"
 
 jb_t *jb_new(uint32_t userid) {
     jb_t *jb = malloc(sizeof(jb_t));
     jb->userid = userid;
     jb->playback = NULL;
     jb->playback_seqnum = 0;
-    jb->entries = 0;
+    jb->nentries = 0;
     jb->rwlock = malloc(sizeof(pthread_rwlock_t));
     assert(pthread_rwlock_init(jb->rwlock, NULL) == 0);
+    jb->npeak_values = PEAK_AVERAGE_PERIOD_IN_MS / PERIOD_SIZE_IN_MS;
+    jb->peak_values = calloc(jb->npeak_values, sizeof(uint16_t));
+    jb->peak_index = 0;
+    jb->peak_average = 0;
     jb->tail = NULL;
     jb->head = NULL;
     return jb;
@@ -25,6 +30,7 @@ void jb_free(jb_t *jb) {
     }
     assert(pthread_rwlock_destroy(jb->rwlock) == 0);
     free(jb->rwlock);
+    free(jb->peak_values);
     free(jb);
 }
 
@@ -32,11 +38,11 @@ jb_entry_t *jb_pop(jb_t *jb) {
     jb_entry_t *head = jb->head;
     if (head != NULL) {
         if (head->prev == NULL) {
-            jb->entries = 0;
+            jb->nentries = 0;
             jb->tail = NULL;
             jb->head = NULL;
         } else {
-            --jb->entries;
+            --jb->nentries;
             head->prev->next = NULL;
             jb->head = head->prev;
         }
@@ -81,14 +87,14 @@ uint8_t jb_insert(jb_t *jb, jb_entry_t *new_jb_entry) {
                     jb_entry->prev = new_jb_entry;
                     SET_FLAG(flags, INTERMEDIATE_INSERTED);
                 }
-                ++jb->entries;
+                ++jb->nentries;
                 break;
             }
         }
     } else {
         new_jb_entry->next = NULL;
         new_jb_entry->prev = NULL;
-        jb->entries = 1;
+        jb->nentries = 1;
         jb->tail = new_jb_entry;
         jb->head = new_jb_entry;
         SET_FLAG(flags, FIRST_INSERTED);
