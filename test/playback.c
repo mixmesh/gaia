@@ -12,10 +12,11 @@
 
 #define MAX_FILES 128
 #define FILES_TO_MIX 3
-#define PEAK_PERIOD_IN_MS 400
+#define PEAK_PERIOD_IN_MS 200
 
 typedef struct {
     FILE *fd;
+    char *filename;
     bool activated;
     uint8_t *data;
     uint16_t *peak_values;
@@ -78,6 +79,7 @@ int main(int argc, char *argv[]) {
             perror(argv[i + 1]);
             exit(FILE_ERROR);
         }
+        files[i].filename = argv[i + 1];
         files[i].activated = true;
         files[i].data = malloc(PERIOD_SIZE_IN_BYTES);
         files[i].peak_values = calloc(npeak_values, sizeof(uint16_t));
@@ -111,6 +113,8 @@ int main(int argc, char *argv[]) {
                     files[i].peak_index = 0;
                     files[i].peak_average =
                         root_mean_square(files[i].peak_values, npeak_values);
+                    //fprintf(stderr, "%s: %d\n", files[i].filename,
+                    //        files[i].peak_average);
                 }
             } else {
                 files[i].activated = false;
@@ -118,18 +122,20 @@ int main(int argc, char *argv[]) {
         }
 
         if (nactive_files > 3) {
-            int compar(const void *file1, const void *file2) {
-                return ((file_t *)file1)->peak_average >
-                    ((file_t *)file2)->peak_average;
+            int compar(const void *a, const void *b) {
+                int32_t value1 = (*(file_t **)a)->peak_average;
+                int32_t value2 = (*(file_t **)b)->peak_average;
+                return value2 - value1;
             };
             qsort(active_files, nactive_files, sizeof(file_t *), compar);
         }
         nactive_files =
             (nactive_files < FILES_TO_MIX) ? nactive_files : FILES_TO_MIX;
         for (uint8_t i = 0; i < nactive_files; i++) {
-            data_to_mix[i] = files[i].data;
+            data_to_mix[i] = active_files[i]->data;
+            //fprintf(stderr, "%s (%d) ", active_files[i]->filename, active_files[i]->peak_average);
         }
-
+        //fprintf(stderr, "\n");
         uint8_t *write_buf;
         if (nactive_files == 0) {
             break;

@@ -1,4 +1,4 @@
-CFLAGS=-std=c18 -Wall -Werror -D_POSIX_C_SOURCE=200809L $(shell pkg-config --cflags alsa)
+CFLAGS=-std=c18 -Werror -D_POSIX_C_SOURCE=200809L $(shell pkg-config --cflags alsa)
 LDLIBS=$(shell pkg-config --libs alsa) -lm -lpthread
 
 EXECS=capture display playback test_jb test_jb_table
