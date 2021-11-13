@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <signal.h>
@@ -82,22 +83,24 @@ int main(int argc, char *argv[]) {
         files[i].peak_index = 0;
     }
 
-    uint8_t *data[nfiles];
+    uint8_t *data_to_mix[3];
     uint8_t mixed_data[PERIOD_SIZE_IN_BYTES];
+    file_t *active_files[nfiles];
 
     while (true) {
-        uint8_t active_files = 0;
+        uint8_t nactive_files = 0;
         for (uint8_t i = 0; i < nfiles; i++) {
             if (!files[i].activated) {
                 continue;
             }
             if (fread(files[i].data, 1, PERIOD_SIZE_IN_BYTES, files[i].fd) ==
                 PERIOD_SIZE_IN_BYTES) {
-                data[active_files++] = files[i].data;
+                active_files[nactive_files++] = &files[i];
                 // Save the peak value in this period
                 uint16_t peak_value = 0;
                 uint16_t *u16data = (uint16_t *)(files[i].data);
-                for (int j = 0; j < PERIOD_SIZE_IN_FRAMES * CHANNELS; j++) {
+                for (uint16_t j = 0; j < PERIOD_SIZE_IN_FRAMES * CHANNELS;
+                     j++) {
                     if (u16data[j] > peak_value) {
                         peak_value = u16data[j];
                     }
@@ -113,13 +116,25 @@ int main(int argc, char *argv[]) {
             }
         }
 
+        if (nactive_files > 4) {
+            int compar(const void *file1, const void *file2) {
+                return ((file_t *)file1)->peak_average >
+                    ((file_t *)file2)->peak_average;
+            };
+            qsort(active_files, nactive_files, sizeof(file_t *), compar);
+        }
+        nactive_files = (nactive_files < 3) ? nactive_files : 3;
+        for (uint8_t i = 0; i < nactive_files; i++) {
+            data_to_mix[i] = files[i].data;
+        }
+
         uint8_t *write_buf;
-        if (active_files == 0) {
+        if (nactive_files == 0) {
             break;
-        } else if (active_files == 1) {
-            write_buf = data[0];
+        } else if (nactive_files == 1) {
+            write_buf = data_to_mix[0];
         } else {
-            assert(audio_umix16((uint16_t **)data, active_files,
+            assert(audio_umix16((uint16_t **)data_to_mix, nactive_files,
                                 (uint16_t *)mixed_data) == 0);
             write_buf = mixed_data;
         }
