@@ -11,6 +11,7 @@
 // $ ./playback test.dat
 
 #define MAX_FILES 128
+#define FILES_TO_MIX 3
 #define PEAK_PERIOD_IN_MS 400
 
 typedef struct {
@@ -83,7 +84,7 @@ int main(int argc, char *argv[]) {
         files[i].peak_index = 0;
     }
 
-    uint8_t *data_to_mix[3];
+    uint8_t *data_to_mix[FILES_TO_MIX];
     uint8_t mixed_data[PERIOD_SIZE_IN_BYTES];
     file_t *active_files[nfiles];
 
@@ -123,7 +124,8 @@ int main(int argc, char *argv[]) {
             };
             qsort(active_files, nactive_files, sizeof(file_t *), compar);
         }
-        nactive_files = (nactive_files < 3) ? nactive_files : 3;
+        nactive_files =
+            (nactive_files < FILES_TO_MIX) ? nactive_files : FILES_TO_MIX;
         for (uint8_t i = 0; i < nactive_files; i++) {
             data_to_mix[i] = files[i].data;
         }
