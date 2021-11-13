@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <signal.h>
+#include <math.h>
 #include <alsa/asoundlib.h>
 #include "../audio.h"
 #include "../globals.h"
@@ -17,6 +18,7 @@ typedef struct {
     uint8_t *data;
     uint16_t *peak_values;
     uint16_t peak_index;
+    uint16_t peak_average;
 } file_t;
 
 file_t files[MAX_FILES];
@@ -34,6 +36,13 @@ void stop() {
         audio_free(audio_info);
     }
     exit(0);
+}
+
+uint16_t root_mean_square(uint16_t *values, uint16_t n) {
+    double sum = 0.0;
+    for(uint16_t i = 0; i < n; i++)
+        sum += (double)values[i] * values[i];
+    return sqrt(sum / n);
 }
 
 int main(int argc, char *argv[]) {
@@ -69,7 +78,7 @@ int main(int argc, char *argv[]) {
         }
         files[i].activated = true;
         files[i].data = malloc(PERIOD_SIZE_IN_BYTES);
-        files[i].peak_values = malloc(sizeof(uint16_t) * npeak_values);
+        files[i].peak_values = calloc(npeak_values, sizeof(uint16_t));
         files[i].peak_index = 0;
     }
 
@@ -96,6 +105,8 @@ int main(int argc, char *argv[]) {
                 files[i].peak_values[files[i].peak_index] = peak_value;
                 if (++files[i].peak_index % npeak_values == 0) {
                     files[i].peak_index = 0;
+                    files[i].peak_average =
+                        root_mean_square(files[i].peak_values, npeak_values);
                 }
             } else {
                 files[i].activated = false;
