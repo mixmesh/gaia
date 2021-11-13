@@ -117,7 +117,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        if (nactive_files > 4) {
+        if (nactive_files > 3) {
             int compar(const void *file1, const void *file2) {
                 return ((file_t *)file1)->peak_average >
                     ((file_t *)file2)->peak_average;
