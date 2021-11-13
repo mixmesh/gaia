@@ -197,7 +197,7 @@ int audio_umix16(uint16_t *data[], uint8_t n, uint16_t *mixed_data) {
     if (n < 2) {
         return -1;
     }
-    for (int i = 0; i < PERIOD_SIZE_IN_BYTES; i++) {
+    for (int i = 0; i < PERIOD_SIZE_IN_FRAMES * CHANNELS; i++) {
         mixed_data[i] = mix(data[0][i], data[1][i]);
         for (int j = 2; j < n; j++) {
             mixed_data[i] = mix(mixed_data[i], data[j][i]);
