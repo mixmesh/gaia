@@ -147,8 +147,7 @@ int main(int argc, char *argv[]) {
             write_buf = mixed_data;
         }
 
-        if (audio_write(audio_info, (uint8_t *)write_buf,
-                        PERIOD_SIZE_IN_FRAMES) < 0) {
+        if (audio_write(audio_info, write_buf, PERIOD_SIZE_IN_FRAMES) < 0) {
             break;
         }
     }
