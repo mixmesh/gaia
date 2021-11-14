@@ -59,7 +59,7 @@ void *file_sender(void *arg) {
     struct timespec period_size_as_tsp =
         {
          .tv_sec = 0,
-         .tv_nsec = PERIOD_SIZE_IN_MS * 1000000L
+         .tv_nsec = PERIOD_SIZE_IN_NS
         };
     struct timespec before_sendto;
     timespecclear(&before_sendto);
@@ -95,15 +95,18 @@ void *file_sender(void *arg) {
         // Sleep (very carefully)
         if (before_sendto.tv_sec != 0) {
             struct timespec now;
-            clock_gettime(CLOCK_MONOTONIC_RAW, &now);
-            struct timespec delta;
-            timespecsub(&now, &before_sendto, &delta);
+            clock_gettime(CLOCK_REALTIME, &now);
+            struct timespec time_spent;
+            timespecsub(&now, &before_sendto, &time_spent);
             struct timespec delay;
-            timespecsub(&period_size_as_tsp, &delta, &delay);
+            timespecsub(&period_size_as_tsp, &time_spent, &delay);
+            struct timespec sleep_until;
+            timespecadd(&now, &delay, &sleep_until);
             struct timespec rem;
-            assert(nanosleep(&delay, &rem) == 0);
+            assert(clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME,
+                                   &sleep_until, &rem) == 0);
         }
-        clock_gettime(CLOCK_MONOTONIC_RAW, &before_sendto);
+        clock_gettime(CLOCK_REALTIME, &before_sendto);
 
         // Write to non-blocking socket
         for (int i = 0; i < naddr_ports; i++) {
