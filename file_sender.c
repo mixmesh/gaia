@@ -81,6 +81,7 @@ void *file_sender(void *arg) {
                 fread(&udp_buf[HEADER_SIZE], 1, PAYLOAD_SIZE_IN_BYTES, fd);
             if (bytes < PAYLOAD_SIZE_IN_BYTES) {
                 if (feof(fd)) {
+                    printf("Reached end of file. Start from scratch!\n");
                     rewind(fd);
                 } else {
                     perror("fread: Failed to read from file");
@@ -94,15 +95,15 @@ void *file_sender(void *arg) {
         // Sleep (very carefully)
         if (before_sendto.tv_sec != 0) {
             struct timespec now;
-            clock_gettime(CLOCK_REALTIME, &now);
+            clock_gettime(CLOCK_MONOTONIC_RAW, &now);
             struct timespec delta;
             timespecsub(&now, &before_sendto, &delta);
             struct timespec delay;
             timespecsub(&period_size_as_tsp, &delta, &delay);
             struct timespec rem;
-            nanosleep(&delay, &rem);
+            assert(nanosleep(&delay, &rem) == 0);
         }
-        clock_gettime(CLOCK_REALTIME, &before_sendto);
+        clock_gettime(CLOCK_MONOTONIC_RAW, &before_sendto);
 
         // Write to non-blocking socket
         for (int i = 0; i < naddr_ports; i++) {
