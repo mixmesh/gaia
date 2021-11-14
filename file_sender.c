@@ -28,14 +28,6 @@ void *file_sender(void *arg) {
         exit(SOCKET_ERROR);
     }
 
-    // Resize socket send buffer
-    /*
-    // NOTE: This was a bad idea for some reason. Disable for now.
-    int snd_buf_size = PERIOD_SIZE_IN_BYTES * BUFFER_MULTIPLICATOR;
-    assert(setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &snd_buf_size,
-    sizeof(snd_buf_size)) == 0);
-    */
-
     // Make socket non-blocking
     int flags = fcntl(sockfd, F_GETFL, 0);
     if (flags < 0) {
@@ -64,7 +56,13 @@ void *file_sender(void *arg) {
 
     uint32_t seqnum = 1;
 
-    struct timespec last_now = {0}, now, diff, rem;
+    struct timespec period_size_as_tsp =
+        {
+         .tv_sec = 0,
+         .tv_nsec = PERIOD_SIZE_IN_MS * 1000000L
+        };
+    struct timespec last_now;
+    timespecclear(&last_now);
 
     // Read from file and write to socket
     printf("Sending audio...\n");
@@ -78,7 +76,6 @@ void *file_sender(void *arg) {
         seqnum++;
 
         // Read from file
-
         while (true) {
             size_t bytes =
                 fread(&udp_buf[HEADER_SIZE], 1, PAYLOAD_SIZE_IN_BYTES, fd);
@@ -89,32 +86,39 @@ void *file_sender(void *arg) {
                     perror("fread: Failed to read from file");
                     goto bail_out;
                 }
+            } else {
+                break;
             }
         }
 
         // Sleep (very carefully)
+        struct timespec now;
+        clock_gettime(CLOCK_REALTIME, &now);
         if (last_now.tv_sec != 0) {
-            assert(clock_gettime(CLOCK_REALTIME, &now) == 0);
-            timespec_diff(&last_now, &now, &diff);
-            memcpy(&last_now, &now, sizeof(now));
-            assert(nanosleep(&diff, &rem) == 0);
+            struct timespec delta;
+            timespecsub(&now, &last_now, &delta);
+            assert(timespecisvalid(&delta));
+            struct timespec delay;
+            timespecsub(&period_size_as_tsp, &delta, &delay);
+            assert(timespecisvalid(&delay));
+            struct timespec rem;
+            fprintf(stderr, "%ld : %ld\n", delay.tv_sec, delay.tv_nsec);
+            // Olof: nanosleep should use delay but it is not correct! Uses
+            // period_size_in_ms for now.
+            assert(nanosleep(&period_size_as_tsp, &rem) == 0);
         }
+        memcpy(&last_now, &now, sizeof(struct timespec));
 
         // Write to non-blocking socket
-        snd_pcm_uframes_t frames = 0;
-        if (frames == PERIOD_SIZE_IN_FRAMES) {
-            for (int i = 0; i < naddr_ports; i++) {
-                ssize_t n  = sendto(sockfd, udp_buf, udp_buf_size, 0,
-                                    (struct sockaddr *)&addrs[i],
-                                    sizeof(addrs[i]));
-                if (n < 0) {
-                    perror("sendto: Failed to write to socket");
-                } else if (n != udp_buf_size) {
-                    printf("Too few bytes written to socket!\n");
-                }
+        for (int i = 0; i < naddr_ports; i++) {
+            ssize_t n  = sendto(sockfd, udp_buf, udp_buf_size, 0,
+                                (struct sockaddr *)&addrs[i],
+                                sizeof(addrs[i]));
+            if (n < 0) {
+                perror("sendto: Failed to write to socket");
+            } else if (n != udp_buf_size) {
+                printf("Too few bytes written to socket!\n");
             }
-        } else {
-            printf("Too few frames read from file!\n");
         }
     }
 

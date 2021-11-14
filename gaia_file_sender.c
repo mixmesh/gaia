@@ -15,8 +15,8 @@ void usage(char *argv[]) {
             "Note: addr and port default respectively defaults to %s and %d\n",
             DEFAULT_ADDR, DEFAULT_PORT);
     fprintf(stderr,
-            "  Example: sudo %s -d 172.16.0.95 -d 172.16.0.95:2356 4711 \
-sound.u16\n",
+            "Example: sudo %s -d 172.16.0.95 -d 172.16.0.95:2356 4711 \
+manhattan.u16\n",
             argv[0]);
     exit(ARG_ERROR);
 }
@@ -48,7 +48,7 @@ int main (int argc, char *argv[]) {
         naddr_ports = 1;
     }
 
-    if (optind != argc - 1) {
+    if (argc != 3) {
         usage(argv);
     }
 

@@ -10,9 +10,7 @@
 // $ ./capture test.dat
 // $ ./playback test.dat
 
-
 #define MAX_FILES 128
-#define MAX_MIX_STREAMS 3
 #define PEAK_AVERAGE_PERIOD_IN_MS 200
 
 typedef struct {
@@ -89,7 +87,7 @@ int main(int argc, char *argv[]) {
         files[i].peak_average = 0;
     }
 
-    uint8_t *data_to_mix[FILES_TO_MIX];
+    uint8_t *data_to_mix[MAX_MIX_STREAMS];
     uint8_t mixed_data[PERIOD_SIZE_IN_BYTES];
     file_t *active_files[nfiles];
 
