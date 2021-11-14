@@ -61,8 +61,8 @@ void *file_sender(void *arg) {
          .tv_sec = 0,
          .tv_nsec = PERIOD_SIZE_IN_MS * 1000000L
         };
-    struct timespec last_now;
-    timespecclear(&last_now);
+    struct timespec before_sendto;
+    timespecclear(&before_sendto);
 
     // Read from file and write to socket
     printf("Sending audio...\n");
@@ -92,22 +92,17 @@ void *file_sender(void *arg) {
         }
 
         // Sleep (very carefully)
-        struct timespec now;
-        clock_gettime(CLOCK_REALTIME, &now);
-        if (last_now.tv_sec != 0) {
+        if (before_sendto.tv_sec != 0) {
+            struct timespec now;
+            clock_gettime(CLOCK_REALTIME, &now);
             struct timespec delta;
-            timespecsub(&now, &last_now, &delta);
-            assert(timespecisvalid(&delta));
+            timespecsub(&now, &before_sendto, &delta);
             struct timespec delay;
             timespecsub(&period_size_as_tsp, &delta, &delay);
-            assert(timespecisvalid(&delay));
             struct timespec rem;
-            fprintf(stderr, "%ld : %ld\n", delay.tv_sec, delay.tv_nsec);
-            // Olof: nanosleep should use delay but it is not correct! Uses
-            // period_size_in_ms for now.
-            assert(nanosleep(&period_size_as_tsp, &rem) == 0);
+            nanosleep(&delay, &rem);
         }
-        memcpy(&last_now, &now, sizeof(struct timespec));
+        clock_gettime(CLOCK_REALTIME, &before_sendto);
 
         // Write to non-blocking socket
         for (int i = 0; i < naddr_ports; i++) {

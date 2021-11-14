@@ -166,7 +166,7 @@ userid");
             if (current_timestamp - last_latency_printout >
                 FOUR_SECONDS_IN_US) {
                 // NOTE: Disable to remove noise on stdout
-                printf("Latency: %fms\n", latency / 1000);
+                //printf("Latency: %fms\n", latency / 1000);
                 last_latency_printout = current_timestamp;
             }
 
