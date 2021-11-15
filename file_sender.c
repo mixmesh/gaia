@@ -6,7 +6,7 @@
 #include "audio.h"
 #include "globals.h"
 
-#define FILE_BUF_SIZE (PAYLOAD_SIZE_IN_BYTES * 100)
+#define FILE_BUF_SIZE (PAYLOAD_SIZE_IN_BYTES * 500)
 
 void *file_sender(void *arg) {
     // Extract parameters
@@ -69,6 +69,7 @@ void *file_sender(void *arg) {
     // Add userid to buffer header
     memcpy(udp_buf, &userid, sizeof(userid));
 
+    // Let sequence number start with 1 (zero is reserved)
     uint32_t seqnum = 1;
 
     struct timespec period_size_as_tsp =
@@ -96,7 +97,6 @@ void *file_sender(void *arg) {
 
         // Cache file to RAM (if needed)
         if (file_buf_index == FILE_BUF_SIZE) {
-            fprintf(stderr, "R");
             size_t read_bytes = fread(file_buf, 1, FILE_BUF_SIZE, fd);
             if (read_bytes < FILE_BUF_SIZE) {
                 if (feof(fd)) {
