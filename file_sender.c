@@ -80,7 +80,6 @@ void *file_sender(void *arg) {
     printf("Period size is %ld nano seconds\n", period_size_as_tsp.tv_nsec);
     struct timespec before_caching;
 
-
     char file_buf[FILE_BUF_SIZE];
     uint32_t file_buf_index = FILE_BUF_SIZE;
 
