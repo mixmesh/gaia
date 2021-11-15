@@ -11,6 +11,7 @@
 typedef struct {
     jb_t *jb;
     pthread_rwlock_t *rwlock;
+    pthread_mutex_t *lock_mutex;
 } jb_table_t;
 
 jb_table_t *jb_table_new(void);
@@ -24,5 +25,7 @@ void jb_table_sort(jb_table_t *jb_table);
 void jb_table_take_rdlock(jb_table_t *jb_table);
 void jb_table_take_wrlock(jb_table_t *jb_table);
 void jb_table_release_lock(jb_table_t *jb_table);
+void jb_table_upgrade_to_wrlock(jb_table_t *jb_table);
+void jb_table_downgrade_to_rdlock(jb_table_t *jb_table);
 
 #endif

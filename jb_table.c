@@ -4,15 +4,17 @@
 #include "jb_table.h"
 
 #define HASH_FIND_UINT32(head, findint, out) \
-HASH_FIND(hh, head, findint, sizeof(uint32_t), out)
+    HASH_FIND(hh, head, findint, sizeof(uint32_t), out)
 #define HASH_ADD_UINT32(head, intfield, add) \
-HASH_ADD(hh, head, intfield, sizeof(uint32_t), add)
+    HASH_ADD(hh, head, intfield, sizeof(uint32_t), add)
 
 jb_table_t *jb_table_new(void) {
     jb_table_t *jb_table = malloc(sizeof(jb_table_t));
     jb_table->jb = NULL;
     jb_table->rwlock = malloc(sizeof(pthread_rwlock_t));
     assert(pthread_rwlock_init(jb_table->rwlock, NULL) == 0);
+    jb_table->lock_mutex = malloc(sizeof(pthread_mutex_t));
+    assert(pthread_mutex_init(jb_table->lock_mutex, NULL) == 0);
     return jb_table;
 }
 
@@ -26,6 +28,8 @@ void jb_table_free(jb_table_t *jb_table, bool free_entries_only) {
     } else {
         assert(pthread_rwlock_destroy(jb_table->rwlock) == 0);
         free(jb_table->rwlock);
+        assert(pthread_mutex_destroy(jb_table->lock_mutex) == 0);
+        free(jb_table->lock_mutex);
         free(jb_table);
     }
 }
@@ -72,13 +76,31 @@ void jb_table_sort(jb_table_t *jb_table) {
 }
 
 void jb_table_take_rdlock(jb_table_t *jb_table) {
+    assert(pthread_mutex_lock(jb_table->lock_mutex) == 0);
     assert(pthread_rwlock_rdlock(jb_table->rwlock) == 0);
+    assert(pthread_mutex_unlock(jb_table->lock_mutex) == 0);
 }
 
 void jb_table_take_wrlock(jb_table_t *jb_table) {
+    assert(pthread_mutex_lock(jb_table->lock_mutex) == 0);
     assert(pthread_rwlock_wrlock(jb_table->rwlock) == 0);
+    assert(pthread_mutex_unlock(jb_table->lock_mutex) == 0);
 }
 
 void jb_table_release_lock(jb_table_t *jb_table) {
     assert(pthread_rwlock_unlock(jb_table->rwlock) == 0);
+}
+
+void jb_table_upgrade_to_wrlock(jb_table_t *jb_table) {
+    assert(pthread_mutex_lock(jb_table->lock_mutex) == 0);
+    assert(pthread_rwlock_unlock(jb_table->rwlock) == 0);
+    assert(pthread_rwlock_wrlock(jb_table->rwlock) == 0);
+    assert(pthread_mutex_unlock(jb_table->lock_mutex) == 0);
+}
+
+void jb_table_downgrade_to_rdlock(jb_table_t *jb_table) {
+    assert(pthread_mutex_lock(jb_table->lock_mutex) == 0);
+    assert(pthread_rwlock_unlock(jb_table->rwlock) == 0);
+    assert(pthread_rwlock_rdlock(jb_table->rwlock) == 0);
+    assert(pthread_mutex_unlock(jb_table->lock_mutex) == 0);
 }

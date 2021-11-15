@@ -30,15 +30,18 @@ void *audio_sink(void *arg) {
                     printf("Initialize playback entry. \
 Reset playback entry.\n");
                     reset_playback_delay(jb);
+                    data[ndata++] = &jb->playback->data[HEADER_SIZE];
                 } else if (jb->playback == jb->tail) {
-                    printf("Jitter buffer has been exhausted. \
-Reset playback entry.\n");
-                    reset_playback_delay(jb);
+                    printf("Jitter buffer has been exhausted. Close it.\n");
+                    jb_table_upgrade_to_wrlock(jb_table);
+                    jb_table_delete(jb_table, jb->userid);
+                    jb_table_downgrade_to_rdlock(jb_table);
                 } else if (jb->playback->seqnum != jb->playback_seqnum) {
                     printf("Playback entry %d has been reused by %d. \
 Reset playback entry.\n",
                            jb->playback_seqnum, jb->playback->seqnum);
                     reset_playback_delay(jb);
+                    data[ndata++] = &jb->playback->data[HEADER_SIZE];
                 } else {
                     // Step playback entry
                     uint32_t next_seqnum = jb->playback->seqnum + 1;
@@ -60,6 +63,7 @@ Use %d again!\n",
                             jb->playback_seqnum = next_seqnum;
                         }
                     }
+                    data[ndata++] = &jb->playback->data[HEADER_SIZE];
                 }
                 /*
                 // NOTE: This debug printout is too expensive
@@ -68,7 +72,6 @@ Use %d again!\n",
                 index, jb->entries);
                 }
                 */
-                data[ndata++] = &jb->playback->data[HEADER_SIZE];
             }
             jb_release_lock(jb);
         };
