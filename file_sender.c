@@ -106,11 +106,11 @@ void *file_sender(void *arg) {
                     if (fread(&file_buf[read_bytes], 1, more_bytes,
                               fd) < more_bytes) {
                         perror("fread");
-                        goto bail_out;
+                        break;
                     }
                 } else {
                     perror("fread");
-                    goto bail_out;
+                    break;
                 }
             }
             file_buf_index = 0;
@@ -147,7 +147,6 @@ void *file_sender(void *arg) {
         }
     }
 
- bail_out:
     fprintf(stderr, "file_sender is shutting down!!!\n");
     free(udp_buf);
     close(sockfd);
