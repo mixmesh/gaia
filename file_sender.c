@@ -6,6 +6,8 @@
 #include "audio.h"
 #include "globals.h"
 
+#define FILE_BUF_SIZE (PAYLOAD_SIZE_IN_BYTES * 100)
+
 void *file_sender(void *arg) {
     // Extract parameters
     file_sender_params_t *sender_params = (file_sender_params_t *)arg;
@@ -21,10 +23,19 @@ void *file_sender(void *arg) {
         exit(FILE_ERROR);
     }
 
+    // Check file size
+    fseek(fd, 0L, SEEK_END);
+    if (ftell(fd) < FILE_BUF_SIZE) {
+        fclose(fd);
+        exit(FILE_ERROR);
+    }
+    rewind(fd);
+
     // Create socket
     int sockfd = -1;
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         perror("socket: Socket creation failed");
+        fclose(fd);
         exit(SOCKET_ERROR);
     }
 
@@ -32,10 +43,14 @@ void *file_sender(void *arg) {
     int flags = fcntl(sockfd, F_GETFL, 0);
     if (flags < 0) {
         perror("fcntl: Socket could not be made non-blocking");
+        fclose(fd);
+        close(sockfd);
         exit(SOCKET_ERROR);
     }
     if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) < 0) {
         perror("fcntl: Socket could not be made non-blocking");
+        fclose(fd);
+        close(sockfd);
         exit(SOCKET_ERROR);
     }
 
@@ -61,8 +76,10 @@ void *file_sender(void *arg) {
          .tv_sec = 0,
          .tv_nsec = PERIOD_SIZE_IN_NS
         };
-    struct timespec before_sendto;
-    timespecclear(&before_sendto);
+    struct timespec before_caching;
+
+    char file_buf[FILE_BUF_SIZE];
+    uint32_t file_buf_index = FILE_BUF_SIZE;
 
     // Read from file and write to socket
     printf("Sending audio...\n");
@@ -75,38 +92,47 @@ void *file_sender(void *arg) {
         memcpy(&udp_buf[12], &seqnum, sizeof(seqnum));
         seqnum++;
 
-        // Read from file
-        while (true) {
-            size_t bytes =
-                fread(&udp_buf[HEADER_SIZE], 1, PAYLOAD_SIZE_IN_BYTES, fd);
-            if (bytes < PAYLOAD_SIZE_IN_BYTES) {
+        clock_gettime(CLOCK_REALTIME, &before_caching);
+
+        // Cache file to RAM (if needed)
+        if (file_buf_index == FILE_BUF_SIZE) {
+            fprintf(stderr, "R");
+            size_t read_bytes = fread(file_buf, 1, FILE_BUF_SIZE, fd);
+            if (read_bytes < FILE_BUF_SIZE) {
                 if (feof(fd)) {
                     printf("Reached end of file. Start from scratch!\n");
                     rewind(fd);
+                    uint32_t more_bytes = FILE_BUF_SIZE - read_bytes;
+                    if (fread(&file_buf[read_bytes], 1, more_bytes,
+                              fd) < more_bytes) {
+                        perror("fread");
+                        goto bail_out;
+                    }
                 } else {
-                    perror("fread: Failed to read from file");
+                    perror("fread");
                     goto bail_out;
                 }
-            } else {
-                break;
             }
+            file_buf_index = 0;
         }
 
+        // Insert payload from data cache into buffer
+        memcpy(&udp_buf[HEADER_SIZE], &file_buf[file_buf_index],
+               PAYLOAD_SIZE_IN_BYTES);
+        file_buf_index += PAYLOAD_SIZE_IN_BYTES;
+
         // Sleep (very carefully)
-        if (before_sendto.tv_sec != 0) {
-            struct timespec now;
-            clock_gettime(CLOCK_REALTIME, &now);
-            struct timespec time_spent;
-            timespecsub(&now, &before_sendto, &time_spent);
-            struct timespec delay;
-            timespecsub(&period_size_as_tsp, &time_spent, &delay);
-            struct timespec sleep_until;
-            timespecadd(&now, &delay, &sleep_until);
-            struct timespec rem;
-            assert(clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME,
-                                   &sleep_until, &rem) == 0);
-        }
-        clock_gettime(CLOCK_REALTIME, &before_sendto);
+        struct timespec now;
+        clock_gettime(CLOCK_REALTIME, &now);
+        struct timespec time_spent;
+        timespecsub(&now, &before_caching, &time_spent);
+        struct timespec delay;
+        timespecsub(&period_size_as_tsp, &time_spent, &delay);
+        struct timespec sleep_until;
+        timespecadd(&now, &delay, &sleep_until);
+        struct timespec rem;
+        assert(clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME,
+                               &sleep_until, &rem) == 0);
 
         // Write to non-blocking socket
         for (int i = 0; i < naddr_ports; i++) {
