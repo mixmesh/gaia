@@ -77,12 +77,14 @@ void *file_sender(void *arg) {
          .tv_sec = 0,
          .tv_nsec = PERIOD_SIZE_IN_NS
         };
-    printf("Period size is %ld nano seconds\n", period_size_as_tsp.tv_nsec);
     struct timespec time;
     clock_gettime(CLOCK_MONOTONIC, &time);
 
     char file_buf[FILE_BUF_SIZE];
     uint32_t file_buf_index = FILE_BUF_SIZE;
+
+    printf("Period size is %d bytes (%ldns)\n", PERIOD_SIZE_IN_BYTES,
+           period_size_as_tsp.tv_nsec);
 
     // Read from file and write to socket
     printf("Sending audio...\n");

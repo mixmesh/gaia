@@ -68,10 +68,11 @@ void *network_sender(void *arg) {
     uint32_t udp_buf_size = HEADER_SIZE + PAYLOAD_SIZE_IN_BYTES;
     uint8_t *udp_buf = malloc(udp_buf_size);
 
-    uint32_t seqnum = 1;
-
     // Add userid to buffer header
     memcpy(udp_buf, &userid, sizeof(userid));
+
+    // Let sequence number start with 1 (zero is reserved)
+    uint32_t seqnum = 1;
 
     // Read from audio device and write to socket
     printf("Sending audio...\n");
