@@ -78,7 +78,8 @@ void *file_sender(void *arg) {
          .tv_nsec = PERIOD_SIZE_IN_NS
         };
     printf("Period size is %ld nano seconds\n", period_size_as_tsp.tv_nsec);
-    struct timespec before_caching;
+    struct timespec time;
+    clock_gettime(CLOCK_MONOTONIC, &time);
 
     char file_buf[FILE_BUF_SIZE];
     uint32_t file_buf_index = FILE_BUF_SIZE;
@@ -93,8 +94,6 @@ void *file_sender(void *arg) {
         // Add seqnum to buffer header
         memcpy(&udp_buf[12], &seqnum, sizeof(seqnum));
         seqnum++;
-
-        clock_gettime(CLOCK_MONOTONIC, &before_caching);
 
         // Cache file to RAM (if needed)
         if (file_buf_index == FILE_BUF_SIZE) {
@@ -123,17 +122,12 @@ void *file_sender(void *arg) {
         file_buf_index += PAYLOAD_SIZE_IN_BYTES;
 
         // Sleep (very carefully)
-        struct timespec now;
-        clock_gettime(CLOCK_REALTIME, &now);
-        struct timespec time_spent;
-        timespecsub(&now, &before_caching, &time_spent);
-        struct timespec delay;
-        timespecsub(&period_size_as_tsp, &time_spent, &delay);
-        struct timespec sleep_until;
-        timespecadd(&now, &delay, &sleep_until);
+        struct timespec next_time;
+        timespecadd(&time, &period_size_as_tsp, &next_time);
         struct timespec rem;
         assert(clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME,
-                               &sleep_until, &rem) == 0);
+                               &next_time, &rem) == 0);
+        memcpy(&time, &next_time, sizeof(struct timespec));
 
         // Write to non-blocking socket
         for (int i = 0; i < naddr_ports; i++) {
