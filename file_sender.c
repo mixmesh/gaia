@@ -72,14 +72,14 @@ void *file_sender(void *arg) {
     // Let sequence number start with 1 (zero is reserved)
     uint32_t seqnum = 1;
 
-    printf("Period size is %f nano seconds\n", PERIOD_SIZE_IN_NS);
-
     struct timespec period_size_as_tsp =
         {
          .tv_sec = 0,
          .tv_nsec = PERIOD_SIZE_IN_NS
         };
+    printf("Period size is %ld nano seconds\n", period_size_as_tsp.tv_nsec);
     struct timespec before_caching;
+
 
     char file_buf[FILE_BUF_SIZE];
     uint32_t file_buf_index = FILE_BUF_SIZE;
