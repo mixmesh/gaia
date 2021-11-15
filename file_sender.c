@@ -93,7 +93,7 @@ void *file_sender(void *arg) {
         memcpy(&udp_buf[12], &seqnum, sizeof(seqnum));
         seqnum++;
 
-        clock_gettime(CLOCK_MONOTONIC_RAW, &before_caching);
+        clock_gettime(CLOCK_MONOTONIC, &before_caching);
 
         // Cache file to RAM (if needed)
         if (file_buf_index == FILE_BUF_SIZE) {
@@ -131,7 +131,7 @@ void *file_sender(void *arg) {
         struct timespec sleep_until;
         timespecadd(&now, &delay, &sleep_until);
         struct timespec rem;
-        assert(clock_nanosleep(CLOCK_MONOTONIC_RAW, TIMER_ABSTIME,
+        assert(clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME,
                                &sleep_until, &rem) == 0);
 
         // Write to non-blocking socket
