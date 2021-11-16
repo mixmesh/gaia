@@ -337,3 +337,19 @@ int audio_smix16(int16_t *data[], uint8_t n, int16_t *mixed_data) {
     }
     return 0;
 }
+
+int audio_dummy_smix16(int16_t *data[], uint8_t n, int16_t *mixed_data) {
+    for (int i = 0; i < PERIOD_SIZE_IN_FRAMES * CHANNELS; i++) {
+        int32_t sum = 0;
+        for (int j = 0; j < n; j++) {
+            sum +=  data[j][i];
+        }
+        if (sum > 32768) {
+            sum = 32768;
+        } else if (sum < -32768) {
+            sum = -32768;
+        }
+        mixed_data[i] = sum;
+    }
+    return 0;
+}
