@@ -9,6 +9,7 @@ jb_t *jb_new(uint32_t userid) {
     jb->userid = userid;
     jb->playback = NULL;
     jb->playback_seqnum = 0;
+    jb->exhausted = false;
     jb->nentries = 0;
     jb->rwlock = malloc(sizeof(pthread_rwlock_t));
     assert(pthread_rwlock_init(jb->rwlock, NULL) == 0);
@@ -21,17 +22,26 @@ jb_t *jb_new(uint32_t userid) {
     return jb;
 }
 
-void jb_free(jb_t *jb) {
+void jb_free(jb_t *jb, bool free_entries_only) {
     jb_entry_t *jb_entry = jb->tail;
     while (jb_entry != NULL) {
         jb_entry_t *next_jb_entry = jb_entry->next;
         jb_entry_free(jb_entry);
         jb_entry = next_jb_entry;
     }
-    assert(pthread_rwlock_destroy(jb->rwlock) == 0);
-    free(jb->rwlock);
-    free(jb->peak_values);
-    free(jb);
+    jb->tail = NULL;
+    jb->head = NULL;
+    if (free_entries_only) {
+        jb->playback = NULL;
+        jb->playback_seqnum = 0;
+        jb->exhausted = false;
+        jb->nentries = 0;
+    } else {
+        assert(pthread_rwlock_destroy(jb->rwlock) == 0);
+        free(jb->rwlock);
+        free(jb->peak_values);
+        free(jb);
+    }
 }
 
 jb_entry_t *jb_pop(jb_t *jb) {

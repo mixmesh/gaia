@@ -15,6 +15,7 @@ typedef struct {
     uint32_t userid;
     jb_entry_t *playback;
     uint32_t playback_seqnum;
+    bool exhausted;
     uint32_t nentries;
     pthread_rwlock_t *rwlock;
     uint16_t npeak_values;
@@ -33,7 +34,7 @@ typedef struct {
 #define INTERMEDIATE_INSERTED (1 << 4)
 
 jb_t *jb_new(uint32_t userid);
-void jb_free(jb_t *jb);
+void jb_free(jb_t *jb, bool free_entries_only);
 jb_entry_t *jb_pop(jb_t *jb);
 uint8_t jb_insert(jb_t *jb, jb_entry_t *new_jb_entry);
 jb_entry_t *jb_get_entry(jb_t *jb, uint32_t index);

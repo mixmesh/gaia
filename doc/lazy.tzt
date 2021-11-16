@@ -25,3 +25,7 @@ Sox
 ---
 sox file.mp3 -c 1 -r 44100 -b 16 -e signed-integer --endian little -t raw output.bin
 
+Core file
+---------
+$ ulimit -c unlimited
+$ ulimit -a

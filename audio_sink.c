@@ -17,31 +17,33 @@ void reset_playback_delay(jb_t *jb) {
 void *audio_sink(void *arg) {
     int err;
     audio_info_t *audio_info = NULL;
+    uint8_t data[MAX_USERS][PAYLOAD_SIZE_IN_BYTES];
 
     // Read from jitter buffer, mix and write to audio device
     while (true) {
-        uint8_t *data[256];
         uint8_t ndata = 0;
-
         void step_playback_entry(jb_t *jb) {
             jb_take_wrlock(jb);
             if (jb->nentries > JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS) {
                 if (jb->playback == NULL) {
-                    printf("Initialize playback entry. \
-Reset playback entry.\n");
+                    printf("Jitter buffer (re)initializes playback for userid \
+%d\n",
+                           jb->userid);
                     reset_playback_delay(jb);
-                    data[ndata++] = &jb->playback->data[HEADER_SIZE];
+                    memcpy(data[ndata++], &jb->playback->data[HEADER_SIZE],
+                           PAYLOAD_SIZE_IN_BYTES);
                 } else if (jb->playback == jb->tail) {
-                    printf("Jitter buffer has been exhausted. Close it.\n");
-                    jb_table_upgrade_to_wrlock(jb_table);
-                    jb_table_delete(jb_table, jb->userid);
-                    jb_table_downgrade_to_rdlock(jb_table);
+                    printf("Jitter buffer playback is exhausted for userid \
+%d\n",
+                           jb->userid);
+                    jb->exhausted = true;
                 } else if (jb->playback->seqnum != jb->playback_seqnum) {
-                    printf("Playback entry %d has been reused by %d. \
-Reset playback entry.\n",
-                           jb->playback_seqnum, jb->playback->seqnum);
+                    printf("Jitter buffer playback has wrapped around for \
+userid %d.\n",
+                           jb->userid);
                     reset_playback_delay(jb);
-                    data[ndata++] = &jb->playback->data[HEADER_SIZE];
+                    memcpy(data[ndata++], &jb->playback->data[HEADER_SIZE],
+                           PAYLOAD_SIZE_IN_BYTES);
                 } else {
                     // Step playback entry
                     uint32_t next_seqnum = jb->playback->seqnum + 1;
@@ -55,15 +57,17 @@ Reset playback entry.\n",
                             // again!
                             assert(jb->playback->prev->seqnum > next_seqnum);
                             // NOTE: Disable to remove noise on stdout
-                            printf("Expected playback entry %d but got %d. \
-Use %d again!\n",
-                                   next_seqnum, jb->playback->prev->seqnum,
-                                   jb->playback->seqnum);
+                            printf("Jitter buffer for userid %d expected \
+playback entry %d but got %d (%d will be reused as %d!)\n",
+                                   jb->userid, next_seqnum,
+                                   jb->playback->prev->seqnum,
+                                   jb->playback->prev->seqnum, next_seqnum);
                             jb->playback->seqnum = next_seqnum;
                             jb->playback_seqnum = next_seqnum;
                         }
                     }
-                    data[ndata++] = &jb->playback->data[HEADER_SIZE];
+                    memcpy(data[ndata++], &jb->playback->data[HEADER_SIZE],
+                           PAYLOAD_SIZE_IN_BYTES);
                 }
                 /*
                 // NOTE: This debug printout is too expensive
@@ -103,8 +107,8 @@ Use %d again!\n",
             } else {
                 uint8_t write_buf[PERIOD_SIZE_IN_BYTES];
                 ndata = (ndata < MAX_MIX_STREAMS) ? ndata : MAX_MIX_STREAMS;
-                assert(audio_smix16((int16_t **)data, ndata,
-                                    (int16_t *)write_buf) == 0);
+                assert(audio_smix16((int16_t (*)[PAYLOAD_SIZE_IN_BYTES / 2])data,
+                                    ndata, (int16_t *)write_buf) == 0);
                 audio_write(audio_info, write_buf, PAYLOAD_SIZE_IN_FRAMES);
             }
         } else {

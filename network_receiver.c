@@ -90,12 +90,13 @@ void *network_receiver(void *arg) {
         }
         printf("Socket receive buffer has been drained\n");
 
-        // Read from socket and write to jitter buffer
-        printf("Receiving audio...\n");
         uint64_t userid = 0;
         jb_t *jb = NULL;
         double latency = 0;
         uint64_t last_latency_printout = 0;
+
+        // Read from socket and write to jitter buffer
+        printf("Receiving audio...\n");
         while (true) {
             // Wait for incoming socket data (or timeout)
             FD_ZERO(&readfds);
@@ -129,10 +130,19 @@ userid");
                 jb_table_take_rdlock(jb_table);
                 if ((jb = jb_table_find(jb_table, new_userid)) == NULL) {
                     jb = jb_new(new_userid);
+                    jb_table_upgrade_to_wrlock(jb_table);
                     assert(jb_table_add(jb_table, jb) == JB_TABLE_SUCCESS);
+                    jb_table_downgrade_to_rdlock(jb_table);
                 }
                 jb_table_release_lock(jb_table);
                 userid = new_userid;
+            }
+
+            // Jitter buffer is exhausted according to audio sink
+            if (jb->exhausted) {
+                jb_take_wrlock(jb);
+                jb_free(jb, true);
+                jb_release_lock(jb);
             }
 
             // Prepare new jitter buffer entry
@@ -141,7 +151,6 @@ userid");
                 jb_take_wrlock(jb);
                 jb_entry = jb_pop(jb);
                 jb_release_lock(jb);
-                jb_entry->seqnum = 0;
             } else {
                 jb_entry = jb_entry_new(udp_buf_size);
             }
@@ -212,7 +221,9 @@ userid");
         }
 
         printf("Erase all jitter buffers\n");
+        jb_table_take_wrlock(jb_table);
         jb_table_free(jb_table, true);
+        jb_table_release_lock(jb_table);
     }
 
  bail_out:

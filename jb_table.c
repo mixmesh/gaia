@@ -18,12 +18,13 @@ jb_table_t *jb_table_new(void) {
     return jb_table;
 }
 
-void jb_table_free(jb_table_t *jb_table, bool free_entries_only) {
+void jb_table_free(jb_table_t *jb_table, bool free_list_only) {
     jb_t *jb, *tmp;
     HASH_ITER(hh, jb_table->jb, jb, tmp) {
-        jb_free(jb);
+        jb_take_wrlock(jb);
+        jb_free(jb, false);
     }
-    if (free_entries_only) {
+    if (free_list_only) {
         jb_table->jb = NULL;
     } else {
         assert(pthread_rwlock_destroy(jb_table->rwlock) == 0);
@@ -53,7 +54,7 @@ void jb_table_delete(jb_table_t *jb_table, uint32_t userid) {
     HASH_FIND_UINT32(jb_table->jb, &userid, jb);
     if (jb != NULL) {
         HASH_DEL(jb_table->jb, jb);
-        jb_free(jb);
+        jb_free(jb, false);
     }
 }
 

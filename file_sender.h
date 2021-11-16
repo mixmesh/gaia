@@ -11,7 +11,7 @@ typedef struct {
 
 typedef struct {
     uint32_t userid;
-    char *filename;
+    char filename[128];
     uint8_t naddr_ports;
     file_sender_addr_port_t *addr_ports;
 } file_sender_params_t;

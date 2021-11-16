@@ -1,6 +1,8 @@
 #ifndef _GLOBALS_H_
 #define _GLOBALS_H_
 
+#define MAX_USERS 128
+
 #define PCM_NAME "plughw:0,0"
 #define FORMAT SND_PCM_FORMAT_S16_LE
 #define CHANNELS 2
@@ -29,7 +31,7 @@
 #define PAYLOAD_SIZE_IN_BYTES (PAYLOAD_SIZE_IN_FRAMES * FRAME_SIZE_IN_BYTES)
 
 #define PEAK_AVERAGE_PERIOD_IN_MS 200
-#define MAX_MIX_STREAMS 4
+#define MAX_MIX_STREAMS 32
 
 // |userid:4|timestamp:8|seqnum:4| = 16 bytes
 #define HEADER_SIZE (4 + 8 + 4)
