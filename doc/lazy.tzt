@@ -20,3 +20,8 @@ Pi
 --
 $ iw wlan0 set power_save off
 $ sudo iw wlp2s0 set power_save off
+
+Sox
+---
+sox file.mp3 -c 1 -r 44100 -b 16 -e signed-integer --endian little -t raw output.bin
+

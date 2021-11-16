@@ -186,10 +186,11 @@ userid");
 
             // Peak value/average handling
             uint16_t peak_value = 0;
-            uint16_t *u16data = (uint16_t *)(&jb_entry->data[HEADER_SIZE]);
+            int16_t *s16data = (int16_t *)&jb_entry->data[HEADER_SIZE];
             for (uint16_t i = 0; i < PERIOD_SIZE_IN_FRAMES * CHANNELS; i++) {
-                if (u16data[i] > peak_value) {
-                    peak_value = u16data[i];
+                uint16_t udata = s16data[i] + 32768;
+                if (udata > peak_value) {
+                    peak_value = udata;
                 }
             }
             jb->peak_values[jb->peak_index] = peak_value;

@@ -103,11 +103,12 @@ int main(int argc, char *argv[]) {
 
                 // Peak value/average handling
                 uint16_t peak_value = 0;
-                uint16_t *u16data = (uint16_t *)(files[i].data);
+                int16_t *s16data = (int16_t *)(files[i].data);
                 for (uint16_t j = 0; j < PERIOD_SIZE_IN_FRAMES * CHANNELS;
                      j++) {
-                    if (u16data[j] > peak_value) {
-                        peak_value = u16data[j];
+                    uint16_t udata = s16data[j] + 32768;
+                    if (udata > peak_value) {
+                        peak_value = udata;
                     }
                 }
                 files[i].peak_values[files[i].peak_index] = peak_value;
@@ -144,8 +145,8 @@ int main(int argc, char *argv[]) {
         } else if (nactive_files == 1) {
             write_buf = data_to_mix[0];
         } else {
-            assert(audio_umix16((uint16_t **)data_to_mix, nactive_files,
-                                (uint16_t *)mixed_data) == 0);
+            assert(audio_smix16((int16_t **)data_to_mix, nactive_files,
+                                (int16_t *)mixed_data) == 0);
             write_buf = mixed_data;
         }
 

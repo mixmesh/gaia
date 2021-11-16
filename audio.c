@@ -1,6 +1,9 @@
 #include "audio.h"
 #include "globals.h"
 
+#define M  (1 << 15)
+#define MM (1 << 31)
+
 // Read https://www.alsa-project.org/wiki/FramesPeriods carefully
 
 int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
@@ -201,6 +204,135 @@ int audio_umix16(uint16_t *data[], uint8_t n, uint16_t *mixed_data) {
         mixed_data[i] = mix(data[0][i], data[1][i]);
         for (int j = 2; j < n; j++) {
             mixed_data[i] = mix(mixed_data[i], data[j][i]);
+        }
+    }
+    return 0;
+}
+
+// a > 0,  b > 0
+static inline int16_t _mix_2xint16_pos(int16_t a,int16_t b) {
+    return (int32_t)a + (int32_t)b - ((int32_t)a * (int32_t)b)/M;
+}
+
+// a < 0,  b < 0
+static inline int16_t _mix_2xint16_neg(int16_t a,int16_t b) {
+    return (int32_t)a + (int32_t)b + ((int32_t)a * (int32_t)b)/M;
+}
+
+// mix 2xint16
+static inline int16_t mix_2xint16(int16_t a,int16_t b) {
+    if ((a > 0) && (b > 0)) {
+	return _mix_2xint16_pos(a, b);
+    } else if ((a < 0) && (b < 0)) {
+	return _mix_2xint16_neg(a, b);
+    } else {
+	return a+b;
+    }
+}
+
+//
+// mix_2xint16(mix_2xint16(a,b), c)  =
+//
+//  t = a+b-(ab)/M; t+c-(tc)/M; ==
+//  a+b+c - ab/M - ac/M - bc/M + abc/MM
+//
+
+// a>0, b>0, c>0
+static inline int16_t _mix_3xint16_pos(int16_t a,int16_t b, int16_t c) {
+    int32_t ab = (int32_t)a*(int32_t)b;
+    int32_t ac = (int32_t)a*(int32_t)c;
+    int32_t bc = (int32_t)b*(int32_t)c;
+    int64_t abc = ab * (int64_t) c;
+    int32_t v = a;
+
+    v += b;
+    v += c;
+    v -= ab/M;
+    v -= ac/M;
+    v -= bc/M;
+    v += abc/MM;
+    return v;
+}
+
+// a<0, b<0, c<0
+
+static inline int16_t _mix_3xint16_neg(int16_t a,int16_t b, int16_t c) {
+    int32_t ab = (int32_t)a*(int32_t)b;
+    int32_t ac = (int32_t)a*(int32_t)c;
+    int32_t bc = (int32_t)b*(int32_t)c;
+    int64_t abc = ab * (int64_t) c;
+    int32_t v = a;
+
+    v += b;
+    v += c;
+    v += ab/M;
+    v += ac/M;
+    v += bc/M;
+    v -= abc/MM;
+    return v;
+}
+
+// mix 3xint16
+static inline int16_t mix_3xint16(int16_t a,int16_t b, int16_t c) {
+    if (a > 0) {
+	if (b > 0) {
+	    if (c > 0) // a>0, b>0, c>0
+		return _mix_3xint16_pos(a, b, c);
+	    else {  // a>0, b>0, c <= 0
+		int16_t ab = _mix_2xint16_pos(a, b);
+		return ab + c;
+	    }
+	} else if (b < 0) {
+	    int16_t ab = a+b;  // a>0, b<0
+	    return mix_2xint16(ab, c);
+	} else { // a>0, b==0
+	    if (c > 0) {
+		return _mix_2xint16_pos(a, c);
+            } else {
+		return a + c;
+            }
+	}
+    } else if (a < 0) {
+	if (b < 0) {
+	    if (c < 0) {
+		return _mix_3xint16_neg(a, b, c);
+            } else {  // a<0, b<0,c >=0
+		int16_t ab = _mix_2xint16_neg(a, b);
+		return ab + c;
+	    }
+	} else if (b > 0) {
+	    int16_t ab = a+b; // a<0, b>0
+	    return mix_2xint16(ab, c);
+	} else { // a<0, b==0
+	    if (c < 0) {
+		return _mix_2xint16_neg(a, c);
+            } else {
+		return a + c;
+            }
+	}
+    } else { // a==0
+	return mix_2xint16(b, c);
+    }
+}
+
+int audio_smix16(int16_t *data[], uint8_t n, int16_t *mixed_data) {
+    if (n < 2) {
+        return -1;
+    }
+    if (n == 2) {
+        for (int i = 0; i < PERIOD_SIZE_IN_FRAMES * CHANNELS; i++) {
+            mixed_data[i] = mix_2xint16(data[0][i], data[1][i]);
+        }
+    } else if (n == 3) {
+        for (int i = 0; i < PERIOD_SIZE_IN_FRAMES * CHANNELS; i++) {
+            mixed_data[i] = mix_3xint16(data[0][i], data[1][i], data[2][i]);
+        }
+    } else {
+        for (int i = 0; i < PERIOD_SIZE_IN_FRAMES * CHANNELS; i++) {
+            mixed_data[i] = mix_2xint16(data[0][i], data[1][i]);
+            for (int j = 2; j < n; j++) {
+                mixed_data[i] = mix_2xint16(mixed_data[i], data[j][i]);
+            }
         }
     }
     return 0;

@@ -2,11 +2,11 @@
 #define _GLOBALS_H_
 
 #define PCM_NAME "plughw:0,0"
-#define FORMAT SND_PCM_FORMAT_U16_LE
+#define FORMAT SND_PCM_FORMAT_S16_LE
 #define CHANNELS 2
 #define SAMPLE_SIZE_IN_BYTES 2
 #define FRAME_SIZE_IN_BYTES (CHANNELS * SAMPLE_SIZE_IN_BYTES)
-#define RATE_IN_HZ 48000
+#define RATE_IN_HZ 44100
 
 // Let it be a power to 2
 #define PERIOD_SIZE_IN_FRAMES 256

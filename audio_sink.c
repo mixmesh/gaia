@@ -103,8 +103,8 @@ Use %d again!\n",
             } else {
                 uint8_t write_buf[PERIOD_SIZE_IN_BYTES];
                 ndata = (ndata < MAX_MIX_STREAMS) ? ndata : MAX_MIX_STREAMS;
-                assert(audio_umix16((uint16_t **)data, ndata,
-                                    (uint16_t *)write_buf) == 0);
+                assert(audio_smix16((int16_t **)data, ndata,
+                                    (int16_t *)write_buf) == 0);
                 audio_write(audio_info, write_buf, PAYLOAD_SIZE_IN_FRAMES);
             }
         } else {
