@@ -166,18 +166,18 @@ scratch!\n",
             qsort(files, nfiles, sizeof(file_t), compar);
         }
 
-        uint8_t limited_nfiles =
+        uint8_t nfiles_to_mix =
             (nfiles < MAX_MIX_STREAMS) ? nfiles : MAX_MIX_STREAMS;
-        for (uint8_t i = 0; i < limited_nfiles; i++) {
+        for (uint8_t i = 0; i < nfiles_to_mix; i++) {
             data[i] = &files[i].cache[files[i].cache_index];
         }
 
-        if (limited_nfiles == 1) {
+        if (nfiles_to_mix == 1) {
             if (audio_write(audio_info, data[0], chunk_size_in_frames) < 0) {
                 break;
             }
         } else {
-            assert(audio_smix16((int16_t **)data, limited_nfiles,
+            assert(audio_smix16((int16_t **)data, nfiles_to_mix,
                                 (int16_t *)mixed_data,
                                 chunk_size_in_frames, CHANNELS) == 0);
             if (audio_write(audio_info, mixed_data,
