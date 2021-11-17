@@ -8,11 +8,11 @@
 #include "globals.h"
 
 void usage(char *argv[]) {
-    fprintf(stderr, "Usage: %s [-D device] [-d addr[:port]] [-u userid] filename ...\n",
+    fprintf(stderr, "Usage: %s [-d addr[:port]] [-u userid] filename ...\n",
             argv[0]);
     fprintf(stderr,
-            "Note: device, addr and port default respectively default to %s, %s and %d\n",
-            DEFAULT_PCM_NAME, DEFAULT_ADDR, DEFAULT_PORT);
+            "Note: addr and port default respectively default to %s and %d\n",
+            DEFAULT_ADDR, DEFAULT_PORT);
     fprintf(stderr,
             "Example: sudo %s -d 172.16.0.95 -d 172.16.0.95:2356 4711 \
 manhattan.u16\n",
@@ -32,7 +32,7 @@ int main (int argc, char *argv[]) {
     uint32_t userid = 1;
     long value;
 
-    while ((opt = getopt(argc, argv, "u:d:D:")) != -1) {
+    while ((opt = getopt(argc, argv, "u:d:")) != -1) {
         switch (opt) {
         case 'd':
             if (get_addr_port(optarg, &addr_ports[naddr_ports].addr,

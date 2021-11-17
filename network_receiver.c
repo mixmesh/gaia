@@ -187,7 +187,8 @@ userid");
                     printf("Duplicated UDP packet (%d)\n", seqnum);
                 } else if (jb->tail->seqnum + 1 != seqnum) {
                     // NOTE: Disable to remove noise on stdout
-                    printf("Missing UDP packet (%d)\n", jb->tail->seqnum + 1);
+                    printf("Missing UDP packet %d. Got %d instead.\n",
+                           jb->tail->seqnum + 1, seqnum);
                 }
             }
             jb_entry->seqnum = seqnum;
