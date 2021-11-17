@@ -103,10 +103,11 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
             return err;
         }
 
+        snd_pcm_uframes_t start_threshold =
+            start_threshold(period_size_in_frames, buffer_multiplicator);
         if ((err =
              snd_pcm_sw_params_set_start_threshold(pcm, sw_params,
-                                                   PLAYBACK_START_THRESHOLD)) <
-            0) {
+                                                   start_threshold)) < 0) {
             snd_pcm_hw_params_free(hw_params);
             snd_pcm_sw_params_free(sw_params);
             return err;
@@ -196,12 +197,12 @@ uint16_t mix(uint16_t a, uint16_t b) {
     }
 }
 
-int audio_umix16(uint16_t data[][PAYLOAD_SIZE_IN_BYTES / 2],
-                 uint8_t n, uint16_t *mixed_data) {
+int audio_umix16(uint16_t **data, uint8_t n, uint16_t *mixed_data,
+                 snd_pcm_uframes_t period_size_in_frames, uint8_t channels) {
     if (n < 2) {
         return -1;
     }
-    for (int i = 0; i < PERIOD_SIZE_IN_FRAMES * CHANNELS; i++) {
+    for (int i = 0; i < period_size_in_frames * channels; i++) {
         mixed_data[i] = mix(data[0][i], data[1][i]);
         for (int j = 2; j < n; j++) {
             mixed_data[i] = mix(mixed_data[i], data[j][i]);
@@ -316,21 +317,21 @@ static inline int16_t mix_3xint16(int16_t a,int16_t b, int16_t c) {
     }
 }
 
-int audio_smix16(int16_t data[][PAYLOAD_SIZE_IN_BYTES / 2], uint8_t n,
-                 int16_t *mixed_data) {
+int audio_smix16(int16_t **data, uint8_t n, int16_t *mixed_data,
+                 snd_pcm_uframes_t period_size_in_frames, uint8_t channels) {
     if (n < 2) {
         return -1;
     }
     if (n == 2) {
-        for (int i = 0; i < PERIOD_SIZE_IN_FRAMES * CHANNELS; i++) {
+        for (int i = 0; i < period_size_in_frames * channels; i++) {
             mixed_data[i] = mix_2xint16(data[0][i], data[1][i]);
         }
     } else if (n == 3) {
-        for (int i = 0; i < PERIOD_SIZE_IN_FRAMES * CHANNELS; i++) {
+        for (int i = 0; i < period_size_in_frames * channels; i++) {
             mixed_data[i] = mix_3xint16(data[0][i], data[1][i], data[2][i]);
         }
     } else {
-        for (int i = 0; i < PERIOD_SIZE_IN_FRAMES * CHANNELS; i++) {
+        for (int i = 0; i < period_size_in_frames * channels; i++) {
             mixed_data[i] = mix_2xint16(data[0][i], data[1][i]);
             for (int j = 2; j < n; j++) {
                 mixed_data[i] = mix_2xint16(mixed_data[i], data[j][i]);
@@ -340,9 +341,10 @@ int audio_smix16(int16_t data[][PAYLOAD_SIZE_IN_BYTES / 2], uint8_t n,
     return 0;
 }
 
-int audio_dummy_smix16(int16_t data[][PAYLOAD_SIZE_IN_BYTES / 2], uint8_t n,
-                       int16_t *mixed_data) {
-    for (int i = 0; i < PERIOD_SIZE_IN_FRAMES * CHANNELS; i++) {
+int audio_dummy_smix16(int16_t **data, uint8_t n, int16_t *mixed_data,
+                       snd_pcm_uframes_t period_size_in_frames,
+                       uint8_t channels) {
+    for (int i = 0; i < period_size_in_frames * channels; i++) {
         int32_t sum = 0;
         for (int j = 0; j < n; j++) {
             sum +=  data[j][i];

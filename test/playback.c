@@ -11,13 +11,12 @@
 // $ ./playback test.dat
 
 #define MAX_FILES 128
-#define PEAK_AVERAGE_PERIOD_IN_MS 200
 
 typedef struct {
     FILE *fd;
     char *filename;
-    bool activated;
-    uint8_t *data;
+    uint8_t *cache;
+    uint32_t cache_index;
     uint16_t *peak_values;
     uint16_t peak_index;
     uint16_t peak_average;
@@ -31,7 +30,7 @@ audio_info_t *audio_info = NULL;
 void stop() {
     for (uint8_t i = 0; i < nfiles; i++) {
         fclose(files[i].fd);
-        free(files[i].data);
+        free(files[i].cache);
         free(files[i].peak_values);
     }
     if (audio_info != NULL) {
@@ -52,6 +51,18 @@ int main(int argc, char *argv[]) {
         exit(ARG_ERROR);
     }
 
+    snd_pcm_uframes_t chunk_size_in_frames = PERIOD_SIZE_IN_FRAMES * 4;
+    uint32_t chunk_size_in_bytes = chunk_size_in_frames * FRAME_SIZE_IN_BYTES;
+    uint32_t chunk_size_in_ms =  chunk_size_in_frames / (RATE_IN_HZ / 1000.0);
+    uint32_t file_cache_size = chunk_size_in_bytes * 10;
+    uint32_t peak_average_period_in_ms = 5000;
+
+    printf("chunk_size_in_frames: %ld\n", chunk_size_in_frames);
+    printf("chunk_size_in_bytes: %d\n", chunk_size_in_bytes);
+    printf("chunk_size_in_ms: %d\n", chunk_size_in_ms);
+    printf("file_cache_size: %dkb\n", file_cache_size / 1024);
+    printf("peak_average_period_in_ms: %d\n", peak_average_period_in_ms);
+
     nfiles = argc - 1;
 
     if (signal(SIGINT, stop) == SIG_ERR) {
@@ -71,87 +82,112 @@ int main(int argc, char *argv[]) {
     audio_print_parameters(audio_info, "playback");
     assert(PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
 
-    uint16_t npeak_values =
-        PEAK_AVERAGE_PERIOD_IN_MS / PERIOD_SIZE_IN_MS;
+    uint16_t npeak_values = peak_average_period_in_ms / chunk_size_in_ms;
 
+    // Open all files and prepare for battle
     for (uint8_t i = 0; i < nfiles; i++) {
         if ((files[i].fd = fopen(argv[i + 1], "r")) == NULL) {
             perror(argv[i + 1]);
             exit(FILE_ERROR);
         }
+
+        // Check file size
+        fseek(files[i].fd, 0L, SEEK_END);
+        if (ftell(files[i].fd) < file_cache_size) {
+            fprintf(stderr, "%s is smaller than %d bytes\n", files[i].filename,
+                    file_cache_size);
+            fclose(files[i].fd);
+            exit(FILE_ERROR);
+        }
+        rewind(files[i].fd);
+
         files[i].filename = argv[i + 1];
-        files[i].activated = true;
-        files[i].data = malloc(PERIOD_SIZE_IN_BYTES);
+        files[i].cache = malloc(file_cache_size);
+        files[i].cache_index = file_cache_size;
         files[i].peak_values = calloc(npeak_values, sizeof(uint16_t));
         files[i].peak_index = 0;
         files[i].peak_average = 0;
     }
 
-    uint8_t *data_to_mix[MAX_MIX_STREAMS];
-    uint8_t mixed_data[PERIOD_SIZE_IN_BYTES];
-    file_t *active_files[nfiles];
+    uint8_t *data[nfiles];
+    uint8_t mixed_data[chunk_size_in_bytes];
 
+    // Read from files, mix and write to audio device
     while (true) {
-        uint8_t nactive_files = 0;
         for (uint8_t i = 0; i < nfiles; i++) {
-            if (!files[i].activated) {
-                continue;
-            }
-            if (fread(files[i].data, 1, PERIOD_SIZE_IN_BYTES, files[i].fd) ==
-                PERIOD_SIZE_IN_BYTES) {
-                active_files[nactive_files++] = &files[i];
-
-                // Peak value/average handling
-                uint16_t peak_value = 0;
-                int16_t *s16data = (int16_t *)(files[i].data);
-                for (uint16_t j = 0; j < PERIOD_SIZE_IN_FRAMES * CHANNELS;
-                     j++) {
-                    uint16_t udata = s16data[j] + 32768;
-                    if (udata > peak_value) {
-                        peak_value = udata;
+            // Cache file to RAM (if needed)
+            if (files[i].cache_index == file_cache_size) {
+                size_t read_bytes =
+                    fread(files[i].cache, 1, file_cache_size, files[i].fd);
+                if (read_bytes < file_cache_size) {
+                    if (feof(files[i].fd)) {
+                        printf("Reached end of file in %s. Start from \
+scratch!\n",
+                               files[i].filename);
+                        rewind(files[i].fd);
+                        uint32_t more_bytes = file_cache_size - read_bytes;
+                        if (fread(&files[i].cache[read_bytes], 1, more_bytes,
+                                  files[i].fd) < more_bytes) {
+                            perror("fread");
+                            break;
+                        }
+                    } else {
+                        perror("fread");
+                        break;
                     }
                 }
-                files[i].peak_values[files[i].peak_index] = peak_value;
-                if (++files[i].peak_index % npeak_values == 0) {
-                    files[i].peak_index = 0;
-                    files[i].peak_average =
-                        root_mean_square(files[i].peak_values, npeak_values);
-                    //fprintf(stderr, "%s: %d\n", files[i].filename,
-                    //        files[i].peak_average);
+                files[i].cache_index = 0;
+            }
+
+            // Peak value/average handling
+            uint16_t peak_value = 0;
+            int16_t *s16data = (int16_t *)&files[i].cache[files[i].cache_index];
+            for (uint16_t j = 0; j < chunk_size_in_frames * CHANNELS;
+                 j++) {
+                uint16_t udata = s16data[j] + 32768;
+                if (udata > peak_value) {
+                    peak_value = udata;
                 }
-            } else {
-                files[i].activated = false;
+            }
+            files[i].peak_values[files[i].peak_index] = peak_value;
+            if (++files[i].peak_index % npeak_values == 0) {
+                files[i].peak_index = 0;
+                files[i].peak_average =
+                    root_mean_square(files[i].peak_values, npeak_values);
             }
         }
 
-        if (nactive_files > 3) {
+        if (nfiles > 2) {
             int compar(const void *file1, const void *file2) {
-                int32_t value1 = (*(file_t **)file1)->peak_average;
-                int32_t value2 = (*(file_t **)file2)->peak_average;
+                int32_t value1 = ((file_t *)file1)->peak_average;
+                int32_t value2 = ((file_t *)file2)->peak_average;
                 return value2 - value1;
             };
-            qsort(active_files, nactive_files, sizeof(file_t *), compar);
-        }
-        nactive_files =
-            (nactive_files < MAX_MIX_STREAMS) ? nactive_files : MAX_MIX_STREAMS;
-        for (uint8_t i = 0; i < nactive_files; i++) {
-            data_to_mix[i] = active_files[i]->data;
-            //fprintf(stderr, "%s (%d) ", active_files[i]->filename, active_files[i]->peak_average);
-        }
-        //fprintf(stderr, "\n");
-        uint8_t *write_buf;
-        if (nactive_files == 0) {
-            break;
-        } else if (nactive_files == 1) {
-            write_buf = data_to_mix[0];
-        } else {
-            assert(audio_smix16((int16_t **)data_to_mix, nactive_files,
-                                (int16_t *)mixed_data) == 0);
-            write_buf = mixed_data;
+            qsort(files, nfiles, sizeof(file_t), compar);
         }
 
-        if (audio_write(audio_info, write_buf, PERIOD_SIZE_IN_FRAMES) < 0) {
-            break;
+        uint8_t limited_nfiles =
+            (nfiles < MAX_MIX_STREAMS) ? nfiles : MAX_MIX_STREAMS;
+        for (uint8_t i = 0; i < limited_nfiles; i++) {
+            data[i] = &files[i].cache[files[i].cache_index];
+        }
+
+        if (limited_nfiles == 1) {
+            if (audio_write(audio_info, data[0], chunk_size_in_frames) < 0) {
+                break;
+            }
+        } else {
+            assert(audio_smix16((int16_t **)data, limited_nfiles,
+                                (int16_t *)mixed_data,
+                                chunk_size_in_frames, CHANNELS) == 0);
+            if (audio_write(audio_info, mixed_data,
+                            chunk_size_in_frames) < 0) {
+                break;
+            }
+        }
+
+        for (uint8_t i = 0; i < nfiles; i++) {
+            files[i].cache_index += chunk_size_in_bytes;
         }
     }
 

@@ -2,6 +2,7 @@
 #define _JB_H_
 
 #include <pthread.h>
+#include <stdbool.h>
 #include "uthash/uthash.h"
 
 typedef struct jb_entry {

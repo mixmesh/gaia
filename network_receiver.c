@@ -207,8 +207,6 @@ userid");
                 jb->peak_index = 0;
                 jb->peak_average =
                     root_mean_square(jb->peak_values, jb->npeak_values);
-                //fprintf(stderr, "%s: %d\n", files[i].filename,
-                //        files[i].peak_average);
                 jb_table_take_wrlock(jb_table);
                 jb_table_sort(jb_table);
                 jb_table_release_lock(jb_table);

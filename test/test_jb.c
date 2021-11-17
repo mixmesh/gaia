@@ -127,7 +127,7 @@ int main (int argc, char *argv[]) {
   assert(jb->nentries == 8);
   print_jb(jb);
 
-  jb_free(jb);
+  jb_free(jb, false);
 
   return 0;
 }

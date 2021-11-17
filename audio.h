@@ -2,7 +2,6 @@
 #define _AUDIO_H_
 
 #include <alsa/asoundlib.h>
-#include "globals.h"
 
 #define AUDIO_NOT_RECOVERED -1000
 
@@ -24,11 +23,12 @@ snd_pcm_uframes_t audio_write(audio_info_t *audio_info, uint8_t *data,
                               snd_pcm_uframes_t nframes);
 int audio_read(audio_info_t *audio_info, uint8_t *data,
                snd_pcm_uframes_t nframes);
-int audio_umix16(uint16_t data[][PAYLOAD_SIZE_IN_BYTES / 2],
-                 uint8_t n, uint16_t *mixed_data);
-int audio_smix16(int16_t data[][PAYLOAD_SIZE_IN_BYTES / 2], uint8_t n,
-                 int16_t *mixed_data);
-int audio_dummy_smix16(int16_t data[][PAYLOAD_SIZE_IN_BYTES / 2], uint8_t n,
-                       int16_t *mixed_data);
+int audio_umix16(uint16_t **data, uint8_t n, uint16_t *mixed_data,
+                 snd_pcm_uframes_t period_size_in_frames, uint8_t channels);
+int audio_smix16(int16_t **data, uint8_t n, int16_t *mixed_data,
+                 snd_pcm_uframes_t period_size_in_frames, uint8_t channels);
+int audio_dummy_smix16(int16_t **data, uint8_t n, int16_t *mixed_data,
+                       snd_pcm_uframes_t period_size_in_frames,
+                       uint8_t channels);
 
 #endif

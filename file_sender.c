@@ -6,7 +6,7 @@
 #include "audio.h"
 #include "globals.h"
 
-#define FILE_BUF_SIZE (PAYLOAD_SIZE_IN_BYTES * 500)
+#define FILE_CACHE_SIZE (PAYLOAD_SIZE_IN_BYTES * 500)
 
 void *file_sender(void *arg) {
     // Extract parameters
@@ -25,7 +25,9 @@ void *file_sender(void *arg) {
 
     // Check file size
     fseek(fd, 0L, SEEK_END);
-    if (ftell(fd) < FILE_BUF_SIZE) {
+    if (ftell(fd) < FILE_CACHE_SIZE) {
+        fprintf(stderr, "%s is smaller than %d bytes\n", filename,
+                FILE_CACHE_SIZE);
         fclose(fd);
         exit(FILE_ERROR);
     }
@@ -80,8 +82,8 @@ void *file_sender(void *arg) {
     struct timespec time;
     clock_gettime(CLOCK_MONOTONIC, &time);
 
-    char file_buf[FILE_BUF_SIZE];
-    uint32_t file_buf_index = FILE_BUF_SIZE;
+    char file_cache[FILE_CACHE_SIZE];
+    uint32_t file_cache_index = FILE_CACHE_SIZE;
 
     printf("Period size is %d bytes (%ldns)\n", PERIOD_SIZE_IN_BYTES,
            period_size_as_tsp.tv_nsec);
@@ -98,14 +100,16 @@ void *file_sender(void *arg) {
         seqnum++;
 
         // Cache file to RAM (if needed)
-        if (file_buf_index == FILE_BUF_SIZE) {
-            size_t read_bytes = fread(file_buf, 1, FILE_BUF_SIZE, fd);
-            if (read_bytes < FILE_BUF_SIZE) {
+        if (file_cache_index == FILE_CACHE_SIZE) {
+            size_t read_bytes = fread(file_cache, 1, FILE_CACHE_SIZE, fd);
+            if (read_bytes < FILE_CACHE_SIZE) {
                 if (feof(fd)) {
+                    printf("Reached end of file in %s. Start from scratch!\n",
+                           filename);
                     printf("Reached end of file. Start from scratch!\n");
                     rewind(fd);
-                    uint32_t more_bytes = FILE_BUF_SIZE - read_bytes;
-                    if (fread(&file_buf[read_bytes], 1, more_bytes,
+                    uint32_t more_bytes = FILE_CACHE_SIZE - read_bytes;
+                    if (fread(&file_cache[read_bytes], 1, more_bytes,
                               fd) < more_bytes) {
                         perror("fread");
                         break;
@@ -115,13 +119,13 @@ void *file_sender(void *arg) {
                     break;
                 }
             }
-            file_buf_index = 0;
+            file_cache_index = 0;
         }
 
         // Insert payload from data cache into buffer
-        memcpy(&udp_buf[HEADER_SIZE], &file_buf[file_buf_index],
+        memcpy(&udp_buf[HEADER_SIZE], &file_cache[file_cache_index],
                PAYLOAD_SIZE_IN_BYTES);
-        file_buf_index += PAYLOAD_SIZE_IN_BYTES;
+        file_cache_index += PAYLOAD_SIZE_IN_BYTES;
 
         // Sleep (very carefully)
         struct timespec next_time;

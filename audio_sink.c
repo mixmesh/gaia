@@ -17,7 +17,7 @@ void reset_playback_delay(jb_t *jb) {
 void *audio_sink(void *arg) {
     int err;
     audio_info_t *audio_info = NULL;
-    uint8_t data[MAX_USERS][PAYLOAD_SIZE_IN_BYTES];
+    uint8_t *data[MAX_USERS];
 
     // Read from jitter buffer, mix and write to audio device
     while (true) {
@@ -30,8 +30,7 @@ void *audio_sink(void *arg) {
 %d\n",
                            jb->userid);
                     reset_playback_delay(jb);
-                    memcpy(data[ndata++], &jb->playback->data[HEADER_SIZE],
-                           PAYLOAD_SIZE_IN_BYTES);
+                    data[ndata++] = &jb->playback->data[HEADER_SIZE];
                 } else if (jb->playback == jb->tail) {
                     printf("Jitter buffer playback is exhausted for userid \
 %d\n",
@@ -42,8 +41,7 @@ void *audio_sink(void *arg) {
 userid %d.\n",
                            jb->userid);
                     reset_playback_delay(jb);
-                    memcpy(data[ndata++], &jb->playback->data[HEADER_SIZE],
-                           PAYLOAD_SIZE_IN_BYTES);
+                    data[ndata++] = &jb->playback->data[HEADER_SIZE];
                 } else {
                     // Step playback entry
                     uint32_t next_seqnum = jb->playback->seqnum + 1;
@@ -66,15 +64,14 @@ playback entry %d but got %d (%d will be reused as %d!)\n",
                             jb->playback_seqnum = next_seqnum;
                         }
                     }
-                    memcpy(data[ndata++], &jb->playback->data[HEADER_SIZE],
-                           PAYLOAD_SIZE_IN_BYTES);
+                    data[ndata++] = &jb->playback->data[HEADER_SIZE];
                 }
                 /*
                 // NOTE: This debug printout is too expensive
                 uint32_t index = jb_get_index(jb, jb->playback);
                 printf("Playback index now is %d out of %d total entries\n",
-                index, jb->entries);
-                }
+                    index, jb->entries);
+            }
                 */
             }
             jb_release_lock(jb);
@@ -105,11 +102,12 @@ playback entry %d but got %d (%d will be reused as %d!)\n",
             if (ndata == 1) {
                 audio_write(audio_info, data[0], PAYLOAD_SIZE_IN_FRAMES);
             } else {
-                uint8_t write_buf[PERIOD_SIZE_IN_BYTES];
+                uint8_t mixed_data[PERIOD_SIZE_IN_BYTES];
                 ndata = (ndata < MAX_MIX_STREAMS) ? ndata : MAX_MIX_STREAMS;
-                assert(audio_smix16((int16_t (*)[PAYLOAD_SIZE_IN_BYTES / 2])data,
-                                    ndata, (int16_t *)write_buf) == 0);
-                audio_write(audio_info, write_buf, PAYLOAD_SIZE_IN_FRAMES);
+                assert(audio_smix16((int16_t **)data,
+                                    ndata, (int16_t *)mixed_data,
+                                    PERIOD_SIZE_IN_FRAMES, CHANNELS) == 0);
+                audio_write(audio_info, mixed_data, PAYLOAD_SIZE_IN_FRAMES);
             }
         } else {
             fprintf(stderr, "No data available in jitter buffers\n");
