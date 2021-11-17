@@ -8,11 +8,8 @@
 void *network_sender(void *arg) {
     int err;
 
-    // Extract parameters
-    network_sender_params_t *sender_params = (network_sender_params_t *)arg;
-    uint32_t userid = sender_params->userid;
-    uint8_t naddr_ports = sender_params->naddr_ports;
-    network_sender_addr_port_t *addr_ports = sender_params->addr_ports;
+    // Parameters
+    network_sender_params_t *params = (network_sender_params_t *)arg;
 
     // Create socket
     int sockfd = -1;
@@ -41,18 +38,18 @@ void *network_sender(void *arg) {
     }
 
     // Create destination addresses
-    struct sockaddr_in dest_addrs[naddr_ports];
-    for (int i = 0; i < naddr_ports; i++) {
+    struct sockaddr_in dest_addrs[params->naddr_ports];
+    for (int i = 0; i < params->naddr_ports; i++) {
         memset(&dest_addrs[i], 0, sizeof(dest_addrs[i]));
         dest_addrs[i].sin_family = AF_INET;
-        dest_addrs[i].sin_addr.s_addr = addr_ports[i].addr;
-        dest_addrs[i].sin_port = htons(addr_ports[i].port);
+        dest_addrs[i].sin_addr.s_addr = params->addr_ports[i].addr;
+        dest_addrs[i].sin_port = htons(params->addr_ports[i].port);
     }
 
     // Open audio device
     audio_info_t *audio_info;
-    if ((err = audio_new(PCM_NAME, SND_PCM_STREAM_CAPTURE, 0, FORMAT,
-                         CHANNELS, RATE_IN_HZ, SAMPLE_SIZE_IN_BYTES,
+    if ((err = audio_new(params->pcm_name, SND_PCM_STREAM_CAPTURE, 0,
+                         FORMAT, CHANNELS, RATE_IN_HZ, SAMPLE_SIZE_IN_BYTES,
                          PERIOD_SIZE_IN_FRAMES, BUFFER_MULTIPLICATOR,
                          &audio_info)) < 0) {
         fprintf(stderr, "audio_new: Could not initialize audio: %s\n",
@@ -69,7 +66,7 @@ void *network_sender(void *arg) {
     uint8_t *udp_buf = malloc(udp_buf_size);
 
     // Add userid to buffer header
-    memcpy(udp_buf, &userid, sizeof(userid));
+    memcpy(udp_buf, &params->userid, sizeof(params->userid));
 
     // Let sequence number start with 1 (zero is reserved)
     uint32_t seqnum = 1;
@@ -94,7 +91,7 @@ void *network_sender(void *arg) {
 
         // Write to non-blocking socket
         if (frames == PERIOD_SIZE_IN_FRAMES) {
-            for (int i = 0; i < naddr_ports; i++) {
+            for (int i = 0; i < params->naddr_ports; i++) {
                 ssize_t n  = sendto(sockfd, udp_buf, udp_buf_size, 0,
                                     (struct sockaddr *)&dest_addrs[i],
                                     sizeof(dest_addrs[i]));

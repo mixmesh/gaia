@@ -3,7 +3,10 @@
 
 #define MAX_USERS 128
 
-#define PCM_NAME "plughw:0,0"
+#define DEFAULT_PCM_NAME "plughw:0,0"
+#define DEFAULT_ADDR "127.0.0.1"
+#define DEFAULT_PORT 2305
+
 #define FORMAT SND_PCM_FORMAT_S16_LE
 #define CHANNELS 2
 #define SAMPLE_SIZE_IN_BYTES 2
@@ -46,8 +49,5 @@
 #define NETWORK_RECEIVER_DIED     9
 #define NETWORK_SENDER_DIED      10
 #define INTERNAL_ERROR           11
-
-#define DEFAULT_ADDR "127.0.0.1"
-#define DEFAULT_PORT 2305
 
 #endif

@@ -9,16 +9,12 @@
 #define FILE_CACHE_SIZE (PAYLOAD_SIZE_IN_BYTES * 500)
 
 void *file_sender(void *arg) {
-    // Extract parameters
-    file_sender_params_t *sender_params = (file_sender_params_t *)arg;
-    uint32_t userid = sender_params->userid;
-    char *filename = sender_params->filename;
-    uint8_t naddr_ports = sender_params->naddr_ports;
-    file_sender_addr_port_t *addr_ports = sender_params->addr_ports;
+    // Parameters
+    file_sender_params_t *params = (file_sender_params_t *)arg;
 
     // Open file
     FILE *fd;
-    if ((fd = fopen(filename, "r")) == NULL) {
+    if ((fd = fopen(params->filename, "r")) == NULL) {
         perror("fopen: Could not open filename");
         exit(FILE_ERROR);
     }
@@ -26,7 +22,7 @@ void *file_sender(void *arg) {
     // Check file size
     fseek(fd, 0L, SEEK_END);
     if (ftell(fd) < FILE_CACHE_SIZE) {
-        fprintf(stderr, "%s is smaller than %d bytes\n", filename,
+        fprintf(stderr, "%s is smaller than %d bytes\n", params->filename,
                 FILE_CACHE_SIZE);
         fclose(fd);
         exit(FILE_ERROR);
@@ -57,19 +53,19 @@ void *file_sender(void *arg) {
     }
 
     // Create destination addresses
-    struct sockaddr_in addrs[naddr_ports];
-    for (int i = 0; i < naddr_ports; i++) {
+    struct sockaddr_in addrs[params->naddr_ports];
+    for (int i = 0; i < params->naddr_ports; i++) {
         memset(&addrs[i], 0, sizeof(addrs[i]));
         addrs[i].sin_family = AF_INET;
-        addrs[i].sin_addr.s_addr = addr_ports[i].addr;
-        addrs[i].sin_port = htons(addr_ports[i].port);
+        addrs[i].sin_addr.s_addr = params->addr_ports[i].addr;
+        addrs[i].sin_port = htons(params->addr_ports[i].port);
     }
 
     uint32_t udp_buf_size = HEADER_SIZE + PAYLOAD_SIZE_IN_BYTES;
     uint8_t *udp_buf = malloc(udp_buf_size);
 
     // Add userid to buffer header
-    memcpy(udp_buf, &userid, sizeof(userid));
+    memcpy(udp_buf, &params->userid, sizeof(params->userid));
 
     // Let sequence number start with 1 (zero is reserved)
     uint32_t seqnum = 1;
@@ -105,7 +101,7 @@ void *file_sender(void *arg) {
             if (read_bytes < FILE_CACHE_SIZE) {
                 if (feof(fd)) {
                     printf("Reached end of file in %s. Start from scratch!\n",
-                           filename);
+                           params->filename);
                     printf("Reached end of file. Start from scratch!\n");
                     rewind(fd);
                     uint32_t more_bytes = FILE_CACHE_SIZE - read_bytes;
@@ -136,7 +132,7 @@ void *file_sender(void *arg) {
         memcpy(&time, &next_time, sizeof(struct timespec));
 
         // Write to non-blocking socket
-        for (int i = 0; i < naddr_ports; i++) {
+        for (int i = 0; i < params->naddr_ports; i++) {
             ssize_t n  = sendto(sockfd, udp_buf, udp_buf_size, 0,
                                 (struct sockaddr *)&addrs[i],
                                 sizeof(addrs[i]));

@@ -10,6 +10,7 @@ typedef struct {
 } file_sender_addr_port_t;
 
 typedef struct {
+    char *pcm_name;
     uint32_t userid;
     char filename[128];
     uint8_t naddr_ports;

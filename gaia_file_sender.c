@@ -8,11 +8,11 @@
 #include "globals.h"
 
 void usage(char *argv[]) {
-    fprintf(stderr, "Usage: %s [-d addr[:port]] [-u userid] filename ...\n",
+    fprintf(stderr, "Usage: %s [-D device] [-d addr[:port]] [-u userid] filename ...\n",
             argv[0]);
     fprintf(stderr,
-            "Note: addr and port default respectively defaults to %s and %d\n",
-            DEFAULT_ADDR, DEFAULT_PORT);
+            "Note: device, addr and port default respectively default to %s, %s and %d\n",
+            DEFAULT_PCM_NAME, DEFAULT_ADDR, DEFAULT_PORT);
     fprintf(stderr,
             "Example: sudo %s -d 172.16.0.95 -d 172.16.0.95:2356 4711 \
 manhattan.u16\n",
@@ -22,6 +22,7 @@ manhattan.u16\n",
 
 int main (int argc, char *argv[]) {
     int err;
+    char* pcm_name = DEFAULT_PCM_NAME;
 
     file_sender_addr_port_t addr_ports[MAX_USERS];
     addr_ports[0].addr = inet_addr(DEFAULT_ADDR);
@@ -31,7 +32,7 @@ int main (int argc, char *argv[]) {
     uint32_t userid = 1;
     long value;
 
-    while ((opt = getopt(argc, argv, "u:d:")) != -1) {
+    while ((opt = getopt(argc, argv, "u:d:D:")) != -1) {
         switch (opt) {
         case 'd':
             if (get_addr_port(optarg, &addr_ports[naddr_ports].addr,
@@ -49,6 +50,9 @@ int main (int argc, char *argv[]) {
                 usage(argv);
             }
             break;
+        case 'D':
+            pcm_name = strdup(optarg);
+            break;
         default:
             usage(argv);
         }
@@ -64,7 +68,7 @@ int main (int argc, char *argv[]) {
     }
 
     pthread_t sender_threads[MAX_USERS];
-    file_sender_params_t *sender_params[MAX_USERS];
+    file_sender_params_t *params[MAX_USERS];
     uint8_t nsender_threads = 0;
 
     // Start sender threads
@@ -79,11 +83,12 @@ int main (int argc, char *argv[]) {
             break;
         }
 
-        sender_params[i] = malloc(sizeof(file_sender_params_t));
-        sender_params[i]->userid = userid++;
-        memcpy(sender_params[i]->filename, filename, strlen(filename) + 1);
-        sender_params[i]->naddr_ports = naddr_ports;
-        sender_params[i]->addr_ports = addr_ports;
+        params[i] = malloc(sizeof(file_sender_params_t));
+        params[i]->pcm_name = pcm_name;
+        params[i]->userid = userid++;
+        memcpy(params[i]->filename, filename, strlen(filename) + 1);
+        params[i]->naddr_ports = naddr_ports;
+        params[i]->addr_ports = addr_ports;
 
         pthread_attr_t sender_attr;
         if ((err = pthread_attr_init(&sender_attr)) != 0) {
@@ -110,7 +115,7 @@ root!\n");
         }
 
         if ((err = pthread_create(&sender_threads[i], &sender_attr, file_sender,
-                                  (void *)sender_params[i])) < 0) {
+                                  (void *)params[i])) < 0) {
             fprintf(stderr,
                     "pthread_create: Failed to start file sender thread (%d)\n",
                     err);
@@ -122,7 +127,7 @@ root!\n");
 
     for (int i = 0; i < nsender_threads; i++) {
         pthread_join(sender_threads[i], NULL);
-        free(&sender_params[i]);
+        free(&params[i]);
     }
 
     return 0;

@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
     }
 
     int err;
-    if ((err = audio_new(PCM_NAME, SND_PCM_STREAM_CAPTURE, 0, FORMAT,
+    if ((err = audio_new(DEFAULT_PCM_NAME, SND_PCM_STREAM_CAPTURE, 0, FORMAT,
                          CHANNELS, RATE_IN_HZ, SAMPLE_SIZE_IN_BYTES,
                          PERIOD_SIZE_IN_FRAMES, BUFFER_MULTIPLICATOR,
                          &audio_info)) < 0) {

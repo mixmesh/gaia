@@ -19,6 +19,9 @@ void *audio_sink(void *arg) {
     audio_info_t *audio_info = NULL;
     uint8_t *data[MAX_USERS];
 
+    // Parameters
+    audio_sink_params_t *params = (audio_sink_params_t *)arg;
+
     // Read from jitter buffer, mix and write to audio device
     while (true) {
         uint8_t ndata = 0;
@@ -84,8 +87,8 @@ playback entry %d but got %d (%d will be reused as %d!)\n",
         if (ndata > 0) {
             // Open audio device (if needed)
             if (audio_info == NULL) {
-                if ((err = audio_new(PCM_NAME, SND_PCM_STREAM_PLAYBACK, 0,
-                                     FORMAT, CHANNELS, RATE_IN_HZ,
+                if ((err = audio_new(params->pcm_name, SND_PCM_STREAM_PLAYBACK,
+                                     0, FORMAT, CHANNELS, RATE_IN_HZ,
                                      SAMPLE_SIZE_IN_BYTES,
                                      PERIOD_SIZE_IN_FRAMES,
                                      BUFFER_MULTIPLICATOR, &audio_info)) < 0) {

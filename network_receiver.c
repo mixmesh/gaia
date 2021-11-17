@@ -24,15 +24,8 @@ uint16_t root_mean_square(uint16_t *peak_values, uint16_t n) {
 void *network_receiver(void *arg) {
     int sockfd = -1;
 
-    printf("Jitter buffer contains %dms of audio data (%d periods, %d bytes)\n",
-           JITTER_BUFFER_SIZE_IN_MS,
-           PERIODS_IN_JITTER_BUFFER,
-           JITTER_BUFFER_SIZE_IN_BYTES);
-
-    // Extract parameters
-    network_receiver_params_t *receiver_params =
-        (network_receiver_params_t *)arg;
-    uint16_t port = receiver_params->port;
+    // Parameters
+    network_receiver_params_t *params = (network_receiver_params_t *)arg;
 
     // Create and bind socket
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -44,7 +37,7 @@ void *network_receiver(void *arg) {
     memset(&src_addr, 0, sizeof(src_addr));
     src_addr.sin_family = AF_INET;
     src_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    src_addr.sin_port = htons(port);
+    src_addr.sin_port = htons(params->port);
 
     if (bind(sockfd, (struct sockaddr *)&src_addr, sizeof(src_addr)) < 0) {
         perror("bind: Binding of socket failed");
@@ -56,6 +49,12 @@ void *network_receiver(void *arg) {
     uint32_t udp_buf_size = HEADER_SIZE + PAYLOAD_SIZE_IN_BYTES;
     uint8_t drain_buf[DRAIN_BUF_SIZE];
 
+    printf("Jitter buffer contains %dms of audio data (%d periods, %d bytes)\n",
+           JITTER_BUFFER_SIZE_IN_MS,
+           PERIODS_IN_JITTER_BUFFER,
+           JITTER_BUFFER_SIZE_IN_BYTES);
+
+    // Read from socket and write to jitter buffer
     while (true) {
         // Waiting for incoming audio
         printf("Waiting for incoming audio...\n");
