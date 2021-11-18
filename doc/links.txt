@@ -7,6 +7,7 @@ Audio programming
 https://lup.lub.lu.se/luur/download?func=downloadFile&recordOId=9021527&fileOId=9021534
 https://signal.org/blog/client-side-audio-quality/
 https://coral.googlesource.com/linux-imx/+/refs/tags/4-2/Documentation/sound/alsa/soc/clocking.txt
+https://matthewvaneerde.wordpress.com/2013/07/24/buffer-size-alignment-and-the-audio-period/
 
 Traffic control in Linux
 ------------------------

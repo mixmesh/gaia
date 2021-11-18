@@ -14,13 +14,15 @@ jb_table_t *jb_table;
 
 void usage(char *argv[]) {
     fprintf(stderr,
-            "Usage: %s [-D device] [-s addr[:port]] [-d addr[:port]] userid\n",
+            "Usage: %s [-D capture-device] [-E playpack-device] \
+[-s addr[:port]] [-d addr[:port]] userid\n",
             argv[0]);
-    fprintf(stderr, "Note: device, addr and port respectively defaults to %s, \
-%s and %d\n", DEFAULT_PCM_NAME, DEFAULT_ADDR, DEFAULT_PORT);
+    fprintf(stderr, "Note: capture-device and playback-device default to %s. \
+addr and port default to %s and %d\n",
+            DEFAULT_PCM_NAME, DEFAULT_ADDR, DEFAULT_PORT);
     fprintf(stderr,
-            "Example: sudo %s -D plughw:0.0 -s 172.16.0.116:2305 -d 172.16.0.95 -d \
-172.16.0.95:2356 4711\n",
+            "Example: sudo %s -D plughw:1,0 -s 172.16.0.116:2305 -d \
+172.16.0.95 -d 172.16.0.95:2356 1000\n",
             argv[0]);
     exit(ARG_ERROR);
 }
@@ -29,7 +31,7 @@ int main (int argc, char *argv[]) {
     int err;
     in_addr_t src_addr = inet_addr(DEFAULT_ADDR);
     uint16_t src_port = DEFAULT_PORT;
-    char* pcm_name = DEFAULT_PCM_NAME;
+    char *capture_pcm_name = DEFAULT_PCM_NAME, *playback_pcm_name = DEFAULT_PCM_NAME;
 
     network_sender_addr_port_t dest_addr_ports[MAX_NETWORK_SENDER_ADDR_PORTS];
     dest_addr_ports[0].addr = inet_addr(DEFAULT_ADDR);
@@ -37,7 +39,7 @@ int main (int argc, char *argv[]) {
 
     int opt, ndest_addr_ports = 0;
 
-    while ((opt = getopt(argc, argv, "s:d:D:")) != -1) {
+    while ((opt = getopt(argc, argv, "s:d:D:E:")) != -1) {
         switch (opt) {
         case 's':
             if (get_addr_port(optarg, &src_addr, &src_port) < 0) {
@@ -53,7 +55,10 @@ int main (int argc, char *argv[]) {
                 (ndest_addr_ports + 1) % MAX_NETWORK_SENDER_ADDR_PORTS;
             break;
         case 'D':
-            pcm_name = strdup(optarg);
+            capture_pcm_name = strdup(optarg);
+            break;
+        case 'E':
+            playback_pcm_name = strdup(optarg);
             break;
         default:
             usage(argv);
@@ -85,7 +90,7 @@ int main (int argc, char *argv[]) {
     pthread_t sender_thread;
     network_sender_params_t sender_params =
         {
-         .pcm_name = pcm_name,
+         .pcm_name = capture_pcm_name,
          .userid = userid,
          .naddr_ports = ndest_addr_ports,
          .addr_ports = dest_addr_ports,
@@ -164,7 +169,7 @@ root!\n");
     pthread_t audio_sink_thread;
     audio_sink_params_t audio_sink_params =
         {
-         .pcm_name = pcm_name
+         .pcm_name = playback_pcm_name
         };
 
     pthread_attr_t audio_sink_attr;

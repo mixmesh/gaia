@@ -11,18 +11,18 @@ void usage(char *argv[]) {
     fprintf(stderr, "Usage: %s [-d addr[:port]] [-u userid] filename ...\n",
             argv[0]);
     fprintf(stderr,
-            "Note: addr and port default respectively default to %s and %d\n",
-            DEFAULT_ADDR, DEFAULT_PORT);
+            "Note: addr and port default to %s and %d\n", DEFAULT_ADDR,
+            DEFAULT_PORT);
     fprintf(stderr,
-            "Example: sudo %s -d 172.16.0.95 -d 172.16.0.95:2356 4711 \
-manhattan.u16\n",
+            "Example: sudo %s -d 172.16.0.95 -d 172.16.0.95:2356 -u 1000 \
+foo.u16\n",
             argv[0]);
     exit(ARG_ERROR);
 }
 
 int main (int argc, char *argv[]) {
     int err;
-    char* pcm_name = DEFAULT_PCM_NAME;
+    char *pcm_name = DEFAULT_PCM_NAME;
 
     file_sender_addr_port_t addr_ports[MAX_USERS];
     addr_ports[0].addr = inet_addr(DEFAULT_ADDR);
