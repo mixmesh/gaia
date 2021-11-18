@@ -12,7 +12,7 @@ $ timedatectl timesync-status
 $ timedatectl set-ntp false
 $ timedatectl set-ntp true
 
-Git
+git
 ---
 $ git reset --hard origin/main        
 
@@ -21,7 +21,7 @@ Pi
 $ iw wlan0 set power_save off
 $ sudo iw wlp2s0 set power_save off
 
-Sox
+sox
 ---
 sox file.mp3 -c 1 -r 44100 -b 16 -e signed-integer --endian little -t raw output.bin
 
@@ -29,3 +29,30 @@ Core file
 ---------
 $ ulimit -c unlimited
 $ ulimit -a
+
+aplay
+-----
+$ arecord -f cd -d 5 -D bluealsa:DEV=20:74:CF:72:85:82,PROFILE=sco test.wav
+$ aplay -D bluealsa:DEV=20:74:CF:72:85:82,PROFILE=a2dp test.wav
+
+with this .asoundrc:
+
+defaults.bluealsa.service "org.bluealsa"
+defaults.bluealsa.device "20:74:CF:72:85:82"
+defaults.bluealsa.profile "a2dp"
+defaults.bluealsa.delay 10000
+
+in that case this works as well:
+
+$ arecord -f cd -d 5 -D bluealsa:PROFILE=sco test.wav
+$ aplay -D bluealsa test.wav
+
+.asoundrc could probably be written to be even better
+
+Make sure that:
+
+systemctl cat bluealsa
+...
+ExecStart=/usr/bin/bluealsa -p a2dp-sink -p a2dp-source -p hfp-ag -p hsp-ag
+
+

@@ -1,6 +1,25 @@
+Realtime
+--------
 https://www.embedded.com/effective-use-of-pthreads-in-embedded-linux-designs-part-1-the-multitasking-paradigm/
+
+Audio programming
+-----------------
 https://lup.lub.lu.se/luur/download?func=downloadFile&recordOId=9021527&fileOId=9021534
-https://github.com/amurzeau/waveOverUDP/tree/master/unix
-https://netbeez.net/blog/how-to-use-the-linux-traffic-control/
 https://signal.org/blog/client-side-audio-quality/
 https://coral.googlesource.com/linux-imx/+/refs/tags/4-2/Documentation/sound/alsa/soc/clocking.txt
+
+Traffic control in Linux
+------------------------
+https://netbeez.net/blog/how-to-use-the-linux-traffic-control/
+
+Nice examples
+-------------
+https://github.com/amurzeau/waveOverUDP/tree/master/unix
+
+ALSA/Bluetooth
+--------------
+https://github.com/Arkq/bluez-alsa
+https://github.com/Arkq/bluez-alsa/issues/352
+https://forums.raspberrypi.com/viewtopic.php?t=206565
+https://github.com/Arkq/bluez-alsa/wiki/Using-the-bluealsa-ALSA-pcm-plugin
+https://stackoverflow.com/questions/62291143/record-audio-from-bluetooth-headset-using-bluealsa-on-linux
