@@ -6,7 +6,7 @@
 #include "audio.h"
 #include "globals.h"
 
-#define FILE_CACHE_SIZE (PAYLOAD_SIZE_IN_BYTES * 500)
+#define FILE_CACHE_SIZE (PAYLOAD_SIZE_IN_BYTES * 100)
 
 void *file_sender(void *arg) {
     // Parameters
