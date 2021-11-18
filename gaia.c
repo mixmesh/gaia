@@ -15,11 +15,12 @@ jb_table_t *jb_table;
 void usage(char *argv[]) {
     fprintf(stderr,
             "Usage: %s [-D capture-device] [-E playpack-device] \
-[-s addr[:port]] [-d addr[:port]] userid\n",
+[-s src-addr[:port]] [-d dest-addr[:port]] userid\n",
             argv[0]);
-    fprintf(stderr, "Note: capture-device and playback-device default to %s. \
-addr and port default to %s and %d\n",
-            DEFAULT_PCM_NAME, DEFAULT_ADDR, DEFAULT_PORT);
+    fprintf(stderr, "Note: capture-device and playback-device default to %s.\n",
+            DEFAULT_PCM_NAME);
+    fprintf(stderr, "Note: src/dest-addr and port default to %s and %d\n",
+            DEFAULT_ADDR, DEFAULT_PORT);
     fprintf(stderr,
             "Example: sudo %s -D plughw:1,0 -s 172.16.0.116:2305 -d \
 172.16.0.95 -d 172.16.0.95:2356 1000\n",

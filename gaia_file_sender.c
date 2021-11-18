@@ -8,10 +8,10 @@
 #include "globals.h"
 
 void usage(char *argv[]) {
-    fprintf(stderr, "Usage: %s [-d addr[:port]] [-u userid] filename ...\n",
+    fprintf(stderr, "Usage: %s [-d dest-addr[:port]] [-u userid] filename ...\n",
             argv[0]);
     fprintf(stderr,
-            "Note: addr and port default to %s and %d\n", DEFAULT_ADDR,
+            "Note: dest-addr and port default to %s and %d\n", DEFAULT_ADDR,
             DEFAULT_PORT);
     fprintf(stderr,
             "Example: sudo %s -d 172.16.0.95 -d 172.16.0.95:2356 -u 1000 \
