@@ -141,6 +141,10 @@ void *file_sender(void *arg) {
                PAYLOAD_SIZE_IN_BYTES);
         file_cache_index += PAYLOAD_SIZE_IN_BYTES;
 
+        if (params->opus_enabled) {
+            // FIXME
+        }
+
         // Sleep (very carefully)
         struct timespec next_time;
         timespecadd(&time, &period_size_as_tsp, &next_time);
