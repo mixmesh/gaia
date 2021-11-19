@@ -1,7 +1,7 @@
 CFLAGS=-std=c18 -Werror -D_POSIX_C_SOURCE=200809L $(shell pkg-config --cflags alsa)
 LDLIBS=$(shell pkg-config --libs alsa) -lm -lpthread -lrt
 
-EXECS=capture display playback test_jb test_jb_table
+EXECS=capture display opus_example playback test_jb test_jb_table
 
 all: $(EXECS)
 
@@ -12,6 +12,9 @@ run: test_jb test_jb_table
 capture: capture.o ../audio.o
 	(cd ..;$(MAKE) objs)
 	$(CC) $^ $(LDLIBS) -o $@
+
+opus_example: opus_example.o
+	$(CC) $^ $(LDLIBS) -l opus -o $@
 
 playback: playback.o ../audio.o
 	(cd ..;$(MAKE) objs)
