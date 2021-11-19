@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include <opus/opus.h>
 #include "audio.h"
 #include "globals.h"
 #include "timing.h"
@@ -38,12 +39,28 @@ void *network_sender(void *arg) {
     }
 
     // Create destination addresses
-    struct sockaddr_in dest_addrs[params->naddr_ports];
+    struct sockaddr_in addrs[params->naddr_ports];
     for (int i = 0; i < params->naddr_ports; i++) {
-        memset(&dest_addrs[i], 0, sizeof(dest_addrs[i]));
-        dest_addrs[i].sin_family = AF_INET;
-        dest_addrs[i].sin_addr.s_addr = params->addr_ports[i].addr;
-        dest_addrs[i].sin_port = htons(params->addr_ports[i].port);
+        memset(&addrs[i], 0, sizeof(addrs[i]));
+        addrs[i].sin_family = AF_INET;
+        addrs[i].sin_addr.s_addr = params->addr_ports[i].addr;
+        addrs[i].sin_port = htons(params->addr_ports[i].port);
+    }
+
+
+    // Create Opus encoders (if enabled)
+    OpusEncoder *opus_encoders[params->naddr_ports];
+    if (params->opus_enabled) {
+        for (int i = 0; i < params->naddr_ports; i++) {
+            opus_encoders[i] =
+                opus_encoder_create(RATE_IN_HZ, CHANNELS,
+                                    OPUS_APPLICATION_AUDIO, &err);
+            if (err < 0) {
+                fprintf(stderr, "ERROR: Failed to create an encoder: %s\n",
+                        opus_strerror(err));
+            }
+            assert(err == 0);
+        }
     }
 
     // Open audio device
@@ -89,12 +106,16 @@ void *network_sender(void *arg) {
             continue;
         }
 
+        if (params->opus_enabled) {
+            // FIXME
+        }
+
         // Write to non-blocking socket
         if (frames == PERIOD_SIZE_IN_FRAMES) {
             for (int i = 0; i < params->naddr_ports; i++) {
                 ssize_t n  = sendto(sockfd, udp_buf, udp_buf_size, 0,
-                                    (struct sockaddr *)&dest_addrs[i],
-                                    sizeof(dest_addrs[i]));
+                                    (struct sockaddr *)&addrs[i],
+                                    sizeof(addrs[i]));
                 if (n < 0) {
                     perror("sendto: Failed to write to socket");
                 } else if (n != udp_buf_size) {

@@ -1,10 +1,11 @@
 #include <stdbool.h>
 #include <assert.h>
+#include <stdio.h>
 #include "jb.h"
 #include "bits.h"
 #include "globals.h"
 
-jb_t *jb_new(uint32_t userid) {
+jb_t *jb_new(uint32_t userid, bool opus_enabled) {
     jb_t *jb = malloc(sizeof(jb_t));
     jb->userid = userid;
     jb->playback = NULL;
@@ -17,10 +18,21 @@ jb_t *jb_new(uint32_t userid) {
     jb->peak_values = calloc(jb->npeak_values, sizeof(uint16_t));
     jb->peak_index = 0;
     jb->peak_average = 0;
+    if (opus_enabled) {
+        int err;
+        jb->opus_decoder = opus_decoder_create(RATE_IN_HZ, CHANNELS, &err);
+        if (err < 0) {
+            fprintf(stderr, "ERROR: Failed to create decoder: %s\n",
+                    opus_strerror(err));
+        }
+        assert(err == 0);
+    } else {
+        jb->opus_decoder = NULL;
+    }
     jb->tail = NULL;
     jb->head = NULL;
     return jb;
-}
+    }
 
 void jb_free(jb_t *jb, bool free_entries_only) {
     jb_entry_t *jb_entry = jb->tail;
@@ -28,6 +40,9 @@ void jb_free(jb_t *jb, bool free_entries_only) {
         jb_entry_t *next_jb_entry = jb_entry->next;
         jb_entry_free(jb_entry);
         jb_entry = next_jb_entry;
+    }
+    if (jb->opus_decoder != NULL) {
+        opus_decoder_destroy(jb->opus_decoder);
     }
     jb->tail = NULL;
     jb->head = NULL;

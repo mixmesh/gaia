@@ -103,6 +103,9 @@ playback entry %d but got %d (%d will be reused as %d!)\n",
                 printf("Audio device has been opened for playback\n");
             }
             if (ndata == 1) {
+                if (params->opus_enabled) {
+                    // FIXME
+                }
                 audio_write(audio_info, data[0], PAYLOAD_SIZE_IN_FRAMES);
             } else {
                 uint8_t mixed_data[PERIOD_SIZE_IN_BYTES];
@@ -110,6 +113,9 @@ playback entry %d but got %d (%d will be reused as %d!)\n",
                 assert(audio_smix16((int16_t **)data,
                                     ndata, (int16_t *)mixed_data,
                                     PERIOD_SIZE_IN_FRAMES, CHANNELS) == 0);
+                if (params->opus_enabled) {
+                    // FIXME
+                }
                 audio_write(audio_info, mixed_data, PAYLOAD_SIZE_IN_FRAMES);
             }
         } else {

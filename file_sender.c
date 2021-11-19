@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdbool.h>
+#include <opus/opus.h>
 #include "globals.h"
 #include "timing.h"
 #include "file_sender.h"
@@ -9,6 +10,8 @@
 #define FILE_CACHE_SIZE (PAYLOAD_SIZE_IN_BYTES * 100)
 
 void *file_sender(void *arg) {
+    int err;
+
     // Parameters
     file_sender_params_t *params = (file_sender_params_t *)arg;
 
@@ -59,6 +62,21 @@ void *file_sender(void *arg) {
         addrs[i].sin_family = AF_INET;
         addrs[i].sin_addr.s_addr = params->addr_ports[i].addr;
         addrs[i].sin_port = htons(params->addr_ports[i].port);
+    }
+
+    // Create Opus encoders (if enabled)
+    OpusEncoder *opus_encoders[params->naddr_ports];
+    if (params->opus_enabled) {
+        for (int i = 0; i < params->naddr_ports; i++) {
+            opus_encoders[i] =
+                opus_encoder_create(RATE_IN_HZ, CHANNELS,
+                                    OPUS_APPLICATION_AUDIO, &err);
+            if (err < 0) {
+                fprintf(stderr, "ERROR: Failed to create an encoder: %s\n",
+                        opus_strerror(err));
+            }
+            assert(err == 0);
+        }
     }
 
     uint32_t udp_buf_size = HEADER_SIZE + PAYLOAD_SIZE_IN_BYTES;

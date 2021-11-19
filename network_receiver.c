@@ -33,13 +33,13 @@ void *network_receiver(void *arg) {
         exit(SOCKET_ERROR);
     }
 
-    struct sockaddr_in src_addr;
-    memset(&src_addr, 0, sizeof(src_addr));
-    src_addr.sin_family = AF_INET;
-    src_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    src_addr.sin_port = htons(params->port);
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    addr.sin_port = htons(params->addr_port->port);
 
-    if (bind(sockfd, (struct sockaddr *)&src_addr, sizeof(src_addr)) < 0) {
+    if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         perror("bind: Binding of socket failed");
         exit(SOCKET_ERROR);
     }
@@ -128,7 +128,7 @@ userid");
             if (userid != new_userid) {
                 jb_table_take_rdlock(jb_table);
                 if ((jb = jb_table_find(jb_table, new_userid)) == NULL) {
-                    jb = jb_new(new_userid);
+                    jb = jb_new(new_userid, params->opus_enabled);
                     jb_table_upgrade_to_wrlock(jb_table);
                     assert(jb_table_add(jb_table, jb) == JB_TABLE_SUCCESS);
                     jb_table_downgrade_to_rdlock(jb_table);

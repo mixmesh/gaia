@@ -14,38 +14,51 @@ jb_table_t *jb_table;
 
 void usage(char *argv[]) {
     fprintf(stderr,
-            "Usage: %s [-D capture-device] [-E playpack-device] \
-[-s src-addr[:port]] [-d dest-addr[:port]] userid\n",
-            argv[0]);
-    fprintf(stderr, "Note: capture-device and playback-device default to %s.\n",
-            DEFAULT_PCM_NAME);
-    fprintf(stderr, "Note: src/dest-addr and port default to %s and %d\n",
-            DEFAULT_ADDR, DEFAULT_PORT);
-    fprintf(stderr,
-            "Example: sudo %s -D plughw:1,0 -s 172.16.0.116:2305 -d \
-172.16.0.95 -d 172.16.0.95:2356 1000\n",
-            argv[0]);
+            "\
+Usage: %s [-D device] [-E device] [-s addr[:port]] [-d addr[:port] -d ...] [-x] userid\n\
+\n\
+Example: \n\
+  sudo %s -D plughw:1,0 -d 172.16.0.95 -d 172.16.0.95:2356 -s 172.16.0.116:2305 1000\n\
+\n\
+Options:\n\
+  -D Use this device to capture audio (%s)\n\
+  -E Use this device to playback audio (%s)\n\
+  -d Send audio streams to this destination address and port (%s:%d)\n\
+  -s Bind to this source address and port (%s:%d)\n\
+  -x Enable use of Opus audio codec\n",
+            argv[0], argv[0], DEFAULT_PCM_NAME, DEFAULT_PCM_NAME,
+            DEFAULT_ADDR, DEFAULT_PORT, DEFAULT_ADDR, DEFAULT_PORT);
     exit(ARG_ERROR);
 }
 
 int main (int argc, char *argv[]) {
     int err;
-    in_addr_t src_addr = inet_addr(DEFAULT_ADDR);
-    uint16_t src_port = DEFAULT_PORT;
-    char *capture_pcm_name = DEFAULT_PCM_NAME, *playback_pcm_name = DEFAULT_PCM_NAME;
 
-    network_sender_addr_port_t dest_addr_ports[MAX_NETWORK_SENDER_ADDR_PORTS];
+    char *capture_pcm_name = DEFAULT_PCM_NAME;
+    char *playback_pcm_name = DEFAULT_PCM_NAME;
+
+    addr_port_t dest_addr_ports[MAX_NETWORK_SENDER_ADDR_PORTS];
     dest_addr_ports[0].addr = inet_addr(DEFAULT_ADDR);
     dest_addr_ports[0].port = DEFAULT_PORT;
+    int ndest_addr_ports = 0;
 
-    int opt, ndest_addr_ports = 0;
+    addr_port_t src_addr_port =
+        {
+         .addr = inet_addr(DEFAULT_ADDR),
+         .port = DEFAULT_PORT
+        };
 
-    while ((opt = getopt(argc, argv, "s:d:D:E:")) != -1) {
+    bool opus_enabled = false;
+
+    int opt;
+
+    while ((opt = getopt(argc, argv, "D:E:d:s:x")) != -1) {
         switch (opt) {
-        case 's':
-            if (get_addr_port(optarg, &src_addr, &src_port) < 0) {
-                usage(argv);
-            }
+        case 'D':
+            capture_pcm_name = strdup(optarg);
+            break;
+        case 'E':
+            playback_pcm_name = strdup(optarg);
             break;
         case 'd':
             if (get_addr_port(optarg, &dest_addr_ports[ndest_addr_ports].addr,
@@ -55,11 +68,14 @@ int main (int argc, char *argv[]) {
             ndest_addr_ports =
                 (ndest_addr_ports + 1) % MAX_NETWORK_SENDER_ADDR_PORTS;
             break;
-        case 'D':
-            capture_pcm_name = strdup(optarg);
+        case 's':
+            if (get_addr_port(optarg, &src_addr_port.addr,
+                              &src_addr_port.port) < 0) {
+                usage(argv);
+            }
             break;
-        case 'E':
-            playback_pcm_name = strdup(optarg);
+        case 'x':
+            opus_enabled = true;
             break;
         default:
             usage(argv);
@@ -95,6 +111,7 @@ int main (int argc, char *argv[]) {
          .userid = userid,
          .naddr_ports = ndest_addr_ports,
          .addr_ports = dest_addr_ports,
+         .opus_enabled = opus_enabled
         };
 
     pthread_attr_t sender_attr;
@@ -130,8 +147,8 @@ root!\n");
     pthread_t receiver_thread;
     network_receiver_params_t receiver_params =
         {
-         .addr = src_addr,
-         .port = src_port,
+         .addr_port = &src_addr_port,
+         .opus_enabled = opus_enabled
         };
 
     pthread_attr_t receiver_attr;
@@ -170,7 +187,8 @@ root!\n");
     pthread_t audio_sink_thread;
     audio_sink_params_t audio_sink_params =
         {
-         .pcm_name = playback_pcm_name
+         .pcm_name = playback_pcm_name,
+         .opus_enabled = opus_enabled
         };
 
     pthread_attr_t audio_sink_attr;

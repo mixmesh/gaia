@@ -4,35 +4,40 @@
 #include <sys/stat.h>
 #include <string.h>
 #include "file_sender.h"
-#include "gaia_utils.h"
 #include "globals.h"
 
 void usage(char *argv[]) {
-    fprintf(stderr, "Usage: %s [-d dest-addr[:port]] [-u userid] filename ...\n",
-            argv[0]);
     fprintf(stderr,
-            "Note: dest-addr and port default to %s and %d\n", DEFAULT_ADDR,
-            DEFAULT_PORT);
-    fprintf(stderr,
-            "Example: sudo %s -d 172.16.0.95 -d 172.16.0.95:2356 -u 1000 \
-foo.u16\n",
-            argv[0]);
+            "\
+Usage: %s [-d addr[:port] -d ...] [-u userid] filename ...\n\
+\n\
+Example:\n\
+  sudo %s -d 172.16.0.95 -d 172.16.0.95:2356 -u 1000\n\
+\n\
+Options:\n\
+  -d Send audio streams to this destination address and port (%s:%d)\n\
+  -u Use this userid as a base, i.e. will be increased one step for each -d option (1)\n\
+  -x Enable use of Opus audio codec\n",
+            argv[0], argv[0], DEFAULT_ADDR, DEFAULT_PORT);
     exit(ARG_ERROR);
 }
 
 int main (int argc, char *argv[]) {
     int err;
-    char *pcm_name = DEFAULT_PCM_NAME;
 
-    file_sender_addr_port_t addr_ports[MAX_USERS];
+    addr_port_t addr_ports[MAX_USERS];
     addr_ports[0].addr = inet_addr(DEFAULT_ADDR);
     addr_ports[0].port = DEFAULT_PORT;
+    int naddr_ports = 0;
 
-    int opt, naddr_ports = 0;
     uint32_t userid = 1;
+
+    bool opus_enabled = false;
+
+    int opt;
     long value;
 
-    while ((opt = getopt(argc, argv, "u:d:")) != -1) {
+    while ((opt = getopt(argc, argv, "u:d:x")) != -1) {
         switch (opt) {
         case 'd':
             if (get_addr_port(optarg, &addr_ports[naddr_ports].addr,
@@ -50,8 +55,8 @@ int main (int argc, char *argv[]) {
                 usage(argv);
             }
             break;
-        case 'D':
-            pcm_name = strdup(optarg);
+        case 'x':
+            opus_enabled = true;
             break;
         default:
             usage(argv);
@@ -84,11 +89,11 @@ int main (int argc, char *argv[]) {
         }
 
         params[i] = malloc(sizeof(file_sender_params_t));
-        params[i]->pcm_name = pcm_name;
         params[i]->userid = userid++;
         memcpy(params[i]->filename, filename, strlen(filename) + 1);
         params[i]->naddr_ports = naddr_ports;
         params[i]->addr_ports = addr_ports;
+        params[i]->opus_enabled = opus_enabled;
 
         pthread_attr_t sender_attr;
         if ((err = pthread_attr_init(&sender_attr)) != 0) {

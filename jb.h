@@ -3,6 +3,7 @@
 
 #include <pthread.h>
 #include <stdbool.h>
+#include <opus/opus.h>
 #include "uthash/uthash.h"
 
 typedef struct jb_entry {
@@ -23,6 +24,7 @@ typedef struct {
     uint16_t *peak_values;
     uint16_t peak_index;
     uint16_t peak_average;
+    OpusDecoder *opus_decoder;
     jb_entry_t *tail;
     jb_entry_t *head;
     UT_hash_handle hh;
@@ -34,7 +36,7 @@ typedef struct {
 #define FIRST_INSERTED        (1 << 3)
 #define INTERMEDIATE_INSERTED (1 << 4)
 
-jb_t *jb_new(uint32_t userid);
+jb_t *jb_new(uint32_t userid, bool opus_enabled);
 void jb_free(jb_t *jb, bool free_entries_only);
 jb_entry_t *jb_pop(jb_t *jb);
 uint8_t jb_insert(jb_t *jb, jb_entry_t *new_jb_entry);
