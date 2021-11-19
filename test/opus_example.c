@@ -99,13 +99,16 @@ int main(int argc, char **argv) {
         }
         /* Convert from little-endian ordering. */
         for (i = 0; i < CHANNELS * FRAME_SIZE; i++)
-            in[i] = pcm_bytes[2 *i + 1] <<8 | pcm_bytes[2 * i];
+            in[i] = pcm_bytes[2 *i + 1] << 8 | pcm_bytes[2 * i];
         /* Encode the frame. */
         nbBytes = opus_encode(encoder, in, FRAME_SIZE, cbits, MAX_PACKET_SIZE);
         if (nbBytes < 0) {
             fprintf(stderr, "encode failed: %s\n", opus_strerror(nbBytes));
             return EXIT_FAILURE;
         }
+
+        printf("%d -> %d\n", CHANNELS * 2 * FRAME_SIZE, nbBytes);
+
         /* Decode the data. In this example, frame_size will be constant because
            the encoder is using a constant frame size. However, that may not
            be the case for all encoders, so the decoder must always check
@@ -117,8 +120,8 @@ int main(int argc, char **argv) {
         }
         /* Convert to little-endian ordering. */
         for(i = 0;i < CHANNELS * frame_size; i++) {
-            pcm_bytes[2*i]=out[i]&0xFF;
-            pcm_bytes[2*i+1]=(out[i]>>8)&0xFF;
+            pcm_bytes[2 * i] = out[i] & 0xFF;
+            pcm_bytes[2 * i + 1] = (out[i] >> 8) & 0xFF;
         }
         /* Write the decoded audio to file. */
         fwrite(pcm_bytes, sizeof(short), frame_size*CHANNELS, fout);

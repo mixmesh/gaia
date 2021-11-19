@@ -22,11 +22,11 @@ playback: playback.o ../audio.o
 
 test_jb: test_jb.o ../jb.o
 	(cd ..;$(MAKE) objs)
-	$(CC) $^ $(LDLIBS) -o $@
+	$(CC) $^ $(LDLIBS) -lopus -o $@
 
 test_jb_table: test_jb_table.o ../jb.o ../jb_table.o
 	(cd ..;$(MAKE) objs)
-	$(CC) $^ $(LDLIBS) -o $@
+	$(CC) $^ $(LDLIBS) -lopus -o $@
 
 clean:
 	rm -f *.o $(EXECS)

@@ -47,7 +47,6 @@ void *network_sender(void *arg) {
         addrs[i].sin_port = htons(params->addr_ports[i].port);
     }
 
-
     // Create Opus encoders (if enabled)
     OpusEncoder *opus_encoders[params->naddr_ports];
     if (params->opus_enabled) {

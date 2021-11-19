@@ -32,7 +32,7 @@ int main (int argc, char *argv[]) {
   fprintf(stderr, "jb_test\n");
   fprintf(stderr, "========================================================================\n");
 
-  jb_t *jb = jb_new(1);
+  jb_t *jb = jb_new(1, false);
   jb_entry_t *jb_entry;
   uint8_t result;
 
