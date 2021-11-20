@@ -65,18 +65,15 @@ void *file_sender(void *arg) {
     }
 
     // Create Opus encoders (if enabled)
-    OpusEncoder *opus_encoders[params->naddr_ports];
+    OpusEncoder *opus_encoder = NULL;
     if (params->opus_enabled) {
-        for (int i = 0; i < params->naddr_ports; i++) {
-            opus_encoders[i] =
-                opus_encoder_create(RATE_IN_HZ, CHANNELS,
-                                    OPUS_APPLICATION_AUDIO, &err);
-            if (err < 0) {
-                fprintf(stderr, "ERROR: Failed to create an encoder: %s\n",
-                        opus_strerror(err));
-            }
-            assert(err == 0);
+        opus_encoder = opus_encoder_create(RATE_IN_HZ, CHANNELS,
+                                           OPUS_APPLICATION_AUDIO, &err);
+        if (err < 0) {
+            fprintf(stderr, "ERROR: Failed to create an encoder: %s\n",
+                    opus_strerror(err));
         }
+        assert(err == 0);
     }
 
     // Allocate memory for UDP buffer
@@ -143,17 +140,19 @@ void *file_sender(void *arg) {
         // Add cached audio packet to UDP buffer
         uint16_t packet_len;
         if (params->opus_enabled) {
-            // FIXME
-            // Encode and measure len
-            assert(false);
+            if ((packet_len = opus_encode(opus_encoder,
+                                          (opus_int16 *)&file_cache[file_cache_index],
+                                          PERIOD_SIZE_IN_FRAMES, &udp_buf[HEADER_SIZE],
+                                          OPUS_MAX_PACKET_LEN_IN_BYTES)) < 0) {
+                fprintf(stderr, "Failed to Opus encode: %s\n",
+                        opus_strerror(packet_len));
+                break;
+            }
         } else {
             memcpy(&udp_buf[HEADER_SIZE], &file_cache[file_cache_index],
                    PERIOD_SIZE_IN_BYTES);
             packet_len = PERIOD_SIZE_IN_BYTES;
         }
-
-        // Advance file cache index
-        file_cache_index += PERIOD_SIZE_IN_BYTES;
 
         // Add packet length to UDP buffer header
         memcpy(&udp_buf[16], &packet_len, sizeof(packet_len));
@@ -178,6 +177,7 @@ void *file_sender(void *arg) {
             }
         }
 
+        file_cache_index += PERIOD_SIZE_IN_BYTES;
         seqnum++;
     }
 

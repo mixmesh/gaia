@@ -14,7 +14,7 @@
 #define RATE_IN_HZ 48000
 
 // Let it be a power to 2
-#define PERIOD_SIZE_IN_FRAMES 256
+#define PERIOD_SIZE_IN_FRAMES 960
 #define PERIOD_SIZE_IN_BYTES (PERIOD_SIZE_IN_FRAMES * FRAME_SIZE_IN_BYTES)
 #define PERIOD_SIZE_IN_MS (PERIOD_SIZE_IN_FRAMES / (RATE_IN_HZ / 1000.0))
 #define PERIOD_SIZE_IN_NS (PERIOD_SIZE_IN_FRAMES / (RATE_IN_HZ / 1000000000.0))
@@ -22,7 +22,7 @@
 #define start_threshold(period_size_in_frames, buffer_multiplicator) \
     (period_size_in_frames * (buffer_multiplicator - 1))
 
-#define JITTER_BUFFER_SIZE_IN_MS 200
+#define JITTER_BUFFER_SIZE_IN_MS 400
 #define PERIODS_IN_JITTER_BUFFER \
     (uint32_t)(JITTER_BUFFER_SIZE_IN_MS / PERIOD_SIZE_IN_MS)
 #define JITTER_BUFFER_SIZE_IN_BYTES                             \

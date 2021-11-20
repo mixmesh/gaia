@@ -28,23 +28,23 @@ void *audio_sink(void *arg) {
         void step_playback_entry(jb_t *jb) {
             jb_take_wrlock(jb);
             if (jb->nentries > JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS) {
+                bool skip_packet = false;
                 if (jb->playback == NULL) {
                     printf("Jitter buffer (re)initializes playback for userid \
 %d\n",
                            jb->userid);
                     reset_playback_delay(jb);
-                    packet[npackets++] = &jb->playback->data[HEADER_SIZE];
                 } else if (jb->playback == jb->tail) {
                     printf("Jitter buffer playback is exhausted for userid \
 %d\n",
                            jb->userid);
                     jb->exhausted = true;
+                    skip_packet = true;
                 } else if (jb->playback->seqnum != jb->playback_seqnum) {
                     printf("Jitter buffer playback has wrapped around for \
 userid %d.\n",
                            jb->userid);
                     reset_playback_delay(jb);
-                    packet[npackets++] = &jb->playback->data[HEADER_SIZE];
                 } else {
                     // Step playback entry
                     uint32_t next_seqnum = jb->playback->seqnum + 1;
@@ -67,8 +67,30 @@ playback entry %d but got %d (%d will be reused as %d!)\n",
                             jb->playback_seqnum = next_seqnum;
                         }
                     }
-                    packet[npackets++] = &jb->playback->data[HEADER_SIZE];
                 }
+
+                if (!skip_packet) {
+                    if (params->opus_enabled) {
+                        uint16_t packet_len =
+                            *(uint16_t *)&jb->playback->udp_buf[16];
+                        int frames;
+                        if ((frames =
+                             opus_decode(jb->opus_decoder,
+                                         &jb->playback->udp_buf[HEADER_SIZE],
+                                         packet_len,
+                                         (opus_int16 *)jb->playback->period_buf,
+                                         OPUS_MAX_PACKET_LEN_IN_BYTES,
+                                         0)) < 0) {
+                            fprintf(stderr, "Failed to Opus decode: %s\n",
+                                    opus_strerror(frames));
+                        }
+                        assert(frames == PERIOD_SIZE_IN_FRAMES);
+                        packet[npackets++] = jb->playback->period_buf;
+                    } else {
+                        packet[npackets++] = &jb->playback->udp_buf[HEADER_SIZE];
+                    }
+                }
+
                 /*
                 // NOTE: This debug printout is too expensive
                 uint32_t index = jb_get_index(jb, jb->playback);
@@ -103,9 +125,6 @@ playback entry %d but got %d (%d will be reused as %d!)\n",
                 printf("Audio device has been opened for playback\n");
             }
             if (npackets == 1) {
-                if (params->opus_enabled) {
-                    // FIXME
-                }
                 audio_write(audio_info, packet[0], PERIOD_SIZE_IN_FRAMES);
             } else {
                 uint8_t mixed_packet[PERIOD_SIZE_IN_BYTES];
@@ -113,9 +132,6 @@ playback entry %d but got %d (%d will be reused as %d!)\n",
                 assert(audio_smix16((int16_t **)packet,
                                     npackets, (int16_t *)mixed_packet,
                                     PERIOD_SIZE_IN_FRAMES, CHANNELS) == 0);
-                if (params->opus_enabled) {
-                    // FIXME
-                }
                 audio_write(audio_info, mixed_packet, PERIOD_SIZE_IN_FRAMES);
             }
         } else {

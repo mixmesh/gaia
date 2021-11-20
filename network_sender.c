@@ -48,18 +48,15 @@ void *network_sender(void *arg) {
     }
 
     // Create Opus encoders (if enabled)
-    OpusEncoder *opus_encoders[params->naddr_ports];
+    OpusEncoder *opus_encoder = NULL;
     if (params->opus_enabled) {
-        for (int i = 0; i < params->naddr_ports; i++) {
-            opus_encoders[i] =
-                opus_encoder_create(RATE_IN_HZ, CHANNELS,
-                                    OPUS_APPLICATION_AUDIO, &err);
-            if (err < 0) {
-                fprintf(stderr, "ERROR: Failed to create an encoder: %s\n",
-                        opus_strerror(err));
-            }
-            assert(err == 0);
+        opus_encoder = opus_encoder_create(RATE_IN_HZ, CHANNELS,
+                                           OPUS_APPLICATION_AUDIO, &err);
+        if (err < 0) {
+            fprintf(stderr, "ERROR: Failed to create an encoder: %s\n",
+                    opus_strerror(err));
         }
+        assert(err == 0);
     }
 
     // Open audio device
@@ -90,6 +87,9 @@ void *network_sender(void *arg) {
     // Add userid to UDP buffer header
     memcpy(udp_buf, &params->userid, sizeof(params->userid));
 
+    // Create a period buffer
+    uint8_t period_buf[PERIOD_SIZE_IN_BYTES];
+
     // Let sequence number start with 1 (zero is reserved)
     uint32_t seqnum = 1;
 
@@ -106,9 +106,20 @@ void *network_sender(void *arg) {
         // Add audio packet to UDP buffer
         uint16_t packet_len;
         if (params->opus_enabled) {
-            // FIXME
-            // Encode and measure len
-            assert(false);
+            snd_pcm_uframes_t frames;
+            if ((frames = audio_read(audio_info, period_buf,
+                                     PERIOD_SIZE_IN_FRAMES)) < 0) {
+                continue;
+            }
+            assert(frames == PERIOD_SIZE_IN_FRAMES);
+            if ((packet_len = opus_encode(opus_encoder,
+                                          (opus_int16 *)period_buf,
+                                          frames, &udp_buf[HEADER_SIZE],
+                                          OPUS_MAX_PACKET_LEN_IN_BYTES)) < 0) {
+                fprintf(stderr, "Failed to Opus encode: %s\n",
+                        opus_strerror(packet_len));
+                break;
+            }
         } else {
             snd_pcm_uframes_t frames;
             if ((frames = audio_read(audio_info, &udp_buf[HEADER_SIZE],

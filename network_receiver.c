@@ -160,12 +160,12 @@ userid");
                 jb_entry = jb_pop(jb);
                 jb_release_lock(jb);
             } else {
-                jb_entry = jb_entry_new(udp_max_buf_size);
+                jb_entry = jb_entry_new(udp_max_buf_size, PERIOD_SIZE_IN_BYTES);
             }
 
             // Read from socket
             ssize_t udp_buf_size = HEADER_SIZE + packet_len;
-            if ((n = recvfrom(sockfd, jb_entry->data, udp_buf_size, 0, NULL,
+            if ((n = recvfrom(sockfd, jb_entry->udp_buf, udp_buf_size, 0, NULL,
                               NULL)) < 0) {
                 perror("recvfrom: Failed to read from socket");
                 goto bail_out;
@@ -176,7 +176,7 @@ userid");
 
             // Calculate latency (for developement debugging only)
             uint64_t timestamp;
-            memcpy(&timestamp, &jb_entry->data[4], sizeof(uint64_t));
+            memcpy(&timestamp, &jb_entry->udp_buf[4], sizeof(uint64_t));
             uint64_t current_timestamp = utimestamp();
             // NOTE: Disable to allow development machines without NTP client
             //assert(current_timestamp > timestamp);
@@ -190,7 +190,7 @@ userid");
 
             // Add seqnum to jitter buffer entry and insert entry
             uint32_t seqnum;
-            memcpy(&seqnum, &jb_entry->data[12], sizeof(seqnum));
+            memcpy(&seqnum, &jb_entry->udp_buf[12], sizeof(seqnum));
             if (jb->nentries > 0) {
                 if (jb->tail->seqnum == seqnum) {
                     // NOTE: Disable to remove noise on stdout
@@ -205,11 +205,11 @@ userid");
 
             // Peak value/average handling
             uint16_t peak_value = 0;
-            int16_t *s16data = (int16_t *)&jb_entry->data[HEADER_SIZE];
+            int16_t *packet = (int16_t *)&jb_entry->udp_buf[HEADER_SIZE];
             for (uint16_t i = 0; i < PERIOD_SIZE_IN_FRAMES * CHANNELS; i++) {
-                uint16_t udata = s16data[i] + 32768;
-                if (udata > peak_value) {
-                    peak_value = udata;
+                uint16_t next_value = packet[i] + 32768;
+                if (next_value > peak_value) {
+                    peak_value = next_value;
                 }
             }
             jb->peak_values[jb->peak_index] = peak_value;

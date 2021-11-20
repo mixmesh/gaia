@@ -160,14 +160,16 @@ void jb_release_lock(jb_t *jb) {
     assert(pthread_rwlock_unlock(jb->rwlock) == 0);
 }
 
-jb_entry_t *jb_entry_new(uint32_t data_size) {
+jb_entry_t *jb_entry_new(uint16_t udp_buf_size, uint16_t period_buf_size) {
     jb_entry_t *jb_entry = malloc(sizeof(jb_entry_t));
     jb_entry->seqnum = 0;
-    jb_entry->data = malloc(data_size);
+    jb_entry->udp_buf = malloc(udp_buf_size);
+    jb_entry->period_buf = malloc(period_buf_size);
     return jb_entry;
 }
 
 void jb_entry_free(jb_entry_t *jb_entry) {
-    free(jb_entry->data);
+    free(jb_entry->udp_buf);
+    free(jb_entry->period_buf);
     free(jb_entry);
 }

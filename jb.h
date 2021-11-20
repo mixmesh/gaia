@@ -8,7 +8,8 @@
 
 typedef struct jb_entry {
     uint32_t seqnum;
-    uint8_t *data;
+    uint8_t *udp_buf;
+    uint8_t *period_buf;
     struct jb_entry *next;
     struct jb_entry *prev;
 } jb_entry_t;
@@ -46,7 +47,7 @@ void jb_take_rdlock(jb_t *jb);
 void jb_take_wrlock(jb_t *jb);
 void jb_release_lock(jb_t *jb);
 
-jb_entry_t *jb_entry_new(uint32_t data_size);
+jb_entry_t *jb_entry_new(uint16_t udp_buf_size, uint16_t period_buf_size);
 void jb_entry_free(jb_entry_t *jb_entry);
 
 #endif
