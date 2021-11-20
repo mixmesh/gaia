@@ -78,10 +78,16 @@ void *network_sender(void *arg) {
     printf("Period size is %d bytes (%fms)\n", PERIOD_SIZE_IN_BYTES,
            PERIOD_SIZE_IN_MS);
 
-    uint32_t udp_buf_size = HEADER_SIZE + PAYLOAD_SIZE_IN_BYTES;
-    uint8_t *udp_buf = malloc(udp_buf_size);
+    // Allocate memory for UDP buffer
+    ssize_t udp_max_buf_size;
+    if (params->opus_enabled) {
+        udp_max_buf_size = HEADER_SIZE + OPUS_MAX_PACKET_LEN_IN_BYTES;
+    } else {
+        udp_max_buf_size = HEADER_SIZE + PERIOD_SIZE_IN_BYTES;
+    }
+    uint8_t *udp_buf = malloc(udp_max_buf_size);
 
-    // Add userid to buffer header
+    // Add userid to UDP buffer header
     memcpy(udp_buf, &params->userid, sizeof(params->userid));
 
     // Let sequence number start with 1 (zero is reserved)
@@ -90,40 +96,45 @@ void *network_sender(void *arg) {
     // Read from audio device and write to socket
     printf("Sending audio...\n");
     while (true) {
-        // Add timestamp to buffer header
+        // Add timestamp to UDP buffer header
         uint64_t timestamp = utimestamp();
         memcpy(&udp_buf[4], &timestamp, sizeof(timestamp));
 
-        // Add seqnum to buffer header
+        // Add seqnum to UDP buffer header
         memcpy(&udp_buf[12], &seqnum, sizeof(seqnum));
-        seqnum++;
 
-        // Read from audio device
-        snd_pcm_uframes_t frames;
-        if ((frames = audio_read(audio_info, &udp_buf[HEADER_SIZE],
-                                 PERIOD_SIZE_IN_FRAMES)) < 0) {
-            continue;
-        }
-
+        // Add audio packet to UDP buffer
+        uint16_t packet_len;
         if (params->opus_enabled) {
             // FIXME
+            // Encode and measure len
+            assert(false);
+        } else {
+            snd_pcm_uframes_t frames;
+            if ((frames = audio_read(audio_info, &udp_buf[HEADER_SIZE],
+                                     PERIOD_SIZE_IN_FRAMES)) < 0) {
+                continue;
+            }
+            assert(frames == PERIOD_SIZE_IN_FRAMES);
+            packet_len = PERIOD_SIZE_IN_BYTES;
         }
 
+        // Add packet length to UDP buffer header
+        memcpy(&udp_buf[16], &packet_len, sizeof(packet_len));
+
         // Write to non-blocking socket
-        if (frames == PERIOD_SIZE_IN_FRAMES) {
-            for (int i = 0; i < params->naddr_ports; i++) {
-                ssize_t n  = sendto(sockfd, udp_buf, udp_buf_size, 0,
-                                    (struct sockaddr *)&addrs[i],
-                                    sizeof(addrs[i]));
-                if (n < 0) {
-                    perror("sendto: Failed to write to socket");
-                } else if (n != udp_buf_size) {
-                    printf("Too few bytes written to socket!\n");
-                }
+        ssize_t udp_buf_size = HEADER_SIZE + packet_len;
+        for (int i = 0; i < params->naddr_ports; i++) {
+            ssize_t n = sendto(sockfd, udp_buf, udp_buf_size, 0,
+                               (struct sockaddr *)&addrs[i], sizeof(addrs[i]));
+            if (n < 0) {
+                perror("sendto: Failed to write to socket");
+            } else if (n != udp_buf_size) {
+                printf("Too few bytes written to socket!\n");
             }
-        } else {
-            printf("Too few frames read from audio device!\n");
         }
+
+        seqnum++;
     }
 
     fprintf(stderr, "network_sender is shutting down!!!\n");

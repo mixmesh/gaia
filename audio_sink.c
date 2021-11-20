@@ -17,14 +17,14 @@ void reset_playback_delay(jb_t *jb) {
 void *audio_sink(void *arg) {
     int err;
     audio_info_t *audio_info = NULL;
-    uint8_t *data[MAX_USERS];
+    uint8_t *packet[MAX_USERS];
 
     // Parameters
     audio_sink_params_t *params = (audio_sink_params_t *)arg;
 
     // Read from jitter buffer, mix and write to audio device
     while (true) {
-        uint8_t ndata = 0;
+        uint8_t npackets = 0;
         void step_playback_entry(jb_t *jb) {
             jb_take_wrlock(jb);
             if (jb->nentries > JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS) {
@@ -33,7 +33,7 @@ void *audio_sink(void *arg) {
 %d\n",
                            jb->userid);
                     reset_playback_delay(jb);
-                    data[ndata++] = &jb->playback->data[HEADER_SIZE];
+                    packet[npackets++] = &jb->playback->data[HEADER_SIZE];
                 } else if (jb->playback == jb->tail) {
                     printf("Jitter buffer playback is exhausted for userid \
 %d\n",
@@ -44,7 +44,7 @@ void *audio_sink(void *arg) {
 userid %d.\n",
                            jb->userid);
                     reset_playback_delay(jb);
-                    data[ndata++] = &jb->playback->data[HEADER_SIZE];
+                    packet[npackets++] = &jb->playback->data[HEADER_SIZE];
                 } else {
                     // Step playback entry
                     uint32_t next_seqnum = jb->playback->seqnum + 1;
@@ -67,7 +67,7 @@ playback entry %d but got %d (%d will be reused as %d!)\n",
                             jb->playback_seqnum = next_seqnum;
                         }
                     }
-                    data[ndata++] = &jb->playback->data[HEADER_SIZE];
+                    packet[npackets++] = &jb->playback->data[HEADER_SIZE];
                 }
                 /*
                 // NOTE: This debug printout is too expensive
@@ -84,7 +84,7 @@ playback entry %d but got %d (%d will be reused as %d!)\n",
         jb_table_foreach(jb_table, step_playback_entry);
         jb_table_release_lock(jb_table);
 
-        if (ndata > 0) {
+        if (npackets > 0) {
             // Open audio device (if needed)
             if (audio_info == NULL) {
                 if ((err = audio_new(params->pcm_name, SND_PCM_STREAM_PLAYBACK,
@@ -102,21 +102,21 @@ playback entry %d but got %d (%d will be reused as %d!)\n",
                        audio_info->period_size_in_frames);
                 printf("Audio device has been opened for playback\n");
             }
-            if (ndata == 1) {
+            if (npackets == 1) {
                 if (params->opus_enabled) {
                     // FIXME
                 }
-                audio_write(audio_info, data[0], PAYLOAD_SIZE_IN_FRAMES);
+                audio_write(audio_info, packet[0], PERIOD_SIZE_IN_FRAMES);
             } else {
-                uint8_t mixed_data[PERIOD_SIZE_IN_BYTES];
-                ndata = (ndata < MAX_MIX_STREAMS) ? ndata : MAX_MIX_STREAMS;
-                assert(audio_smix16((int16_t **)data,
-                                    ndata, (int16_t *)mixed_data,
+                uint8_t mixed_packet[PERIOD_SIZE_IN_BYTES];
+                npackets = (npackets < MAX_MIX_STREAMS) ? npackets : MAX_MIX_STREAMS;
+                assert(audio_smix16((int16_t **)packet,
+                                    npackets, (int16_t *)mixed_packet,
                                     PERIOD_SIZE_IN_FRAMES, CHANNELS) == 0);
                 if (params->opus_enabled) {
                     // FIXME
                 }
-                audio_write(audio_info, mixed_data, PAYLOAD_SIZE_IN_FRAMES);
+                audio_write(audio_info, mixed_packet, PERIOD_SIZE_IN_FRAMES);
             }
         } else {
             fprintf(stderr, "No data available in jitter buffers\n");

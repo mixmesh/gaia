@@ -46,7 +46,14 @@ void *network_receiver(void *arg) {
 
     struct timeval zero_timeout = {.tv_usec = 0, .tv_sec = 0};
     struct timeval one_second_timeout = {.tv_usec = 0, .tv_sec = 1};
-    uint32_t udp_buf_size = HEADER_SIZE + PAYLOAD_SIZE_IN_BYTES;
+
+    ssize_t udp_max_buf_size;
+    if (params->opus_enabled) {
+        udp_max_buf_size = HEADER_SIZE + OPUS_MAX_PACKET_LEN_IN_BYTES;
+    } else {
+        udp_max_buf_size = HEADER_SIZE + PERIOD_SIZE_IN_BYTES;
+    }
+
     uint8_t drain_buf[DRAIN_BUF_SIZE];
 
     printf("Jitter buffer contains %dms of audio data (%d periods, %d bytes)\n",
@@ -111,18 +118,20 @@ void *network_receiver(void *arg) {
                 break;
             }
 
-            // Peek into socket and extract userid
-            uint32_t new_userid;
+            // Peek into socket and extract buffer header
+            uint8_t header_buf[HEADER_SIZE];
             int n;
-            if ((n = recvfrom(sockfd, &new_userid, sizeof(uint32_t), MSG_PEEK,
-                              NULL, NULL)) < 0) {
+            if ((n = recvfrom(sockfd, header_buf, HEADER_SIZE, MSG_PEEK, NULL,
+                              NULL)) < 0) {
                 perror("recvfrom: Failed to peek into socket and extract \
 userid");
                 goto bail_out;
-            } else if (n != sizeof(uint32_t)) {
+            } else if (n != HEADER_SIZE) {
                 printf("Ignored truncated UDP packet!\n");
                 break;
             }
+            uint32_t new_userid = *(uint32_t *)&header_buf[0];
+            uint16_t packet_len = *(uint16_t *)&header_buf[16];
 
             // Get jitter buffer
             if (userid != new_userid) {
@@ -151,10 +160,11 @@ userid");
                 jb_entry = jb_pop(jb);
                 jb_release_lock(jb);
             } else {
-                jb_entry = jb_entry_new(udp_buf_size);
+                jb_entry = jb_entry_new(udp_max_buf_size);
             }
 
             // Read from socket
+            ssize_t udp_buf_size = HEADER_SIZE + packet_len;
             if ((n = recvfrom(sockfd, jb_entry->data, udp_buf_size, 0, NULL,
                               NULL)) < 0) {
                 perror("recvfrom: Failed to read from socket");

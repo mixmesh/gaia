@@ -7,7 +7,7 @@
 #include "audio.h"
 #include "globals.h"
 
-#define FILE_CACHE_SIZE (PAYLOAD_SIZE_IN_BYTES * 100)
+#define FILE_CACHE_SIZE (PERIOD_SIZE_IN_BYTES * 100)
 
 void *file_sender(void *arg) {
     int err;
@@ -79,10 +79,16 @@ void *file_sender(void *arg) {
         }
     }
 
-    uint32_t udp_buf_size = HEADER_SIZE + PAYLOAD_SIZE_IN_BYTES;
-    uint8_t *udp_buf = malloc(udp_buf_size);
+    // Allocate memory for UDP buffer
+    ssize_t udp_max_buf_size;
+    if (params->opus_enabled) {
+        udp_max_buf_size = HEADER_SIZE + OPUS_MAX_PACKET_LEN_IN_BYTES;
+    } else {
+        udp_max_buf_size = HEADER_SIZE + PERIOD_SIZE_IN_BYTES;
+    }
+    uint8_t *udp_buf = malloc(udp_max_buf_size);
 
-    // Add userid to buffer header
+    // Add userid to UDP buffer header
     memcpy(udp_buf, &params->userid, sizeof(params->userid));
 
     // Let sequence number start with 1 (zero is reserved)
@@ -105,26 +111,24 @@ void *file_sender(void *arg) {
     // Read from file and write to socket
     printf("Sending audio...\n");
     while (true) {
-        // Add timestamp to buffer header
+        // Add timestamp to UDP buffer header
         uint64_t timestamp = utimestamp();
         memcpy(&udp_buf[4], &timestamp, sizeof(timestamp));
 
-        // Add seqnum to buffer header
+        // Add seqnum to UDP buffer header
         memcpy(&udp_buf[12], &seqnum, sizeof(seqnum));
-        seqnum++;
 
         // Cache file to RAM (if needed)
         if (file_cache_index == FILE_CACHE_SIZE) {
-            size_t read_bytes = fread(file_cache, 1, FILE_CACHE_SIZE, fd);
-            if (read_bytes < FILE_CACHE_SIZE) {
+            size_t n = fread(file_cache, 1, FILE_CACHE_SIZE, fd);
+            if (n < FILE_CACHE_SIZE) {
                 if (feof(fd)) {
                     printf("Reached end of file in %s. Start from scratch!\n",
                            params->filename);
                     printf("Reached end of file. Start from scratch!\n");
                     rewind(fd);
-                    uint32_t more_bytes = FILE_CACHE_SIZE - read_bytes;
-                    if (fread(&file_cache[read_bytes], 1, more_bytes,
-                              fd) < more_bytes) {
+                    uint32_t more_bytes = FILE_CACHE_SIZE - n;
+                    if (fread(&file_cache[n], 1, more_bytes, fd) < more_bytes) {
                         perror("fread");
                         break;
                     }
@@ -136,14 +140,23 @@ void *file_sender(void *arg) {
             file_cache_index = 0;
         }
 
-        // Insert payload from data cache into buffer
-        memcpy(&udp_buf[HEADER_SIZE], &file_cache[file_cache_index],
-               PAYLOAD_SIZE_IN_BYTES);
-        file_cache_index += PAYLOAD_SIZE_IN_BYTES;
-
+        // Add cached audio packet to UDP buffer
+        uint16_t packet_len;
         if (params->opus_enabled) {
             // FIXME
+            // Encode and measure len
+            assert(false);
+        } else {
+            memcpy(&udp_buf[HEADER_SIZE], &file_cache[file_cache_index],
+                   PERIOD_SIZE_IN_BYTES);
+            packet_len = PERIOD_SIZE_IN_BYTES;
         }
+
+        // Advance file cache index
+        file_cache_index += PERIOD_SIZE_IN_BYTES;
+
+        // Add packet length to UDP buffer header
+        memcpy(&udp_buf[16], &packet_len, sizeof(packet_len));
 
         // Sleep (very carefully)
         struct timespec next_time;
@@ -154,16 +167,18 @@ void *file_sender(void *arg) {
         memcpy(&time, &next_time, sizeof(struct timespec));
 
         // Write to non-blocking socket
+        ssize_t udp_buf_size = HEADER_SIZE + packet_len;
         for (int i = 0; i < params->naddr_ports; i++) {
-            ssize_t n  = sendto(sockfd, udp_buf, udp_buf_size, 0,
-                                (struct sockaddr *)&addrs[i],
-                                sizeof(addrs[i]));
+            ssize_t n = sendto(sockfd, udp_buf, udp_buf_size, 0,
+                               (struct sockaddr *)&addrs[i], sizeof(addrs[i]));
             if (n < 0) {
                 perror("sendto: Failed to write to socket");
             } else if (n != udp_buf_size) {
                 printf("Too few bytes written to socket!\n");
             }
         }
+
+        seqnum++;
     }
 
     fprintf(stderr, "file_sender is shutting down!!!\n");

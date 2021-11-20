@@ -29,14 +29,13 @@
     (uint32_t)(PERIODS_IN_JITTER_BUFFER * PERIOD_SIZE_IN_BYTES)
 #define JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS (PERIODS_IN_JITTER_BUFFER / 2)
 
-#define PAYLOAD_SIZE_IN_FRAMES PERIOD_SIZE_IN_FRAMES
-#define PAYLOAD_SIZE_IN_BYTES (PAYLOAD_SIZE_IN_FRAMES * FRAME_SIZE_IN_BYTES)
+#define OPUS_MAX_PACKET_LEN_IN_BYTES 1276
 
 #define PEAK_AVERAGE_PERIOD_IN_MS 200
 #define MAX_MIX_STREAMS 32
 
-// |userid:4|timestamp:8|seqnum:4| = 16 bytes
-#define HEADER_SIZE (4 + 8 + 4)
+// |userid:4|timestamp:8|seqnum:4|packet_len:2| = 18 bytes
+#define HEADER_SIZE (4 + 8 + 4 + 2)
 
 #define ARG_ERROR                 1
 #define SCHED_ERROR               2

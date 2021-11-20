@@ -5,5 +5,5 @@ for f in *.wav; do
     mv "${f}" "${f2}" 2>/dev/null
     f3=${f2%.wav}.s16
     echo "Converts ${f2} to ${f3}"
-    sox "${f2}" -c 2 -r 44100 -b 16 -e signed-integer --endian little -t raw "${f3}"
+    sox "${f2}" -c 2 -r 48000 -b 16 -e signed-integer --endian little -t raw "${f3}"
 done

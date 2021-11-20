@@ -14,7 +14,7 @@ $ timedatectl set-ntp true
 
 git
 ---
-$ git reset --hard origin/main        
+$ git reset --hard origin/main
 
 Pi
 --
@@ -23,7 +23,7 @@ $ sudo iw wlp2s0 set power_save off
 
 sox
 ---
-sox file.mp3 -c 1 -r 44100 -b 16 -e signed-integer --endian little -t raw output.bin
+sox file.mp3 -c 2 -r 48000 -b 16 -e signed-integer --endian little -t raw file.s16
 
 Core file
 ---------
@@ -54,5 +54,3 @@ Make sure that:
 systemctl cat bluealsa
 ...
 ExecStart=/usr/bin/bluealsa -p a2dp-sink -p a2dp-source -p hfp-ag -p hsp-ag
-
-
