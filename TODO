@@ -1,6 +1,6 @@
-* Add mixing to audio_sink.c and test with several users
-
 == STOP! THINK!
+
+* Nodis/multicasting
 
 * Adaptive jitter buffer
   * Look at the 94 paper and work with pitch scaling
@@ -13,14 +13,13 @@
 * No tech
 * Real-time communication
 * Gaia
-* PinePhone without screen
-* Spotify merging
+* PinePhone without screen?
+* Spotify merging?
 * Video feed (glasses/3ps)
-* HLR/GPS routing ala Tony
-* Speech pattern recognition
+* HLR/GPS routing ala Tony (multi-hop)
+* Sound pattern recognition
   * Beep when connected
 * Fabulous Five concept
-* The concept og love
 * Take message if user is occupied
 * Weeks of battery time:
   * Wake on LAN

@@ -6,10 +6,10 @@
 #define AUDIO_NOT_RECOVERED -1000
 
 typedef struct {
-  snd_pcm_t *pcm;
-  snd_pcm_hw_params_t *hw_params;
-  snd_pcm_sw_params_t *sw_params;
-  snd_pcm_uframes_t period_size_in_frames;
+    snd_pcm_t *pcm;
+    snd_pcm_hw_params_t *hw_params;
+    snd_pcm_sw_params_t *sw_params;
+    snd_pcm_uframes_t period_size_in_frames;
 } audio_info_t;
 
 int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
@@ -23,6 +23,12 @@ snd_pcm_uframes_t audio_write(audio_info_t *audio_info, uint8_t *data,
                               snd_pcm_uframes_t nframes);
 int audio_read(audio_info_t *audio_info, uint8_t *data,
                snd_pcm_uframes_t nframes);
-int audio_umix16(uint16_t *data[], uint8_t n, uint16_t *mixed_data);
+int audio_umix16(uint16_t **data, uint8_t n, uint16_t *mixed_data,
+                 snd_pcm_uframes_t period_size_in_frames, uint8_t channels);
+int audio_smix16(int16_t **data, uint8_t n, int16_t *mixed_data,
+                 snd_pcm_uframes_t period_size_in_frames, uint8_t channels);
+int audio_dummy_smix16(int16_t **data, uint8_t n, int16_t *mixed_data,
+                       snd_pcm_uframes_t period_size_in_frames,
+                       uint8_t channels);
 
 #endif

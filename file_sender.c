@@ -1,40 +1,57 @@
+#include <stdio.h>
 #include <stdbool.h>
 #include <opus/opus.h>
-#include "audio.h"
 #include "globals.h"
 #include "timing.h"
-#include "network_sender.h"
+#include "file_sender.h"
 #include "audio.h"
+#include "globals.h"
 
-void *network_sender(void *arg) {
+#define FILE_CACHE_SIZE (PERIOD_SIZE_IN_BYTES * 100)
+
+void *file_sender(void *arg) {
     int err;
 
     // Parameters
-    network_sender_params_t *params = (network_sender_params_t *)arg;
+    file_sender_params_t *params = (file_sender_params_t *)arg;
+
+    // Open file
+    FILE *fd;
+    if ((fd = fopen(params->filename, "r")) == NULL) {
+        perror("fopen: Could not open filename");
+        exit(FILE_ERROR);
+    }
+
+    // Check file size
+    fseek(fd, 0L, SEEK_END);
+    if (ftell(fd) < FILE_CACHE_SIZE) {
+        fprintf(stderr, "%s is smaller than %d bytes\n", params->filename,
+                FILE_CACHE_SIZE);
+        fclose(fd);
+        exit(FILE_ERROR);
+    }
+    rewind(fd);
 
     // Create socket
     int sockfd = -1;
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         perror("socket: Socket creation failed");
+        fclose(fd);
         exit(SOCKET_ERROR);
     }
-
-    // Resize socket send buffer
-    /*
-    // NOTE: This was a bad idea for some reason. Disable for now.
-    int snd_buf_size = PERIOD_SIZE_IN_BYTES * BUFFER_MULTIPLICATOR;
-    assert(setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &snd_buf_size,
-    sizeof(snd_buf_size)) == 0);
-    */
 
     // Make socket non-blocking
     int flags = fcntl(sockfd, F_GETFL, 0);
     if (flags < 0) {
         perror("fcntl: Socket could not be made non-blocking");
+        fclose(fd);
+        close(sockfd);
         exit(SOCKET_ERROR);
     }
     if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) < 0) {
         perror("fcntl: Socket could not be made non-blocking");
+        fclose(fd);
+        close(sockfd);
         exit(SOCKET_ERROR);
     }
 
@@ -59,22 +76,6 @@ void *network_sender(void *arg) {
         assert(err == 0);
     }
 
-    // Open audio device
-    audio_info_t *audio_info;
-    if ((err = audio_new(params->pcm_name, SND_PCM_STREAM_CAPTURE, 0,
-                         FORMAT, CHANNELS, RATE_IN_HZ, SAMPLE_SIZE_IN_BYTES,
-                         PERIOD_SIZE_IN_FRAMES, BUFFER_MULTIPLICATOR,
-                         &audio_info)) < 0) {
-        fprintf(stderr, "audio_new: Could not initialize audio: %s\n",
-                snd_strerror(err));
-        exit(AUDIO_ERROR);
-    }
-    audio_print_parameters(audio_info, "sender");
-    assert(PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
-
-    printf("Period size is %d bytes (%fms)\n", PERIOD_SIZE_IN_BYTES,
-           PERIOD_SIZE_IN_MS);
-
     // Allocate memory for UDP buffer
     ssize_t udp_max_buf_size;
     if (params->opus_enabled) {
@@ -87,13 +88,24 @@ void *network_sender(void *arg) {
     // Add userid to UDP buffer header
     memcpy(udp_buf, &params->userid, sizeof(params->userid));
 
-    // Create a period buffer
-    uint8_t period_buf[PERIOD_SIZE_IN_BYTES];
-
     // Let sequence number start with 1 (zero is reserved)
     uint32_t seqnum = 1;
 
-    // Read from audio device and write to socket
+    struct timespec period_size_as_tsp =
+        {
+         .tv_sec = 0,
+         .tv_nsec = PERIOD_SIZE_IN_NS
+        };
+    struct timespec time;
+    clock_gettime(CLOCK_MONOTONIC, &time);
+
+    char file_cache[FILE_CACHE_SIZE];
+    uint32_t file_cache_index = FILE_CACHE_SIZE;
+
+    printf("Period size is %d bytes (%ldns)\n", PERIOD_SIZE_IN_BYTES,
+           period_size_as_tsp.tv_nsec);
+
+    // Read from file and write to socket
     printf("Sending audio...\n");
     while (true) {
         // Add timestamp to UDP buffer header
@@ -103,35 +115,55 @@ void *network_sender(void *arg) {
         // Add seqnum to UDP buffer header
         memcpy(&udp_buf[12], &seqnum, sizeof(seqnum));
 
-        // Add audio packet to UDP buffer
+        // Cache file to RAM (if needed)
+        if (file_cache_index == FILE_CACHE_SIZE) {
+            size_t n = fread(file_cache, 1, FILE_CACHE_SIZE, fd);
+            if (n < FILE_CACHE_SIZE) {
+                if (feof(fd)) {
+                    printf("Reached end of file in %s. Start from scratch!\n",
+                           params->filename);
+                    printf("Reached end of file. Start from scratch!\n");
+                    rewind(fd);
+                    uint32_t more_bytes = FILE_CACHE_SIZE - n;
+                    if (fread(&file_cache[n], 1, more_bytes, fd) < more_bytes) {
+                        perror("fread");
+                        break;
+                    }
+                } else {
+                    perror("fread");
+                    break;
+                }
+            }
+            file_cache_index = 0;
+        }
+
+        // Add cached audio packet to UDP buffer
         uint16_t packet_len;
         if (params->opus_enabled) {
-            snd_pcm_uframes_t frames;
-            if ((frames = audio_read(audio_info, period_buf,
-                                     PERIOD_SIZE_IN_FRAMES)) < 0) {
-                continue;
-            }
-            assert(frames == PERIOD_SIZE_IN_FRAMES);
             if ((packet_len = opus_encode(opus_encoder,
-                                          (opus_int16 *)period_buf,
-                                          frames, &udp_buf[HEADER_SIZE],
+                                          (opus_int16 *)&file_cache[file_cache_index],
+                                          PERIOD_SIZE_IN_FRAMES, &udp_buf[HEADER_SIZE],
                                           OPUS_MAX_PACKET_LEN_IN_BYTES)) < 0) {
                 fprintf(stderr, "Failed to Opus encode: %s\n",
                         opus_strerror(packet_len));
                 break;
             }
         } else {
-            snd_pcm_uframes_t frames;
-            if ((frames = audio_read(audio_info, &udp_buf[HEADER_SIZE],
-                                     PERIOD_SIZE_IN_FRAMES)) < 0) {
-                continue;
-            }
-            assert(frames == PERIOD_SIZE_IN_FRAMES);
+            memcpy(&udp_buf[HEADER_SIZE], &file_cache[file_cache_index],
+                   PERIOD_SIZE_IN_BYTES);
             packet_len = PERIOD_SIZE_IN_BYTES;
         }
 
         // Add packet length to UDP buffer header
         memcpy(&udp_buf[16], &packet_len, sizeof(packet_len));
+
+        // Sleep (very carefully)
+        struct timespec next_time;
+        timespecadd(&time, &period_size_as_tsp, &next_time);
+        struct timespec rem;
+        assert(clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME,
+                               &next_time, &rem) == 0);
+        memcpy(&time, &next_time, sizeof(struct timespec));
 
         // Write to non-blocking socket
         ssize_t udp_buf_size = HEADER_SIZE + packet_len;
@@ -145,12 +177,13 @@ void *network_sender(void *arg) {
             }
         }
 
+        file_cache_index += PERIOD_SIZE_IN_BYTES;
         seqnum++;
     }
 
-    fprintf(stderr, "network_sender is shutting down!!!\n");
-    audio_free(audio_info);
+    fprintf(stderr, "file_sender is shutting down!!!\n");
     free(udp_buf);
     close(sockfd);
-    exit(NETWORK_SENDER_DIED);
+    fclose(fd);
+    exit(FILE_SENDER_DIED);
 }

@@ -1,0 +1,56 @@
+Traffic Control
+---------------
+$ sudo tc qdisc replace dev lo root netem loss 10%
+$ sudo tc qdisc replace dev lo root netem corrupt 5%
+$ sudo tc qdisc replacee dev lo root netem duplicate 10%
+
+NTP
+---
+$ sudo systemctl restart systemd-timesyncd.service
+$ timedatectl status
+$ timedatectl timesync-status
+$ timedatectl set-ntp false
+$ timedatectl set-ntp true
+
+git
+---
+$ git reset --hard origin/main
+
+Pi
+--
+$ iw wlan0 set power_save off
+$ sudo iw wlp2s0 set power_save off
+
+sox
+---
+sox file.mp3 -c 2 -r 48000 -b 16 -e signed-integer --endian little -t raw file.s16
+
+Core file
+---------
+$ ulimit -c unlimited
+$ ulimit -a
+
+aplay
+-----
+$ arecord -f cd -d 5 -D bluealsa:DEV=20:74:CF:72:85:82,PROFILE=sco test.wav
+$ aplay -D bluealsa:DEV=20:74:CF:72:85:82,PROFILE=a2dp test.wav
+
+with this .asoundrc:
+
+defaults.bluealsa.service "org.bluealsa"
+defaults.bluealsa.device "20:74:CF:72:85:82"
+defaults.bluealsa.profile "a2dp"
+defaults.bluealsa.delay 10000
+
+in that case this works as well:
+
+$ arecord -f cd -d 5 -D bluealsa:PROFILE=sco test.wav
+$ aplay -D bluealsa test.wav
+
+.asoundrc could probably be written to be even better
+
+Make sure that:
+
+systemctl cat bluealsa
+...
+ExecStart=/usr/bin/bluealsa -p a2dp-sink -p a2dp-source -p hfp-ag -p hsp-ag
