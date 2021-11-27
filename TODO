@@ -8,7 +8,6 @@
 * UDP hole punching server
 * Extend hole punching server with HLR functionality
 * Encrypt streams
-* Use libopus as as audio codec (variable payload)
 
 * No tech
 * Real-time communication

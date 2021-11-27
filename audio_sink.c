@@ -96,7 +96,6 @@ playback entry %d but got %d (%d will be reused as %d!)\n",
                 uint32_t index = jb_get_index(jb, jb->playback);
                 printf("Playback index now is %d out of %d total entries\n",
                     index, jb->entries);
-            }
                 */
             }
             jb_release_lock(jb);

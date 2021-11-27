@@ -24,3 +24,7 @@ https://github.com/Arkq/bluez-alsa/issues/352
 https://forums.raspberrypi.com/viewtopic.php?t=206565
 https://github.com/Arkq/bluez-alsa/wiki/Using-the-bluealsa-ALSA-pcm-plugin
 https://stackoverflow.com/questions/62291143/record-audio-from-bluetooth-headset-using-bluealsa-on-linux
+
+Speech recognition
+------------------
+https://towardsdatascience.com/tensorflow-speech-recognition-challenge-solution-outline-9c42dbd219c9
