@@ -1,0 +1,8 @@
+%% -*- erlang -*-
+{application, gaia,
+ [{description, "Gaia main application"},
+  {vsn, git},
+  {modules, ["@@MODULES@@"]},
+  {registered, []},
+  {mod, {gaia_app, []}},
+  {applications, [kernel, stdlib, sasl]}]}.
