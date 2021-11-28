@@ -33,7 +33,7 @@ init(Parent) ->
     Sender =
         spawn_link(
           fun() ->
-                  start_sender(1, ?DEFAULT_PORT,
+                  start_sender(1, ?DEFAULT_PORT + 1,
                                [{?DEFAULT_ADDR, ?DEFAULT_PORT}])
           end),
     {ok, #{parent => Parent, sender => Sender}}.
@@ -50,7 +50,7 @@ message_handler(#{parent := Parent, sender := Sender} = State) ->
         {'EXIT', Pid, Reason} ->
             case Pid of
                 Sender ->
-                    io:format(standard_error,"The sender died: ~p\n", Reason),
+                    io:format(standard_error,"The sender died: ~p\n", [Reason]),
                     stop;
                 _ ->
                     noreply
@@ -78,19 +78,20 @@ start_sender(Userid, SrcPort, DestAddresses) ->
                 {ok, AlsaHandle, _ActualHwParams, _ActualSwParams} ->
                     sender_loop(Userid, DestAddresses, Socket, AlsaHandle, 1);
                 {error, Reason} ->
-                    {error, alsa:strerror(Reason)}
+                    exit({error, alsa:strerror(Reason)})
             end;
         {error, Reason} ->
-            {error, file:format_error(Reason)}
+            exit({error, file:format_error(Reason)})
     end.
 
 sender_loop(Userid, DestAddresses, Socket, AlsaHandle, Seqnum) ->
-    case alsa:read(AlsaHandle, ?PERIOD_SIZE_IN_BYTES) of
+    case alsa:read(AlsaHandle, ?PERIOD_SIZE_IN_FRAMES) of
         {ok, Packet} when is_binary(Packet) ->
             Timestamp = erlang:system_time(microsecond) -
                 ?SECONDS_BETWEEN_1970_and_2021 * 1000000,
             PacketLen = size(Packet),
-            Buf = <<Userid:32, Timestamp:64, Seqnum:32, PacketLen:16,
+            Buf = <<Userid:32/unsigned-integer, Timestamp:64/unsigned-integer,
+                    Seqnum:32/unsigned-integer, PacketLen:16/unsigned-integer,
                     Packet/binary>>,
             lists:foreach(
               fun({IpAddress, Port}) ->
@@ -98,8 +99,9 @@ sender_loop(Userid, DestAddresses, Socket, AlsaHandle, Seqnum) ->
                           ok ->
                               ok;
                           {error, Reason} ->
-                              io:format(standard_error,"~s\n",
-                                        file:format_error(Reason))
+                              exit({error,
+                                    io:format(standard_error,"~s\n",
+                                              [file:format_error(Reason)])})
                       end
               end, DestAddresses),
             sender_loop(Userid, DestAddresses, Socket, AlsaHandle, Seqnum + 1);
@@ -111,5 +113,5 @@ sender_loop(Userid, DestAddresses, Socket, AlsaHandle, Seqnum) ->
             sender_loop(Userid, DestAddresses, Socket, AlsaHandle, Seqnum);
         {error, Reason} ->
             alsa:close(AlsaHandle),
-            {error, alsa:strerror(Reason)}
+            exit({error, alsa:strerror(Reason)})
     end.

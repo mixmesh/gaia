@@ -15,7 +15,7 @@ jb_table_t *jb_table;
 void usage(char *argv[]) {
     fprintf(stderr,
             "\
-Usage: %s [-D device] [-E device] [-s addr[:port]] [-d addr[:port] -d ...] [-x] userid\n\
+Usage: %s [-D device] [-E device] [-L] [-s addr[:port]] [-d addr[:port] -d ...] [-x] userid\n\
 \n\
 Example: \n\
   sudo %s -D plughw:1,0 -d 172.16.0.95 -d 172.16.0.95:2356 -s 172.16.0.116:2305 1000\n\
@@ -23,6 +23,7 @@ Example: \n\
 Options:\n\
   -D Use this device to capture audio (%s)\n\
   -E Use this device to playback audio (%s)\n\
+  -L Do not start network sender thread\n\
   -d Send audio streams to this destination address and port (%s:%d)\n\
   -s Bind to this source address and port (%s:%d)\n\
   -x Enable use of Opus audio codec\n",
@@ -48,17 +49,21 @@ int main (int argc, char *argv[]) {
          .port = DEFAULT_PORT
         };
 
+    bool disable_network_sender = false;
     bool opus_enabled = false;
 
     int opt;
 
-    while ((opt = getopt(argc, argv, "D:E:d:s:x")) != -1) {
+    while ((opt = getopt(argc, argv, "D:E:Ld:s:x")) != -1) {
         switch (opt) {
         case 'D':
             capture_pcm_name = strdup(optarg);
             break;
         case 'E':
             playback_pcm_name = strdup(optarg);
+            break;
+        case 'L':
+            disable_network_sender = true;
             break;
         case 'd':
             if (get_addr_port(optarg, &dest_addr_ports[ndest_addr_ports].addr,
@@ -105,42 +110,46 @@ int main (int argc, char *argv[]) {
 
     // Start sender thread
     pthread_t sender_thread;
-    network_sender_params_t sender_params =
-        {
-         .pcm_name = capture_pcm_name,
-         .userid = userid,
-         .naddr_ports = ndest_addr_ports,
-         .addr_ports = dest_addr_ports,
-         .opus_enabled = opus_enabled
-        };
+    if (!disable_network_sender) {
+        network_sender_params_t sender_params =
+            {
+             .pcm_name = capture_pcm_name,
+             .userid = userid,
+             .naddr_ports = ndest_addr_ports,
+             .addr_ports = dest_addr_ports,
+             .opus_enabled = opus_enabled
+            };
 
-    pthread_attr_t sender_attr;
-    if ((err = pthread_attr_init(&sender_attr)) != 0) {
-        fprintf(stderr,
-                "pthread_attr_init: Failed to initialize sender thread \
-attribute (%d)\n",
-                err);
-        exit(THREAD_ERROR);
-    }
-
-    if (geteuid() == 0) {
-        if ((err = set_fifo_scheduling(&sender_attr, 0)) != 0) {
+        pthread_attr_t sender_attr;
+        if ((err = pthread_attr_init(&sender_attr)) != 0) {
             fprintf(stderr,
-                    "set_fifo_scheduling: Failed to set FIFO scheduling (%d)\n",
+                    "pthread_attr_init: Failed to initialize sender thread \
+attribute (%d)\n",
                     err);
-            exit(SCHED_ERROR);
+            exit(THREAD_ERROR);
         }
-    } else {
-        fprintf(stderr,
-                "WARNING: Failed to set FIFO scheduling, i.e. euid not \
-root!\n");
-    }
 
-    if ((err = pthread_create(&sender_thread, &sender_attr, network_sender,
-                              (void *)&sender_params)) < 0) {
-        fprintf(stderr, "pthread_create: Failed to start sender thread (%d)\n",
-                err);
-        exit(THREAD_ERROR);
+        if (geteuid() == 0) {
+            if ((err = set_fifo_scheduling(&sender_attr, 0)) != 0) {
+                fprintf(stderr,
+                        "set_fifo_scheduling: Failed to set FIFO scheduling \
+(%d)\n",
+                        err);
+                exit(SCHED_ERROR);
+            }
+        } else {
+            fprintf(stderr,
+                    "WARNING: Failed to set FIFO scheduling, i.e. euid not \
+root!\n");
+        }
+
+        if ((err = pthread_create(&sender_thread, &sender_attr, network_sender,
+                                  (void *)&sender_params)) < 0) {
+            fprintf(stderr, "pthread_create: Failed to start sender thread \
+(%d)\n",
+                    err);
+            exit(THREAD_ERROR);
+        }
     }
 
     // Start receiver thread
@@ -222,7 +231,9 @@ root!\n");
         exit(THREAD_ERROR);
     }
 
-    pthread_join(sender_thread, NULL);
+    if (!disable_network_sender) {
+        pthread_join(sender_thread, NULL);
+    }
     pthread_join(receiver_thread, NULL);
     pthread_join(audio_sink_thread, NULL);
     jb_table_free(jb_table, false);
