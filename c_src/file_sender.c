@@ -86,7 +86,8 @@ void *file_sender(void *arg) {
     uint8_t *udp_buf = malloc(udp_max_buf_size);
 
     // Add userid to UDP buffer header
-    memcpy(udp_buf, &params->userid, sizeof(params->userid));
+    uint32_t userid_nl = htonl(params->userid);
+    memcpy(udp_buf, &userid_nl, sizeof(uint32_t));
 
     // Let sequence number start with 1 (zero is reserved)
     uint32_t seqnum = 1;
@@ -109,11 +110,12 @@ void *file_sender(void *arg) {
     printf("Sending audio...\n");
     while (true) {
         // Add timestamp to UDP buffer header
-        uint64_t timestamp = utimestamp();
-        memcpy(&udp_buf[4], &timestamp, sizeof(timestamp));
+        uint64_t timestamp_nll = htonll(utimestamp());
+        memcpy(&udp_buf[4], &timestamp_nll, sizeof(uint64_t));
 
         // Add seqnum to UDP buffer header
-        memcpy(&udp_buf[12], &seqnum, sizeof(seqnum));
+        uint32_t seqnum_nl = htonl(seqnum);
+        memcpy(&udp_buf[12], &seqnum_nl, sizeof(uint32_t));
 
         // Cache file to RAM (if needed)
         if (file_cache_index == FILE_CACHE_SIZE) {
@@ -155,7 +157,8 @@ void *file_sender(void *arg) {
         }
 
         // Add packet length to UDP buffer header
-        memcpy(&udp_buf[16], &packet_len, sizeof(packet_len));
+        uint16_t packet_len_ns = htons(packet_len);
+        memcpy(&udp_buf[16], &packet_len_ns, sizeof(uint16_t));
 
         // Sleep (very carefully)
         struct timespec next_time;

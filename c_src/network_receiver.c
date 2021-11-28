@@ -130,8 +130,8 @@ userid");
                 printf("Ignored truncated UDP packet!\n");
                 break;
             }
-            uint32_t new_userid = *(uint32_t *)&header_buf[0];
-            uint16_t packet_len = *(uint16_t *)&header_buf[16];
+            uint32_t new_userid = ntohl(*(uint32_t *)&header_buf[0]);
+            uint16_t packet_len = ntohs(*(uint16_t *)&header_buf[16]);
 
             // Get jitter buffer
             if (userid != new_userid) {
@@ -175,8 +175,9 @@ userid");
             }
 
             // Calculate latency (for developement debugging only)
-            uint64_t timestamp;
-            memcpy(&timestamp, &jb_entry->udp_buf[4], sizeof(uint64_t));
+            uint64_t timestamp_nll;
+            memcpy(&timestamp_nll, &jb_entry->udp_buf[4], sizeof(uint64_t));
+            uint64_t timestamp = ntohll(timestamp_nll);
             uint64_t current_timestamp = utimestamp();
             // NOTE: Disable to allow development machines without NTP client
             //assert(current_timestamp > timestamp);
@@ -184,13 +185,15 @@ userid");
             if (current_timestamp - last_latency_printout >
                 FOUR_SECONDS_IN_US) {
                 // NOTE: Disable to remove noise on stdout
-                //printf("Latency: %fms\n", latency / 1000);
+                printf("Latency: %fms\n", latency / 1000);
                 last_latency_printout = current_timestamp;
             }
 
             // Add seqnum to jitter buffer entry and insert entry
-            uint32_t seqnum;
-            memcpy(&seqnum, &jb_entry->udp_buf[12], sizeof(seqnum));
+            uint32_t seqnum_nl;
+            memcpy(&seqnum_nl, &jb_entry->udp_buf[12], sizeof(uint32_t));
+            uint32_t seqnum = ntohl(seqnum_nl);
+
             if (jb->nentries > 0) {
                 if (jb->tail->seqnum == seqnum) {
                     // NOTE: Disable to remove noise on stdout
