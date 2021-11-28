@@ -38,7 +38,7 @@ init(Parent) ->
           end),
     {ok, #{parent => Parent, sender => Sender}}.
 
-message_handler(State) ->
+message_handler(#{parent := Parent, sender := Sender} = State) ->
     receive
         {call, From, stop} ->
             exit(maps:get(State, sender), kill),
@@ -48,8 +48,8 @@ message_handler(State) ->
         {'EXIT', Parent, Reason} ->
             exit(Reason);
         {'EXIT', Pid, Reason} ->
-            case maps:get(State, sender) of
-                Pid ->
+            case Pid of
+                Sender ->
                     io:format(standard_error,"The sender died: ~p\n", Reason),
                     stop;
                 _ ->
@@ -75,7 +75,7 @@ start_sender(Userid, SrcPort, DestAddresses) ->
                   buffer_size =>
                       ?PERIOD_SIZE_IN_FRAMES * ?BUFFER_MULTIPLICATOR},
             case alsa:open(?DEFAULT_PCM_NAME, capture, WantedHwParams, #{}) of
-                {ok, AlsaHandle, ActualHwParams, ActualSwParams} ->
+                {ok, AlsaHandle, _ActualHwParams, _ActualSwParams} ->
                     sender_loop(Userid, DestAddresses, Socket, AlsaHandle, 1);
                 {error, Reason} ->
                     {error, alsa:strerror(Reason)}
@@ -94,20 +94,20 @@ sender_loop(Userid, DestAddresses, Socket, AlsaHandle, Seqnum) ->
                     Packet/binary>>,
             lists:foreach(
               fun({IpAddress, Port}) ->
-                      case gen_udp:send(Socket, Buf) of
+                      case gen_udp:send(Socket, IpAddress, Port, Buf) of
                           ok ->
                               ok;
                           {error, Reason} ->
-                              io:format(standard_error,"%s\n",
+                              io:format(standard_error,"~s\n",
                                         file:format_error(Reason))
                       end
               end, DestAddresses),
             sender_loop(Userid, DestAddresses, Socket, AlsaHandle, Seqnum + 1);
         {ok, overrun} ->
-            io:format(standard_error, "%s", [alsa:strerror(overrun)]),
+            io:format(standard_error, "~s", [alsa:strerror(overrun)]),
             sender_loop(Userid, DestAddresses, Socket, AlsaHandle, Seqnum);
         {ok, suspend_event} ->
-            io:format(standard_error, "%s", [alsa:strerror(suspend_event)]),
+            io:format(standard_error, "~s", [alsa:strerror(suspend_event)]),
             sender_loop(Userid, DestAddresses, Socket, AlsaHandle, Seqnum);
         {error, Reason} ->
             alsa:close(AlsaHandle),
