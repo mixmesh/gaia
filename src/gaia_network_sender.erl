@@ -41,7 +41,7 @@ init(Parent) ->
 message_handler(#{parent := Parent, sender := Sender} = State) ->
     receive
         {call, From, stop} ->
-            exit(maps:get(State, sender), kill),
+            exit(Sender, kill),
             {stop, From, ok};
         {system, From, Request} ->
             {system, From, Request};
