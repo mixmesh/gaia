@@ -12,7 +12,7 @@ void usage(char *argv[]) {
 Usage: %s [-d addr[:port] -d ...] [-u userid] filename ...\n\
 \n\
 Example:\n\
-  sudo %s -d 172.16.0.95 -d 172.16.0.95:2356 -u 1000\n\
+  sudo %s -d 172.16.0.95 -d 172.16.0.95:2356 -u 1000 foo.s16\n\
 \n\
 Options:\n\
   -d Send audio streams to this destination address and port (%s:%d)\n\
