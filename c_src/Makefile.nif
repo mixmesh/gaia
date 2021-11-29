@@ -13,5 +13,8 @@ all: ../priv/gaia_nif.so
 %.o : %.c
 	$(CC) $(CFLAGS) -c $<
 
+prepare:
+	rm -f *.o
+
 clean:
 	rm -f *.o ../priv/gaia_nif.so
