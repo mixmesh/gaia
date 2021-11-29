@@ -106,10 +106,10 @@ sender_loop(Userid, DestAddresses, Socket, AlsaHandle, Seqnum) ->
               end, DestAddresses),
             sender_loop(Userid, DestAddresses, Socket, AlsaHandle, Seqnum + 1);
         {ok, overrun} ->
-            io:format(standard_error, "~s", [alsa:strerror(overrun)]),
+            io:format(standard_error, "~s\n", [alsa:strerror(overrun)]),
             sender_loop(Userid, DestAddresses, Socket, AlsaHandle, Seqnum);
         {ok, suspend_event} ->
-            io:format(standard_error, "~s", [alsa:strerror(suspend_event)]),
+            io:format(standard_error, "~s\n", [alsa:strerror(suspend_event)]),
             sender_loop(Userid, DestAddresses, Socket, AlsaHandle, Seqnum);
         {error, Reason} ->
             alsa:close(AlsaHandle),
