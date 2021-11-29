@@ -7,7 +7,7 @@ LDFLAGS=-shared
 
 all: ../priv/gaia_nif.so
 
-../priv/gaia_nif.so: audio_sink.o gaia_nif.o jb.o jb_table.o network_receiver.o timing.o
+../priv/gaia_nif.so: audio.o audio_sink.o gaia_nif.o jb.o jb_table.o network_receiver.o timing.o
 	$(CC) $^ $(LDFLAGS) $(LDLIBS) -o ../priv/gaia_nif.so
 
 %.o : %.c

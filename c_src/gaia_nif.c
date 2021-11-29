@@ -39,8 +39,8 @@ ErlNifTid audio_sink_tid;
 jb_table_t *jb_table;
 
 pthread_rwlock_t *params_rwlock;
-network_receiver_params_t receiver_params;
-audio_sink_params_t audio_sink_params;
+network_receiver_params_t receiver_params = {.addr_port = NULL};
+audio_sink_params_t audio_sink_params = {.pcm_name = NULL};
 uint64_t params_last_updated;
 
 void take_params_rdlock(void) {
@@ -108,6 +108,7 @@ bool parse_params(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
                 } else {
                     return false;
                 }
+                enif_map_iterator_next(env, &iter);
             }
         } else {
             return false;
@@ -121,7 +122,7 @@ bool parse_params(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
             ERL_NIF_TERM key, value;
             while (enif_map_iterator_get_pair(env, &iter, &key, &value)) {
                 if (key == ATOM(pcm_name)) {
-                    if (enif_get_string(env, argv[0], audio_sink_pcm_name,
+                    if (enif_get_string(env, value, audio_sink_pcm_name,
                                         MAX_PCM_NAME_LEN, ERL_NIF_LATIN1) < 1) {
                         return false;
                     }
@@ -136,18 +137,24 @@ bool parse_params(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
                 } else {
                     return false;
                 }
+                enif_map_iterator_next(env, &iter);
             }
         } else {
             return false;
         }
 
-        free(receiver_params.addr_port);
+
+        if (receiver_params.addr_port != NULL) {
+            free(receiver_params.addr_port);
+        }
         receiver_params.addr_port = malloc(sizeof(addr_port_t));
         receiver_params.addr_port->addr = network_receiver_addr;
         receiver_params.addr_port->port = network_receiver_port;
         receiver_params.opus_enabled = network_receiver_opus_enabled;
 
-        free(audio_sink_params.pcm_name);
+        if (audio_sink_params.pcm_name != NULL) {
+            free(audio_sink_params.pcm_name);
+        }
         audio_sink_params.pcm_name = strdup(audio_sink_pcm_name);
         audio_sink_params.opus_enabled = audio_sink_opus_enabled;
 
@@ -176,13 +183,15 @@ static ERL_NIF_TERM _start(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) 
     params_rwlock = malloc(sizeof(pthread_rwlock_t));
     assert(pthread_rwlock_init(params_rwlock, NULL) == 0);
 
+    jb_table = jb_table_new();
+
     // Start network receiver thread
     enif_thread_create("network_receiver", &network_receiver_tid,
-                       network_receiver, NULL, (void *)&receiver_params);
+                       network_receiver, (void *)&receiver_params, NULL);
 
     // Start audio sink thread
-    enif_thread_create("audio_sink", &audio_sink_tid, audio_sink, NULL,
-                       (void *)&audio_sink_params);
+    enif_thread_create("audio_sink", &audio_sink_tid, audio_sink,
+                       (void *)&audio_sink_params, NULL);
 
     started = true;
     return ATOM(ok);
@@ -205,6 +214,8 @@ static ERL_NIF_TERM _stop(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
     take_params_wrlock();
     assert(pthread_rwlock_destroy(params_rwlock) == 0);
     free(params_rwlock);
+
+    jb_table_free(jb_table, false);
 
     started = false;
     return ATOM(ok);
@@ -259,4 +270,4 @@ static ErlNifFunc nif_funcs[] =
      {"set_params", 1, _set_params, 0},
     };
 
-ERL_NIF_INIT(alsa, nif_funcs, load, NULL, NULL, unload);
+ERL_NIF_INIT(gaia_nif, nif_funcs, load, NULL, NULL, unload);

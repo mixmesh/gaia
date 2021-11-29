@@ -36,7 +36,7 @@ preloaded_atoms() ->
 -spec start(params()) -> ok.
 
 start() ->
-    start({#{addr_port => {?DEFAULT_ADDR, ?DEFAULT_PORT},
+    start({#{addr_port => {?DEFAULT_ADDR_STRING, ?DEFAULT_PORT},
              opus_enabled => false},
            #{pcm_name => "hw:0,0",
              opus_enabled => false}}).

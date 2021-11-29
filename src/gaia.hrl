@@ -5,6 +5,7 @@
 
 -define(DEFAULT_PCM_NAME, "hw:0,0").
 -define(DEFAULT_ADDR, {127, 0, 0, 1}).
+-define(DEFAULT_ADDR_STRING, "127.0.0.1").
 -define(DEFAULT_PORT, 2305).
 
 -define(FORMAT, ?SND_PCM_FORMAT_S16_LE).
