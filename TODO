@@ -1,3 +1,15 @@
+* Fixa gaia:stop() (set variable to threads)
+* Wrapper for pthreads stuff
+* Use exit more sparingly
+* Start to use xylanslog macros for logging
+
+* write gaia_serv.erl
+  * write gaia_config.erl
+  * sends multicast (as defined in config)
+  * listens on multicast (update connfig)
+  * send config to gaia process and threads to 
+
+
 == STOP! THINK!
 
 * Nodis/multicasting
