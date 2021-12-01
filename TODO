@@ -1,4 +1,4 @@
-* Use exit more sparingly, replace with pthread_exit() + add stop variable so gaia_nif:stop() works
+* add stop variable so gaia_nif:stop() works
 
 * Start to use xylanslog macros for logging
 
