@@ -95,3 +95,11 @@ int thread_mutex_unlock(thread_mutex_t *mutex) {
     return pthread_mutex_unlock(mutex->pthread_mutex);
 #endif
 }
+
+void thread_exit(void *retval) {
+#ifdef NIF
+    enif_thread_exit(retval);
+#else
+    pthread_exit(retval);
+#endif
+}

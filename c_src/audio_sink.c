@@ -114,7 +114,8 @@ playback entry %d but got %d (%d will be reused as %d!)",
                                      BUFFER_MULTIPLICATOR, &audio_info)) < 0) {
                     DEBUGF("audio_new: Could not initialize audio: %s",
                            snd_strerror(err));
-                    exit(AUDIO_ERROR);
+                    int retval = AUDIO_ERROR;
+                    thread_exit(&retval);
                 }
                 audio_print_parameters(audio_info, "sink");
                 assert(PERIOD_SIZE_IN_FRAMES ==
@@ -145,5 +146,7 @@ playback entry %d but got %d (%d will be reused as %d!)",
 
     DEBUGP("audio_sink is shutting down!!!");
     audio_free(audio_info);
-    exit(AUDIO_SINK_DIED);
+    int retval = AUDIO_SINK_DIED;
+    thread_exit(&retval);
+    return NULL;
 }

@@ -204,6 +204,7 @@ static ERL_NIF_TERM _stop(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
         return enif_make_tuple2(env, ATOM(error), ATOM(not_started));
     }
 
+    // FIXME: BROEKN
     // Shutdown threads
     enif_thread_exit(network_receiver_tid);
     enif_thread_exit(audio_sink_tid);

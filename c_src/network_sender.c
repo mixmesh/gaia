@@ -6,6 +6,7 @@
 #include "network_sender.h"
 #include "audio.h"
 #include "gaia_utils.h"
+#include "threadlib.h"
 
 void *network_sender(void *arg) {
     int err;
@@ -19,7 +20,8 @@ void *network_sender(void *arg) {
 #ifdef DEBUG
         perror("socket: Socket creation failed");
 #endif
-        exit(SOCKET_ERROR);
+        int retval = SOCKET_ERROR;
+        thread_exit(&retval);
     }
 
     // Resize socket send buffer
@@ -36,13 +38,15 @@ void *network_sender(void *arg) {
 #ifdef DEBUG
         perror("fcntl: Socket could not be made non-blocking");
 #endif
-        exit(SOCKET_ERROR);
+        int retval = SOCKET_ERROR;
+        thread_exit(&retval);
     }
     if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) < 0) {
 #ifdef DEBUG
         perror("fcntl: Socket could not be made non-blocking");
 #endif
-        exit(SOCKET_ERROR);
+        int retval = SOCKET_ERROR;
+        thread_exit(&retval);
     }
 
     // Create destination addresses
@@ -74,7 +78,8 @@ void *network_sender(void *arg) {
                          PERIOD_SIZE_IN_FRAMES, BUFFER_MULTIPLICATOR,
                          &audio_info)) < 0) {
         DEBUGF("audio_new: Could not initialize audio: %s", snd_strerror(err));
-        exit(AUDIO_ERROR);
+        int retval = AUDIO_ERROR;
+        thread_exit(&retval);
     }
     audio_print_parameters(audio_info, "sender");
     assert(PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
@@ -164,5 +169,7 @@ void *network_sender(void *arg) {
     audio_free(audio_info);
     free(udp_buf);
     close(sockfd);
-    exit(NETWORK_SENDER_DIED);
+    int retval = NETWORK_SENDER_DIED;
+    thread_exit(&retval);
+    return NULL;
 }

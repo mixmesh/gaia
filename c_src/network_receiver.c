@@ -33,7 +33,8 @@ void *network_receiver(void *arg) {
 #ifdef DEBUG
         perror("socket: Socket creation failed");
 #endif
-        exit(SOCKET_ERROR);
+        int retval = SOCKET_ERROR;
+        thread_exit(&retval);
     }
 
     struct sockaddr_in addr;
@@ -46,7 +47,8 @@ void *network_receiver(void *arg) {
 #ifdef DEBUG
         perror("bind: Binding of socket failed");
 #endif
-        exit(SOCKET_ERROR);
+        int retval = SOCKET_ERROR;
+        thread_exit(&retval);
     }
 
     struct timeval zero_timeout = {.tv_usec = 0, .tv_sec = 0};
@@ -255,5 +257,7 @@ userid");
  bail_out:
     DEBUGP("network_receiver is shutting down!!!");
     close(sockfd);
-    exit(NETWORK_RECEIVER_DIED);
+    int retval = NETWORK_RECEIVER_DIED;
+    thread_exit(&retval);
+    return NULL;
 }
