@@ -203,7 +203,6 @@ userid");
             latency = latency * 0.9 + (current_timestamp - timestamp) * 0.1;
             if (current_timestamp - last_latency_printout >
                 FOUR_SECONDS_IN_US) {
-                // NOTE: Disable to remove noise on stdout
                 DEBUGF("Latency: %fms", latency / 1000);
                 last_latency_printout = current_timestamp;
             }
@@ -215,10 +214,8 @@ userid");
 
             if (jb->nentries > 0) {
                 if (jb->tail->seqnum == seqnum) {
-                    // NOTE: Disable to remove noise on stdout
                     DEBUGF("Duplicated UDP packet (%d)", seqnum);
                 } else if (jb->tail->seqnum + 1 != seqnum) {
-                    // NOTE: Disable to remove noise on stdout
                     DEBUGF("Missing UDP packet %d. Got %d instead.",
                            jb->tail->seqnum + 1, seqnum);
                 }

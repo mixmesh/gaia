@@ -57,7 +57,6 @@ userid %d",
                             // Seqnum mismatch. Use the old playback entry
                             // again!
                             assert(jb->playback->prev->seqnum > next_seqnum);
-                            // NOTE: Disable to remove noise on stdout
                             DEBUGF("Jitter buffer for userid %d expected \
 playback entry %d but got %d (%d will be reused as %d!)",
                                    jb->userid, next_seqnum,
