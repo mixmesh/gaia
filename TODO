@@ -1,18 +1,23 @@
-* Fixa gaia:stop() (set variable to threads)
-* Wrapper for pthreads stuff
-* Use exit more sparingly
+* Use exit more sparingly, replace with pthread_exit()
+* Use DEBUG to turn on DEBUGF, remove all printfs in c
 * Start to use xylanslog macros for logging
 
-* write gaia_serv.erl
-  * write gaia_config.erl
+* Write a json config for my exampke config (gaia_schema.erl)
+
+* write audio_sink_serv.erl
+  * rewrite gaia_sender_server.erl to use it
+
+* write gaia_serv.erl (see tavla)
   * sends multicast (as defined in config)
   * listens on multicast (update connfig)
   * send config to gaia process and threads to 
+  * and more
 
+* write gaia_app.erl and gaia_sup.erl (update app file)
+
+* write gaia_command_serv.erl
 
 == STOP! THINK!
-
-* Nodis/multicasting
 
 * Adaptive jitter buffer
   * Look at the 94 paper and work with pitch scaling
