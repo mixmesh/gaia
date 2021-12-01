@@ -98,12 +98,12 @@ playback entry %d but got %d (%d will be reused as %d!)\n",
                     index, jb->entries);
                 */
             }
-            jb_release_lock(jb);
+            jb_release_wrlock(jb);
         };
 
         jb_table_take_rdlock(jb_table);
         jb_table_foreach(jb_table, step_playback_entry);
-        jb_table_release_lock(jb_table);
+        jb_table_release_rdlock(jb_table);
 
         if (npackets > 0) {
             // Open audio device (if needed)

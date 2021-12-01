@@ -3,9 +3,23 @@
 
 #include <arpa/inet.h>
 
+#ifdef DEBUG
+#define DEBUGF(f,a...) fprintf(stderr, f "\r\n", a)
+#else
+#define DEBUGF(f,a...)
+#endif
+
+#if __BIG_ENDIAN__
+#define htonll(x) (x)
+#define ntohll(x) (x)
+#else
+#define htonll(x) (((uint64_t)htonl((x) & 0xFFFFFFFF) << 32) | htonl((x) >> 32))
+#define ntohll(x) (((uint64_t)ntohl((x) & 0xFFFFFFFF) << 32) | ntohl((x) >> 32))
+#endif
+
 #define MAX_USERS 128
 
-#define DEFAULT_PCM_NAME "plughw:0,0"
+#define DEFAULT_PCM_NAME "hw:0,0"
 #define DEFAULT_ADDR "127.0.0.1"
 #define DEFAULT_PORT 2305
 
@@ -15,7 +29,6 @@
 #define FRAME_SIZE_IN_BYTES (CHANNELS * SAMPLE_SIZE_IN_BYTES)
 #define RATE_IN_HZ 48000
 
-// Let it be a power to 2
 #define PERIOD_SIZE_IN_FRAMES 960
 #define PERIOD_SIZE_IN_BYTES (PERIOD_SIZE_IN_FRAMES * FRAME_SIZE_IN_BYTES)
 #define PERIOD_SIZE_IN_MS (PERIOD_SIZE_IN_FRAMES / (RATE_IN_HZ / 1000.0))
@@ -50,13 +63,5 @@
 #define NETWORK_RECEIVER_DIED     9
 #define NETWORK_SENDER_DIED      10
 #define INTERNAL_ERROR           11
-
-#if __BIG_ENDIAN__
-#define htonll(x) (x)
-#define ntohll(x) (x)
-#else
-#define htonll(x) (((uint64_t)htonl((x) & 0xFFFFFFFF) << 32) | htonl((x) >> 32))
-#define ntohll(x) (((uint64_t)ntohl((x) & 0xFFFFFFFF) << 32) | ntohl((x) >> 32))
-#endif
 
 #endif

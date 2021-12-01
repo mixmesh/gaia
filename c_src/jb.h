@@ -1,10 +1,10 @@
 #ifndef _JB_H_
 #define _JB_H_
 
-#include <pthread.h>
 #include <stdbool.h>
 #include <opus/opus.h>
 #include "uthash/uthash.h"
+#include "threadlib.h"
 
 typedef struct jb_entry {
     uint32_t seqnum;
@@ -20,7 +20,7 @@ typedef struct {
     uint32_t playback_seqnum;
     bool exhausted;
     uint32_t nentries;
-    pthread_rwlock_t *rwlock;
+    thread_rwlock_t *rwlock;
     uint16_t npeak_values;
     uint16_t *peak_values;
     uint16_t peak_index;
@@ -45,7 +45,8 @@ jb_entry_t *jb_get_entry(jb_t *jb, uint32_t index);
 uint32_t jb_get_index(jb_t *jb, jb_entry_t *jb_entry);
 void jb_take_rdlock(jb_t *jb);
 void jb_take_wrlock(jb_t *jb);
-void jb_release_lock(jb_t *jb);
+void jb_release_rdlock(jb_t *jb);
+void jb_release_wrlock(jb_t *jb);
 
 jb_entry_t *jb_entry_new(uint16_t udp_buf_size, uint16_t period_buf_size);
 void jb_entry_free(jb_entry_t *jb_entry);

@@ -12,8 +12,8 @@ jb_t *jb_new(uint32_t userid, bool opus_enabled) {
     jb->playback_seqnum = 0;
     jb->exhausted = false;
     jb->nentries = 0;
-    jb->rwlock = malloc(sizeof(pthread_rwlock_t));
-    assert(pthread_rwlock_init(jb->rwlock, NULL) == 0);
+    jb->rwlock = malloc(sizeof(thread_rwlock_t));
+    assert(thread_rwlock_init(jb->rwlock, "jb") == 0);
     jb->npeak_values = PEAK_AVERAGE_PERIOD_IN_MS / PERIOD_SIZE_IN_MS;
     jb->peak_values = calloc(jb->npeak_values, sizeof(uint16_t));
     jb->peak_index = 0;
@@ -35,6 +35,7 @@ jb_t *jb_new(uint32_t userid, bool opus_enabled) {
     }
 
 void jb_free(jb_t *jb, bool free_entries_only) {
+    jb_take_wrlock(jb);
     jb_entry_t *jb_entry = jb->tail;
     while (jb_entry != NULL) {
         jb_entry_t *next_jb_entry = jb_entry->next;
@@ -51,8 +52,10 @@ void jb_free(jb_t *jb, bool free_entries_only) {
         jb->playback_seqnum = 0;
         jb->exhausted = false;
         jb->nentries = 0;
+        jb_release_wrlock(jb);
     } else {
-        assert(pthread_rwlock_destroy(jb->rwlock) == 0);
+        jb_release_wrlock(jb);
+        assert(thread_rwlock_destroy(jb->rwlock) == 0);
         free(jb->rwlock);
         free(jb->peak_values);
         free(jb);
@@ -149,15 +152,19 @@ uint32_t jb_get_index(jb_t *jb, jb_entry_t *jb_entry) {
 }
 
 void jb_take_rdlock(jb_t *jb) {
-    assert(pthread_rwlock_rdlock(jb->rwlock) == 0);
+    assert(thread_rwlock_rdlock(jb->rwlock) == 0);
 }
 
 void jb_take_wrlock(jb_t *jb) {
-    assert(pthread_rwlock_wrlock(jb->rwlock) == 0);
+    assert(thread_rwlock_wrlock(jb->rwlock) == 0);
 }
 
-void jb_release_lock(jb_t *jb) {
-    assert(pthread_rwlock_unlock(jb->rwlock) == 0);
+void jb_release_rdlock(jb_t *jb) {
+    assert(thread_rwlock_rdunlock(jb->rwlock) == 0);
+}
+
+void jb_release_wrlock(jb_t *jb) {
+    assert(thread_rwlock_wrunlock(jb->rwlock) == 0);
 }
 
 jb_entry_t *jb_entry_new(uint16_t udp_buf_size, uint16_t period_buf_size) {

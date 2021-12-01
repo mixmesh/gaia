@@ -211,7 +211,6 @@ static ERL_NIF_TERM _stop(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
     enif_thread_exit(audio_sink_tid);
 
     // Remove locks
-    take_params_wrlock();
     assert(pthread_rwlock_destroy(params_rwlock) == 0);
     free(params_rwlock);
 

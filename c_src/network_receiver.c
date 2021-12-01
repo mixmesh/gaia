@@ -142,7 +142,7 @@ userid");
                     assert(jb_table_add(jb_table, jb) == JB_TABLE_SUCCESS);
                     jb_table_downgrade_to_rdlock(jb_table);
                 }
-                jb_table_release_lock(jb_table);
+                jb_table_release_rdlock(jb_table);
                 userid = new_userid;
             }
 
@@ -150,7 +150,7 @@ userid");
             if (jb->exhausted) {
                 jb_take_wrlock(jb);
                 jb_free(jb, true);
-                jb_release_lock(jb);
+                jb_release_wrlock(jb);
             }
 
             // Prepare new jitter buffer entry
@@ -158,7 +158,7 @@ userid");
             if (jb->nentries > PERIODS_IN_JITTER_BUFFER) {
                 jb_take_wrlock(jb);
                 jb_entry = jb_pop(jb);
-                jb_release_lock(jb);
+                jb_release_wrlock(jb);
             } else {
                 jb_entry = jb_entry_new(udp_max_buf_size, PERIOD_SIZE_IN_BYTES);
             }
@@ -222,19 +222,17 @@ userid");
                     root_mean_square(jb->peak_values, jb->npeak_values);
                 jb_table_take_wrlock(jb_table);
                 jb_table_sort(jb_table);
-                jb_table_release_lock(jb_table);
+                jb_table_release_wrlock(jb_table);
             }
 
             // Insert buffer entry
             jb_take_wrlock(jb);
             assert(jb_insert(jb, jb_entry) != 0);
-            jb_release_lock(jb);
+            jb_release_wrlock(jb);
         }
 
         printf("Erase all jitter buffers\n");
-        jb_table_take_wrlock(jb_table);
         jb_table_free(jb_table, true);
-        jb_table_release_lock(jb_table);
     }
 
  bail_out:

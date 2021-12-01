@@ -11,25 +11,26 @@
 jb_table_t *jb_table_new(void) {
     jb_table_t *jb_table = malloc(sizeof(jb_table_t));
     jb_table->jb = NULL;
-    jb_table->rwlock = malloc(sizeof(pthread_rwlock_t));
-    assert(pthread_rwlock_init(jb_table->rwlock, NULL) == 0);
-    jb_table->lock_mutex = malloc(sizeof(pthread_mutex_t));
-    assert(pthread_mutex_init(jb_table->lock_mutex, NULL) == 0);
+    jb_table->rwlock = malloc(sizeof(thread_rwlock_t));
+    assert(thread_rwlock_init(jb_table->rwlock, "jb_table") == 0);
+    jb_table->lock_mutex = malloc(sizeof(thread_mutex_t));
+    assert(thread_mutex_init(jb_table->lock_mutex, "jb_table") == 0);
     return jb_table;
 }
 
 void jb_table_free(jb_table_t *jb_table, bool free_list_only) {
+    jb_table_take_wrlock(jb_table);
     jb_t *jb, *tmp;
     HASH_ITER(hh, jb_table->jb, jb, tmp) {
-        jb_take_wrlock(jb);
         jb_free(jb, false);
     }
+    jb_table_release_wrlock(jb_table);
     if (free_list_only) {
         jb_table->jb = NULL;
     } else {
-        assert(pthread_rwlock_destroy(jb_table->rwlock) == 0);
+        assert(thread_rwlock_destroy(jb_table->rwlock) == 0);
         free(jb_table->rwlock);
-        assert(pthread_mutex_destroy(jb_table->lock_mutex) == 0);
+        assert(thread_mutex_destroy(jb_table->lock_mutex) == 0);
         free(jb_table->lock_mutex);
         free(jb_table);
     }
@@ -77,31 +78,35 @@ void jb_table_sort(jb_table_t *jb_table) {
 }
 
 void jb_table_take_rdlock(jb_table_t *jb_table) {
-    assert(pthread_mutex_lock(jb_table->lock_mutex) == 0);
-    assert(pthread_rwlock_rdlock(jb_table->rwlock) == 0);
-    assert(pthread_mutex_unlock(jb_table->lock_mutex) == 0);
+    assert(thread_mutex_lock(jb_table->lock_mutex) == 0);
+    assert(thread_rwlock_rdlock(jb_table->rwlock) == 0);
+    assert(thread_mutex_unlock(jb_table->lock_mutex) == 0);
 }
 
 void jb_table_take_wrlock(jb_table_t *jb_table) {
-    assert(pthread_mutex_lock(jb_table->lock_mutex) == 0);
-    assert(pthread_rwlock_wrlock(jb_table->rwlock) == 0);
-    assert(pthread_mutex_unlock(jb_table->lock_mutex) == 0);
+    assert(thread_mutex_lock(jb_table->lock_mutex) == 0);
+    assert(thread_rwlock_wrlock(jb_table->rwlock) == 0);
+    assert(thread_mutex_unlock(jb_table->lock_mutex) == 0);
 }
 
-void jb_table_release_lock(jb_table_t *jb_table) {
-    assert(pthread_rwlock_unlock(jb_table->rwlock) == 0);
+void jb_table_release_rdlock(jb_table_t *jb_table) {
+    assert(thread_rwlock_rdunlock(jb_table->rwlock) == 0);
+}
+
+void jb_table_release_wrlock(jb_table_t *jb_table) {
+    assert(thread_rwlock_wrunlock(jb_table->rwlock) == 0);
 }
 
 void jb_table_upgrade_to_wrlock(jb_table_t *jb_table) {
-    assert(pthread_mutex_lock(jb_table->lock_mutex) == 0);
-    assert(pthread_rwlock_unlock(jb_table->rwlock) == 0);
-    assert(pthread_rwlock_wrlock(jb_table->rwlock) == 0);
-    assert(pthread_mutex_unlock(jb_table->lock_mutex) == 0);
+    assert(thread_mutex_lock(jb_table->lock_mutex) == 0);
+    assert(thread_rwlock_rdunlock(jb_table->rwlock) == 0);
+    assert(thread_rwlock_wrlock(jb_table->rwlock) == 0);
+    assert(thread_mutex_unlock(jb_table->lock_mutex) == 0);
 }
 
 void jb_table_downgrade_to_rdlock(jb_table_t *jb_table) {
-    assert(pthread_mutex_lock(jb_table->lock_mutex) == 0);
-    assert(pthread_rwlock_unlock(jb_table->rwlock) == 0);
-    assert(pthread_rwlock_rdlock(jb_table->rwlock) == 0);
-    assert(pthread_mutex_unlock(jb_table->lock_mutex) == 0);
+    assert(thread_mutex_lock(jb_table->lock_mutex) == 0);
+    assert(thread_rwlock_wrunlock(jb_table->rwlock) == 0);
+    assert(thread_rwlock_rdlock(jb_table->rwlock) == 0);
+    assert(thread_mutex_unlock(jb_table->lock_mutex) == 0);
 }
