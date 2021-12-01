@@ -6,9 +6,7 @@
 #include "audio_sink.h"
 #include "network_receiver.h"
 #include "timing.h"
-
-// #define DEBUGF(f,a...) fprintf(stderr, f "\r\n", a)
-#define DEBUGF(f,a...)
+#include "gaia_utils.h"
 
 #define ATOM(name) atm_##name
 

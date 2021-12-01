@@ -3,6 +3,7 @@
 #include "audio_sink.h"
 #include "globals.h"
 #include "timing.h"
+#include "gaia_utils.h"
 
 #define WAIT_IN_MS 2000
 
@@ -30,19 +31,18 @@ void *audio_sink(void *arg) {
             if (jb->nentries > JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS) {
                 bool skip_packet = false;
                 if (jb->playback == NULL) {
-                    printf("Jitter buffer (re)initializes playback for userid \
-%d\n",
+                    DEBUGF("Jitter buffer (re)initializes playback for userid \
+%d",
                            jb->userid);
                     reset_playback_delay(jb);
                 } else if (jb->playback == jb->tail) {
-                    printf("Jitter buffer playback is exhausted for userid \
-%d\n",
+                    DEBUGF("Jitter buffer playback is exhausted for userid %d",
                            jb->userid);
                     jb->exhausted = true;
                     skip_packet = true;
                 } else if (jb->playback->seqnum != jb->playback_seqnum) {
-                    printf("Jitter buffer playback has wrapped around for \
-userid %d.\n",
+                    DEBUGF("Jitter buffer playback has wrapped around for \
+userid %d",
                            jb->userid);
                     reset_playback_delay(jb);
                 } else {
@@ -58,8 +58,8 @@ userid %d.\n",
                             // again!
                             assert(jb->playback->prev->seqnum > next_seqnum);
                             // NOTE: Disable to remove noise on stdout
-                            printf("Jitter buffer for userid %d expected \
-playback entry %d but got %d (%d will be reused as %d!)\n",
+                            DEBUGF("Jitter buffer for userid %d expected \
+playback entry %d but got %d (%d will be reused as %d!)",
                                    jb->userid, next_seqnum,
                                    jb->playback->prev->seqnum,
                                    jb->playback->prev->seqnum, next_seqnum);
@@ -81,8 +81,7 @@ playback entry %d but got %d (%d will be reused as %d!)\n",
                                          (opus_int16 *)jb->playback->period_buf,
                                          OPUS_MAX_PACKET_LEN_IN_BYTES,
                                          0)) < 0) {
-                            fprintf(stderr, "Failed to Opus decode: %s\n",
-                                    opus_strerror(frames));
+                            DEBUGF("Failed to Opus decode: %s", opus_strerror(frames));
                         }
                         assert(frames == PERIOD_SIZE_IN_FRAMES);
                         packet[npackets++] = jb->playback->period_buf;
@@ -94,8 +93,8 @@ playback entry %d but got %d (%d will be reused as %d!)\n",
                 /*
                 // NOTE: This debug printout is too expensive
                 uint32_t index = jb_get_index(jb, jb->playback);
-                printf("Playback index now is %d out of %d total entries\n",
-                    index, jb->entries);
+                DEBUGF("Playback index now is %d out of %d total entries",
+                       index, jb->entries);
                 */
             }
             jb_release_wrlock(jb);
@@ -113,15 +112,14 @@ playback entry %d but got %d (%d will be reused as %d!)\n",
                                      SAMPLE_SIZE_IN_BYTES,
                                      PERIOD_SIZE_IN_FRAMES,
                                      BUFFER_MULTIPLICATOR, &audio_info)) < 0) {
-                    fprintf(stderr, "audio_new: Could not initialize audio: \
-%s\n",
-                            snd_strerror(err));
+                    DEBUGF("audio_new: Could not initialize audio: %s",
+                           snd_strerror(err));
                     exit(AUDIO_ERROR);
                 }
                 audio_print_parameters(audio_info, "sink");
                 assert(PERIOD_SIZE_IN_FRAMES ==
                        audio_info->period_size_in_frames);
-                printf("Audio device has been opened for playback\n");
+                DEBUGP("Audio device has been opened for playback");
             }
             if (npackets == 1) {
                 audio_write(audio_info, packet[0], PERIOD_SIZE_IN_FRAMES);
@@ -134,18 +132,18 @@ playback entry %d but got %d (%d will be reused as %d!)\n",
                 audio_write(audio_info, mixed_packet, PERIOD_SIZE_IN_FRAMES);
             }
         } else {
-            fprintf(stderr, "No data available in jitter buffers\n");
+            DEBUGP("No data available in jitter buffers");
             // Close audio device and wait a bit
             if (audio_info != NULL) {
                 audio_free(audio_info);
                 audio_info = NULL;
             }
-            fprintf(stderr, "Audio sink sleeps for %dms\n", WAIT_IN_MS);
+            DEBUGF("Audio sink sleeps for %dms", WAIT_IN_MS);
             msleep(WAIT_IN_MS);
         }
     }
 
-    fprintf(stderr, "audio_sink is shutting down!!!\n");
+    DEBUGP("audio_sink is shutting down!!!");
     audio_free(audio_info);
     exit(AUDIO_SINK_DIED);
 }

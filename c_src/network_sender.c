@@ -5,6 +5,7 @@
 #include "timing.h"
 #include "network_sender.h"
 #include "audio.h"
+#include "gaia_utils.h"
 
 void *network_sender(void *arg) {
     int err;
@@ -15,7 +16,9 @@ void *network_sender(void *arg) {
     // Create socket
     int sockfd = -1;
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+#ifdef DEBUG
         perror("socket: Socket creation failed");
+#endif
         exit(SOCKET_ERROR);
     }
 
@@ -30,11 +33,15 @@ void *network_sender(void *arg) {
     // Make socket non-blocking
     int flags = fcntl(sockfd, F_GETFL, 0);
     if (flags < 0) {
+#ifdef DEBUG
         perror("fcntl: Socket could not be made non-blocking");
+#endif
         exit(SOCKET_ERROR);
     }
     if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) < 0) {
+#ifdef DEBUG
         perror("fcntl: Socket could not be made non-blocking");
+#endif
         exit(SOCKET_ERROR);
     }
 
@@ -53,8 +60,8 @@ void *network_sender(void *arg) {
         opus_encoder = opus_encoder_create(RATE_IN_HZ, CHANNELS,
                                            OPUS_APPLICATION_AUDIO, &err);
         if (err < 0) {
-            fprintf(stderr, "ERROR: Failed to create an encoder: %s\n",
-                    opus_strerror(err));
+            DEBUGF("ERROR: Failed to create an encoder: %s",
+                   opus_strerror(err));
         }
         assert(err == 0);
     }
@@ -66,14 +73,13 @@ void *network_sender(void *arg) {
                          FORMAT, CHANNELS, RATE_IN_HZ, SAMPLE_SIZE_IN_BYTES,
                          PERIOD_SIZE_IN_FRAMES, BUFFER_MULTIPLICATOR,
                          &audio_info)) < 0) {
-        fprintf(stderr, "audio_new: Could not initialize audio: %s\n",
-                snd_strerror(err));
+        DEBUGF("audio_new: Could not initialize audio: %s", snd_strerror(err));
         exit(AUDIO_ERROR);
     }
     audio_print_parameters(audio_info, "sender");
     assert(PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
 
-    printf("Period size is %d bytes (%fms)\n", PERIOD_SIZE_IN_BYTES,
+    DEBUGF("Period size is %d bytes (%fms)", PERIOD_SIZE_IN_BYTES,
            PERIOD_SIZE_IN_MS);
 
     // Allocate memory for UDP buffer
@@ -96,7 +102,7 @@ void *network_sender(void *arg) {
     uint32_t seqnum = 1;
 
     // Read from audio device and write to socket
-    printf("Sending audio...\n");
+    DEBUGP("Sending audio...");
     while (true) {
         // Add timestamp to UDP buffer header
         uint64_t timestamp_nll = htonll(utimestamp());
@@ -119,8 +125,7 @@ void *network_sender(void *arg) {
                                           (opus_int16 *)period_buf,
                                           frames, &udp_buf[HEADER_SIZE],
                                           OPUS_MAX_PACKET_LEN_IN_BYTES)) < 0) {
-                fprintf(stderr, "Failed to Opus encode: %s\n",
-                        opus_strerror(packet_len));
+                DEBUGF("Failed to Opus encode: %s", opus_strerror(packet_len));
                 break;
             }
         } else {
@@ -144,16 +149,18 @@ void *network_sender(void *arg) {
             ssize_t n = sendto(sockfd, udp_buf, udp_buf_size, 0,
                                (struct sockaddr *)&addrs[i], sizeof(addrs[i]));
             if (n < 0) {
+#ifdef DEBUG
                 perror("sendto: Failed to write to socket");
+#endif
             } else if (n != udp_buf_size) {
-                printf("Too few bytes written to socket!\n");
+                DEBUGP("Too few bytes written to socket!");
             }
         }
 
         seqnum++;
     }
 
-    fprintf(stderr, "network_sender is shutting down!!!\n");
+    DEBUGP("network_sender is shutting down!!!");
     audio_free(audio_info);
     free(udp_buf);
     close(sockfd);

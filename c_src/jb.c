@@ -4,6 +4,7 @@
 #include "jb.h"
 #include "bits.h"
 #include "globals.h"
+#include "gaia_utils.h"
 
 jb_t *jb_new(uint32_t userid, bool opus_enabled) {
     jb_t *jb = malloc(sizeof(jb_t));
@@ -22,8 +23,7 @@ jb_t *jb_new(uint32_t userid, bool opus_enabled) {
         int err;
         jb->opus_decoder = opus_decoder_create(RATE_IN_HZ, CHANNELS, &err);
         if (err < 0) {
-            fprintf(stderr, "ERROR: Failed to create decoder: %s\n",
-                    opus_strerror(err));
+            DEBUGF("ERROR: Failed to create decoder: %s\n", opus_strerror(err));
         }
         assert(err == 0);
     } else {

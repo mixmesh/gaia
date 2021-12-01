@@ -1,5 +1,6 @@
 #include "audio.h"
 #include "globals.h"
+#include "gaia_utils.h"
 
 #define M  (1 << 15)
 #define MM (1 << 31)
@@ -62,10 +63,8 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
         return err;
     }
     if (desired_period_size_in_frames != period_size_in_frames) {
-        fprintf(stderr,
-                "NOTE: Desired period size was %ld bytes but it was set to \
-%ld\n",
-                desired_period_size_in_frames, period_size_in_frames);
+        DEBUGF("NOTE: Desired period size was %ld bytes but it was set to %ld",
+               desired_period_size_in_frames, period_size_in_frames);
     }
 
     snd_pcm_uframes_t desired_buffer_size_in_frames =
@@ -78,10 +77,8 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
         return err;
     }
     if (desired_buffer_size_in_frames != buffer_size_in_frames) {
-        fprintf(stderr,
-                "NOTE: Desired buffer size was %ld bytes but it was set to \
-%ld\n",
-                desired_buffer_size_in_frames, buffer_size_in_frames);
+        DEBUGF("NOTE: Desired buffer size was %ld bytes but it was set to %ld",
+               desired_buffer_size_in_frames, buffer_size_in_frames);
     }
 
     if ((err = snd_pcm_hw_params(pcm, hw_params)) < 0) {
@@ -150,22 +147,24 @@ void audio_free(audio_info_t *audio_info) {
 }
 
 void audio_print_parameters(audio_info_t *audio_info, char *who) {
+#ifdef DEBUG
     snd_output_t *output;
     snd_output_stdio_attach(&output, stderr, 0);
     snd_output_printf(output, "Audio %s settings:\n", who);
     snd_pcm_dump_setup(audio_info->pcm, output);
     snd_output_close(output);
+#endif
 }
 
 snd_pcm_uframes_t audio_write(audio_info_t *audio_info, uint8_t *data,
                               snd_pcm_uframes_t nframes) {
     snd_pcm_uframes_t frames = snd_pcm_writei(audio_info->pcm, data, nframes);
     if (frames < 0) {
-        printf("snd_pcm_readi: Failed to write to audio device: %s\n",
+        DEBUGF("snd_pcm_readi: Failed to write to audio device: %s",
                snd_strerror(frames));
         if (snd_pcm_recover(audio_info->pcm, frames, 0) < 0) {
-            fprintf(stderr, "snd_pcm_readi: Failed to recover audio device: %s\n",
-                    snd_strerror(frames));
+            DEBUGF("snd_pcm_readi: Failed to recover audio device: %s",
+                   snd_strerror(frames));
             return AUDIO_NOT_RECOVERED;
         }
     }
@@ -176,12 +175,11 @@ int audio_read(audio_info_t *audio_info, uint8_t *data,
                snd_pcm_uframes_t nframes) {
     snd_pcm_uframes_t frames = snd_pcm_readi(audio_info->pcm, data, nframes);
     if (frames < 0) {
-        printf("snd_pcm_readi: Failed to read from audio device: %s\n",
+        DEBUGF("snd_pcm_readi: Failed to read from audio device: %s",
                snd_strerror(frames));
         if (snd_pcm_recover(audio_info->pcm, frames, 0) < 0) {
-            fprintf(stderr, "snd_pcm_readi: Failed to recover audio device: \
-%s\n",
-                    snd_strerror(frames));
+            DEBUGF("snd_pcm_readi: Failed to recover audio device: %s",
+                   snd_strerror(frames));
             return AUDIO_NOT_RECOVERED;
         }
     }

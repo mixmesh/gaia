@@ -5,6 +5,22 @@
 #include <arpa/inet.h>
 #include <inttypes.h>
 
+#ifdef DEBUG
+#define DEBUGF(f, a...) fprintf(stderr, f "\n", a)
+#define DEBUGP(s) fprintf(stderr, s "\n")
+#else
+#define DEBUGF(f, a...)
+#define DEBUGP(s)
+#endif
+
+#if __BIG_ENDIAN__
+#define htonll(x) (x)
+#define ntohll(x) (x)
+#else
+#define htonll(x) (((uint64_t)htonl((x) & 0xFFFFFFFF) << 32) | htonl((x) >> 32))
+#define ntohll(x) (((uint64_t)ntohl((x) & 0xFFFFFFFF) << 32) | ntohl((x) >> 32))
+#endif
+
 typedef struct {
     in_addr_t addr;
     uint16_t port;
