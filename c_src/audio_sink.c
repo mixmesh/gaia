@@ -8,6 +8,7 @@
 #define WAIT_IN_MS 2000
 
 extern jb_table_t *jb_table;
+extern bool kill_audio_sink;
 
 void reset_playback_delay(jb_t *jb) {
     jb->playback = jb_get_entry(jb, JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS);
@@ -24,7 +25,7 @@ void *audio_sink(void *arg) {
     audio_sink_params_t *params = (audio_sink_params_t *)arg;
 
     // Read from jitter buffer, mix and write to audio device
-    while (true) {
+    while (!kill_audio_sink) {
         uint8_t npackets = 0;
         void step_playback_entry(jb_t *jb) {
             jb_take_wrlock(jb);
@@ -144,7 +145,9 @@ playback entry %d but got %d (%d will be reused as %d!)",
     }
 
     DEBUGP("audio_sink is shutting down!!!");
-    audio_free(audio_info);
+    if (audio_info != NULL) {
+        audio_free(audio_info);
+    }
     int retval = AUDIO_SINK_DIED;
     thread_exit(&retval);
     return NULL;

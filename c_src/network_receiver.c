@@ -14,6 +14,7 @@
 #define DRAIN_BUF_SIZE 1
 
 extern jb_table_t *jb_table;
+extern bool kill_network_receiver;
 
 uint16_t root_mean_square(uint16_t *peak_values, uint16_t n) {
     double sum = 0.0;
@@ -53,6 +54,7 @@ void *network_receiver(void *arg) {
 
     struct timeval zero_timeout = {.tv_usec = 0, .tv_sec = 0};
     struct timeval one_second_timeout = {.tv_usec = 0, .tv_sec = 1};
+    struct timeval two_second_timeout = {.tv_usec = 0, .tv_sec = 2};
 
     ssize_t udp_max_buf_size;
     if (params->opus_enabled) {
@@ -69,17 +71,21 @@ void *network_receiver(void *arg) {
            JITTER_BUFFER_SIZE_IN_BYTES);
 
     // Read from socket and write to jitter buffer
-    while (true) {
+    while (!kill_network_receiver) {
         // Waiting for incoming audio
         DEBUGP("Waiting for incoming audio...");
         fd_set readfds;
         FD_ZERO(&readfds);
         FD_SET(sockfd, &readfds);
-        if (select(sockfd + 1, &readfds, 0, 0, NULL) < 0) {
+        struct timeval timeout = two_second_timeout;
+        int nfds = select(sockfd + 1, &readfds, 0, 0, &timeout);
+        if (nfds < 0) {
 #ifdef DEBUG
             perror("select: Failed to wait for incoming audio");
 #endif
             break;
+        } else if (nfds == 0) {
+            continue;
         }
 
         // Drain socket receive buffer
@@ -116,7 +122,7 @@ void *network_receiver(void *arg) {
 
         // Read from socket and write to jitter buffer
         DEBUGP("Receiving audio...");
-        while (true) {
+        while (!kill_network_receiver) {
             // Wait for incoming socket data (or timeout)
             FD_ZERO(&readfds);
             FD_SET(sockfd, &readfds);

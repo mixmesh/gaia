@@ -33,6 +33,7 @@ bool started = false;
 
 ErlNifTid network_receiver_tid;
 ErlNifTid audio_sink_tid;
+bool kill_network_sender = false;
 bool kill_network_receiver = false;
 bool kill_audio_sink = false;
 
@@ -206,13 +207,19 @@ static ERL_NIF_TERM _stop(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
         return enif_make_tuple2(env, ATOM(error), ATOM(not_started));
     }
 
-    // Wait for threads to die
-    kill_network_receiver = true;
+    // Wait for audio sink thread to die
     kill_audio_sink = true;
-    enif_thread_join(network_receiver_tid, NULL);
+    DEBUGP("Waiting for audio sink to kill itself");
     enif_thread_join(audio_sink_tid, NULL);
-    kill_network_receiver = false;
+    DEBUGP("Audio sink has killed itself");
     kill_audio_sink = false;
+
+    // Wait for network receiver thread to die
+    kill_network_receiver = true;
+    DEBUGP("Waiting for network receiver to kill itself");
+    enif_thread_join(network_receiver_tid, NULL);
+    DEBUGP("Network receiver has killed itself");
+    kill_network_receiver = false;
 
     // Remove locks
     assert(pthread_rwlock_destroy(params_rwlock) == 0);
@@ -220,6 +227,7 @@ static ERL_NIF_TERM _stop(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
 
     jb_table_free(jb_table, false);
 
+    DEBUGP("All is good. We can die in peace.");
     started = false;
     return ATOM(ok);
 }

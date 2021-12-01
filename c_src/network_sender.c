@@ -8,6 +8,8 @@
 #include "gaia_utils.h"
 #include "threadlib.h"
 
+extern bool kill_network_sender;
+
 void *network_sender(void *arg) {
     int err;
 
@@ -108,7 +110,7 @@ void *network_sender(void *arg) {
 
     // Read from audio device and write to socket
     DEBUGP("Sending audio...");
-    while (true) {
+    while (!kill_network_sender) {
         // Add timestamp to UDP buffer header
         uint64_t timestamp_nll = htonll(utimestamp());
         memcpy(&udp_buf[4], &timestamp_nll, sizeof(uint64_t));

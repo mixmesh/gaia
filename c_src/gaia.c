@@ -10,6 +10,10 @@
 
 #define MAX_NETWORK_SENDER_ADDR_PORTS 256
 
+bool kill_network_sender = false;
+bool kill_network_receiver = false;
+bool kill_audio_sink = false;
+
 jb_table_t *jb_table;
 
 void usage(char *argv[]) {
