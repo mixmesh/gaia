@@ -33,6 +33,8 @@ bool started = false;
 
 ErlNifTid network_receiver_tid;
 ErlNifTid audio_sink_tid;
+bool kill_network_receiver = false;
+bool kill_audio_sink = false;
 
 jb_table_t *jb_table;
 
@@ -204,10 +206,13 @@ static ERL_NIF_TERM _stop(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
         return enif_make_tuple2(env, ATOM(error), ATOM(not_started));
     }
 
-    // FIXME: BROEKN
-    // Shutdown threads
-    enif_thread_exit(network_receiver_tid);
-    enif_thread_exit(audio_sink_tid);
+    // Wait for threads to die
+    kill_network_receiver = true;
+    kill_audio_sink = true;
+    enif_thread_join(network_receiver_tid, NULL);
+    enif_thread_join(audio_sink_tid, NULL);
+    kill_network_receiver = false;
+    kill_audio_sink = false;
 
     // Remove locks
     assert(pthread_rwlock_destroy(params_rwlock) == 0);
@@ -264,7 +269,7 @@ static void unload(ErlNifEnv* env, void* priv_data) {
 static ErlNifFunc nif_funcs[] =
     {
      {"start", 1, _start, 0},
-     {"stop", 0, _stop, 0},
+     {"stop", 0, _stop, ERL_NIF_DIRTY_JOB_IO_BOUND},
      {"set_params", 1, _set_params, 0},
     };
 
