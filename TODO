@@ -1,19 +1,10 @@
-* add stop variable so gaia_nif:stop() works
-
-* Start to use xylanslog macros for logging
-
-* Write a json config for my exampke config (gaia_schema.erl)
-
-* write audio_sink_serv.erl
-  * rewrite gaia_sender_server.erl to use it
-
-* write gaia_serv.erl (see tavla)
+* write gaia_audio_sink_serv.erl
+* write gaia_serv.erl
+  * listens on multicast
   * sends multicast (as defined in config)
   * listens on multicast (update connfig)
   * send config to gaia process and threads to 
   * and more
-
-* write gaia_app.erl and gaia_sup.erl (update app file)
 
 * write gaia_command_serv.erl
 
