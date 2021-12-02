@@ -48,7 +48,8 @@ init(Parent, GaiaId, InterfaceIpAddress, UseAudioSource) ->
                    socket => Socket,
                    sender_pid => not_started,
                    config => not_set,
-                   seqnum => 1}};
+                   seqnum => 1,
+                   subscription => false}};
         {error, Reason} ->
             {error, Reason}
     end.
@@ -69,7 +70,8 @@ message_handler(#{parent := Parent,
                   socket := Socket,
                   sender_pid := SenderPid,
                   config := Config,
-                  seqnum := Seqnum} = State) ->
+                  seqnum := Seqnum,
+                  subscription := Subscription} = State) ->
     receive
         {call, From, stop} ->
             ?LOG_DEBUG(#{module => ?MODULE, call => stop}),
@@ -83,11 +85,12 @@ message_handler(#{parent := Parent,
                  #{dest_addresses := DestAddresses}} ->
                     {noreply, State#{config => NewConfig}};
                 {_, #{dest_addresses := []}} ->
-                    ok = gaia_audio_source:unsubscribe(),
-                    {noreply, State#{config => NewConfig}};
+                    ok = gaia_audio_source_serv:unsubscribe(Subscription),
+                    {noreply, State#{config => NewConfig, subscription = false}};
                 {#{dest_addresses := []}, _} ->
-                    ok = gaia_audio_source:subscribe(),
-                    {noreply, State#{config => NewConfig}};
+                    {ok, NewSubscription} = gaia_audio_source_serv:subscribe(),
+                    {noreply, State#{config => NewConfig,
+                                     subscription => NewSubscription}};
                 _ ->
                     {noreply, State#{config => NewConfig}}
             end;
@@ -103,25 +106,13 @@ message_handler(#{parent := Parent,
                     {noreply, State#{sender_pid => not_started,
                                      config => NewConfig}};
                 {#{dest_addresses := []}, #{dest_addresses := DestAddresses}} ->
-                    if
-                        SenderPid /= not_started ->
-                            exit(SenderPid, die);
-                        true ->
-                            ok
-                    end,
                     NewSenderPid =
-                        spawn_link(
-                          fun() ->
-                                  start_sender(GaiaId, Socket, DestAddresses)
-                          end),
+                        start_sender(GaiaId, Socket, SenderPid, DestAddresses),
                     {noreply, State#{sender_pid => NewSenderPid,
                                      config => NewConfig}};
                 {not_set, #{dest_addresses := DestAddresses}} ->
                     NewSenderPid =
-                        spawn_link(
-                          fun() ->
-                                  start_sender(GaiaId, Socket, DestAddresses)
-                          end),
+                        start_sender(GaiaId, Socket, SenderPid, DestAddresses),
                     {noreply, State#{sender_pid => NewSenderPid,
                                      config => NewConfig}}
             end;
@@ -145,6 +136,12 @@ message_handler(#{parent := Parent,
             ?LOG_ERROR(#{module => ?MODULE, unknown_message => UnknownMessage}),
             noreply
     end.
+
+start_sender(GaiaId, Socket, not_started, DestAddresses) ->
+    spawn_link(fun() -> start_sender(GaiaId, Socket, DestAddresses) end);
+start_sender(GaiaId, Socket, SenderPid, DestAddresses) ->
+    exit(SenderPid, die),
+    start_sender(GaiaId, Socket, not_started, DestAddresses).
 
 %%
 %% Sender
