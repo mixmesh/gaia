@@ -86,7 +86,7 @@ message_handler(#{parent := Parent,
                     {noreply, State#{config => NewConfig}};
                 {_, #{dest_addresses := []}} ->
                     ok = gaia_audio_source_serv:unsubscribe(Subscription),
-                    {noreply, State#{config => NewConfig, subscription = false}};
+                    {noreply, State#{config => NewConfig, subscription => false}};
                 {#{dest_addresses := []}, _} ->
                     {ok, NewSubscription} = gaia_audio_source_serv:subscribe(),
                     {noreply, State#{config => NewConfig,
