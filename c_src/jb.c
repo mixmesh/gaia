@@ -6,9 +6,9 @@
 #include "globals.h"
 #include "gaia_utils.h"
 
-jb_t *jb_new(uint32_t userid, bool opus_enabled) {
+jb_t *jb_new(uint32_t gaia_id, bool opus_enabled) {
     jb_t *jb = malloc(sizeof(jb_t));
-    jb->userid = userid;
+    jb->gaia_id = gaia_id;
     jb->playback = NULL;
     jb->playback_seqnum = 0;
     jb->exhausted = false;

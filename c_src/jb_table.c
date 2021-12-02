@@ -37,22 +37,22 @@ void jb_table_free(jb_table_t *jb_table, bool free_list_only) {
 }
 
 int8_t jb_table_add(jb_table_t *jb_table, jb_t *jb) {
-    if (jb_table_find(jb_table, jb->userid) != NULL) {
+    if (jb_table_find(jb_table, jb->gaia_id) != NULL) {
         return JB_TABLE_ALREADY_EXISTS;
     }
-    HASH_ADD_UINT32(jb_table->jb, userid, jb);
+    HASH_ADD_UINT32(jb_table->jb, gaia_id, jb);
     return JB_TABLE_SUCCESS;
 }
 
-jb_t *jb_table_find(jb_table_t *jb_table, uint32_t userid) {
+jb_t *jb_table_find(jb_table_t *jb_table, uint32_t gaia_id) {
     jb_t *jb;
-    HASH_FIND_UINT32(jb_table->jb, &userid, jb);
+    HASH_FIND_UINT32(jb_table->jb, &gaia_id, jb);
     return jb;
 }
 
-void jb_table_delete(jb_table_t *jb_table, uint32_t userid) {
+void jb_table_delete(jb_table_t *jb_table, uint32_t gaia_id) {
     jb_t *jb;
-    HASH_FIND_UINT32(jb_table->jb, &userid, jb);
+    HASH_FIND_UINT32(jb_table->jb, &gaia_id, jb);
     if (jb != NULL) {
         HASH_DEL(jb_table->jb, jb);
         jb_free(jb, false);

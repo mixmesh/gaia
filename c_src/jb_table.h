@@ -17,8 +17,8 @@ typedef struct {
 jb_table_t *jb_table_new(void);
 void jb_table_free(jb_table_t *jb_table, bool free_entries_only);
 int8_t jb_table_add(jb_table_t *jb_table, jb_t *jb);
-jb_t *jb_table_find(jb_table_t *jb_table, uint32_t userid);
-void jb_table_delete(jb_table_t *jb_table, uint32_t userid);
+jb_t *jb_table_find(jb_table_t *jb_table, uint32_t gaia_id);
+void jb_table_delete(jb_table_t *jb_table, uint32_t gaia_id);
 uint16_t jb_table_count(jb_table_t *jb_table);
 void jb_table_foreach(jb_table_t *jb_table, void (*callback)(jb_t *t));
 void jb_table_sort(jb_table_t *jb_table);

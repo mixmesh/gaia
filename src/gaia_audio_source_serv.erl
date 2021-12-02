@@ -1,5 +1,5 @@
 -module(gaia_audio_source_serv).
--export([start_link/0, stop/0]).
+-export([start_link/0, stop/1]).
 -export([message_handler/1]).
 
 -include_lib("apptools/include/serv.hrl").
@@ -19,8 +19,8 @@ start_link() ->
 %% Exported: stop
 %%
 
-stop() ->
-    serv:call(?MODULE, stop).
+stop(Pid) ->
+    serv:call(Pid, stop).
 
 %%
 %% Server

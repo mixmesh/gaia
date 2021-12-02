@@ -19,7 +19,7 @@ void reset_playback_delay(jb_t *jb) {
 void *audio_sink(void *arg) {
     int err;
     audio_info_t *audio_info = NULL;
-    uint8_t *packet[MAX_USERS];
+    uint8_t *packet[MAX_MEMBERS];
 
     // Parameters
     audio_sink_params_t *params = (audio_sink_params_t *)arg;
@@ -32,19 +32,19 @@ void *audio_sink(void *arg) {
             if (jb->nentries > JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS) {
                 bool skip_packet = false;
                 if (jb->playback == NULL) {
-                    DEBUGF("Jitter buffer (re)initializes playback for userid \
+                    DEBUGF("Jitter buffer (re)initializes playback for gaia-id \
 %d",
-                           jb->userid);
+                           jb->gaia_id);
                     reset_playback_delay(jb);
                 } else if (jb->playback == jb->tail) {
-                    DEBUGF("Jitter buffer playback is exhausted for userid %d",
-                           jb->userid);
+                    DEBUGF("Jitter buffer playback is exhausted for gaia-id %d",
+                           jb->gaia_id);
                     jb->exhausted = true;
                     skip_packet = true;
                 } else if (jb->playback->seqnum != jb->playback_seqnum) {
                     DEBUGF("Jitter buffer playback has wrapped around for \
-userid %d",
-                           jb->userid);
+gaia-id %d",
+                           jb->gaia_id);
                     reset_playback_delay(jb);
                 } else {
                     // Step playback entry
@@ -58,9 +58,9 @@ userid %d",
                             // Seqnum mismatch. Use the old playback entry
                             // again!
                             assert(jb->playback->prev->seqnum > next_seqnum);
-                            DEBUGF("Jitter buffer for userid %d expected \
+                            DEBUGF("Jitter buffer for gaia-id %d expected \
 playback entry %d but got %d (%d will be reused as %d!)",
-                                   jb->userid, next_seqnum,
+                                   jb->gaia_id, next_seqnum,
                                    jb->playback->prev->seqnum,
                                    jb->playback->prev->seqnum, next_seqnum);
                             jb->playback->seqnum = next_seqnum;

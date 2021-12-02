@@ -16,8 +16,13 @@ get() ->
            name = {integer, 1, 65535},
            typical = 1,
            reloadable = false}},
-       {address,
+       {'interface-ip-address',
+        #json_type{
+           name = ip_address,
+           typical = {242, 45, 0, 34},
+           reloadable = false}},
+       {'bind-address',
         #json_type{
            name = ip_address_port,
-           typical = {{242,45,0,34}, 10000},
+           typical = {{242, 45, 0, 34}, 10000},
            reloadable = false}}]}].

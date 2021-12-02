@@ -15,7 +15,7 @@ typedef struct jb_entry {
 } jb_entry_t;
 
 typedef struct {
-    uint32_t userid;
+    uint32_t gaia_id;
     jb_entry_t *playback;
     uint32_t playback_seqnum;
     bool exhausted;
@@ -37,7 +37,7 @@ typedef struct {
 #define FIRST_INSERTED        (1 << 3)
 #define INTERMEDIATE_INSERTED (1 << 4)
 
-jb_t *jb_new(uint32_t userid, bool opus_enabled);
+jb_t *jb_new(uint32_t gaia_id, bool opus_enabled);
 void jb_free(jb_t *jb, bool free_entries_only);
 jb_entry_t *jb_pop(jb_t *jb);
 uint8_t jb_insert(jb_t *jb, jb_entry_t *new_jb_entry);

@@ -85,9 +85,9 @@ void *file_sender(void *arg) {
     }
     uint8_t *udp_buf = malloc(udp_max_buf_size);
 
-    // Add userid to UDP buffer header
-    uint32_t userid_nl = htonl(params->userid);
-    memcpy(udp_buf, &userid_nl, sizeof(uint32_t));
+    // Add gaia-id to UDP buffer header
+    uint32_t gaia_id_nl = htonl(params->gaia_id);
+    memcpy(udp_buf, &gaia_id_nl, sizeof(uint32_t));
 
     // Let sequence number start with 1 (zero is reserved)
     uint32_t seqnum = 1;

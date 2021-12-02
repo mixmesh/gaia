@@ -8,7 +8,7 @@
 
 typedef struct {
     char* pcm_name;
-    uint32_t userid;
+    uint32_t gaia_id;
     uint8_t naddr_ports;
     addr_port_t *addr_ports;
     bool opus_enabled;

@@ -1,5 +1,5 @@
 -module(gaia_network_sender_serv).
--export([start_link/3, stop/0, update_config/0, update_config/1]).
+-export([start_link/3, stop/1, update_config/2]).
 -export([message_handler/1]).
 
 -include_lib("apptools/include/serv.hrl").
@@ -12,40 +12,38 @@
 %% Exported: start_link
 %%
 
-start_link(GaiaId, SrcAddress, UseAudioSource) ->
-    ?spawn_server(fun(Parent) ->
-                          init(Parent, GaiaId, SrcAddress, UseAudioSource)
-                  end,
-                  fun initial_message_handler/1).
+start_link(GaiaId, InterfaceIpAddress, UseAudioSource) ->
+    ?spawn_server(
+       fun(Parent) ->
+               init(Parent, GaiaId, InterfaceIpAddress, UseAudioSource)
+       end,
+       fun initial_message_handler/1).
 
 %%
 %% Exported: stop
 %%
 
-stop() ->
-    serv:call(?MODULE, stop).
+stop(Pid) ->
+    serv:call(Pid, stop).
 
 %%
 %% Exported: update_config
 %%
 
-update_config() ->
-    update_config(#{dest_adresses => [{?DEFAULT_ADDR, ?DEFAULT_PORT}]}).
-
-update_config(Config) ->
-    serv:cast(?MODULE, {update_config, Config}).
+update_config(Pid, Config) ->
+    serv:cast(Pid, {update_config, Config}).
 
 %%
 %% Server
 %%
 
-init(Parent, GaiaId, {_SrcIpAddress, SrcPort} = SrcAddress, UseAudioSource) ->
-    ?LOG_INFO("Gaia network sender server has been started"),
-    case gen_udp:open(SrcPort, [{mode, binary}, {active, false}]) of
+init(Parent, GaiaId, InterfaceIpAddress, UseAudioSource) ->
+    case gen_udp:open(0, [{ifaddr, InterfaceIpAddress}, {mode, binary},
+                          {active, false}]) of
         {ok, Socket} ->
+            ?LOG_INFO("Gaia network sender server has been started"),
             {ok, #{parent => Parent,
                    gaia_id => GaiaId,
-                   src_address => SrcAddress,
                    use_audio_source => UseAudioSource,
                    socket => Socket,
                    sender_pid => not_started,
@@ -67,7 +65,6 @@ initial_message_handler(State) ->
 
 message_handler(#{parent := Parent,
                   gaia_id := GaiaId,
-                  src_address := _SrcAddress,
                   use_audio_source := UseAudioSource,
                   socket := Socket,
                   sender_pid := SenderPid,
@@ -75,9 +72,12 @@ message_handler(#{parent := Parent,
                   seqnum := Seqnum} = State) ->
     receive
         {call, From, stop} ->
+            ?LOG_DEBUG(#{module => ?MODULE, call => stop}),
             exit(SenderPid, die),
             {stop, From, ok};
         {cast, {update_config, NewConfig}} when UseAudioSource ->
+            ?LOG_DEBUG(#{module => ?MODULE,
+                         call => {update_config, Config, NewConfig}}),
             case {Config, NewConfig} of
                 {#{dest_addresses := DestAddresses},
                  #{dest_addresses := DestAddresses}} ->
@@ -92,6 +92,8 @@ message_handler(#{parent := Parent,
                     {noreply, State#{config => NewConfig}}
             end;
         {cast, {update_config, NewConfig}} ->
+            ?LOG_DEBUG(#{module => ?MODULE,
+                         call => {update_config, Config, NewConfig}}),
             case {Config, NewConfig} of
                 {#{dest_addresses := DestAddresses},
                  #{dest_addresses := DestAddresses}} ->
@@ -113,6 +115,14 @@ message_handler(#{parent := Parent,
                                   start_sender(GaiaId, Socket, DestAddresses)
                           end),
                     {noreply, State#{sender_pid => NewSenderPid,
+                                     config => NewConfig}};
+                {not_set, #{dest_addresses := DestAddresses}} ->
+                    NewSenderPid =
+                        spawn_link(
+                          fun() ->
+                                  start_sender(GaiaId, Socket, DestAddresses)
+                          end),
+                    {noreply, State#{sender_pid => NewSenderPid,
                                      config => NewConfig}}
             end;
         {subscription_packet, Packet} ->
@@ -121,10 +131,12 @@ message_handler(#{parent := Parent,
                              Packet),
             {noreply, State#{seqnum => Seqnum + 1}};
         {system, From, Request} ->
+            ?LOG_DEBUG(#{module => ?MODULE, system => Request}),
             {system, From, Request};
         {'EXIT', Parent, Reason} ->
             exit(Reason);
         {'EXIT', SenderPid, normal} ->
+            ?LOG_DEBUG(#{module => ?MODULE, exitreason => sender_died}),
             noreply;
         {'EXIT', SenderPid, Reason} ->
             ?LOG_ERROR(#{module => ?MODULE, exit_reason => Reason}),

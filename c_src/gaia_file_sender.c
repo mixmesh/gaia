@@ -9,14 +9,14 @@
 void usage(char *argv[]) {
     fprintf(stderr,
             "\
-Usage: %s [-d addr[:port] -d ...] [-u userid] filename ...\n\
+Usage: %s [-d addr[:port] -d ...] [-u gaia-id] filename ...\n\
 \n\
 Example:\n\
   sudo %s -d 172.16.0.95 -d 172.16.0.95:2356 -u 1000 foo.s16\n\
 \n\
 Options:\n\
   -d Send audio streams to this destination address and port (%s:%d)\n\
-  -u Use this userid as a base, i.e. will be increased one step for each -d option (1)\n\
+  -u Use this gaia-id as a base, i.e. will be increased one step for each -d option (1)\n\
   -x Enable use of Opus audio codec\n",
             argv[0], argv[0], DEFAULT_ADDR, DEFAULT_PORT);
     exit(ARG_ERROR);
@@ -25,12 +25,12 @@ Options:\n\
 int main (int argc, char *argv[]) {
     int err;
 
-    addr_port_t addr_ports[MAX_USERS];
+    addr_port_t addr_ports[MAX_MEMBERS];
     addr_ports[0].addr = inet_addr(DEFAULT_ADDR);
     addr_ports[0].port = DEFAULT_PORT;
     int naddr_ports = 0;
 
-    uint32_t userid = 1;
+    uint32_t gaia_id = 1;
 
     bool opus_enabled = false;
 
@@ -44,14 +44,14 @@ int main (int argc, char *argv[]) {
                               &addr_ports[naddr_ports].port) < 0) {
                 usage(argv);
             }
-            naddr_ports = (naddr_ports + 1) % MAX_USERS;
+            naddr_ports = (naddr_ports + 1) % MAX_MEMBERS;
             break;
         case 'u':
             if (string_to_long(optarg, &value) < 0) {
                 usage(argv);
             }
-            userid = value;
-            if (userid == 0) {
+            gaia_id = value;
+            if (gaia_id == 0) {
                 usage(argv);
             }
             break;
@@ -72,8 +72,8 @@ int main (int argc, char *argv[]) {
         usage(argv);
     }
 
-    pthread_t sender_threads[MAX_USERS];
-    file_sender_params_t *params[MAX_USERS];
+    pthread_t sender_threads[MAX_MEMBERS];
+    file_sender_params_t *params[MAX_MEMBERS];
     uint8_t nsender_threads = 0;
 
     // Start sender threads
@@ -89,7 +89,7 @@ int main (int argc, char *argv[]) {
         }
 
         params[i] = malloc(sizeof(file_sender_params_t));
-        params[i]->userid = userid++;
+        params[i]->gaia_id = gaia_id++;
         memcpy(params[i]->filename, filename, strlen(filename) + 1);
         params[i]->naddr_ports = naddr_ports;
         params[i]->addr_ports = addr_ports;

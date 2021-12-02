@@ -3,7 +3,7 @@
 
 #include <arpa/inet.h>
 
-#define MAX_USERS 128
+#define MAX_MEMBERS 128
 
 #define DEFAULT_PCM_NAME "hw:0,0"
 #define DEFAULT_ADDR "127.0.0.1"
@@ -35,7 +35,7 @@
 #define PEAK_AVERAGE_PERIOD_IN_MS 200
 #define MAX_MIX_STREAMS 32
 
-// |userid:4|timestamp:8|seqnum:4|packet_len:2| = 18 bytes
+// |gaiaid:4|timestamp:8|seqnum:4|packet_len:2| = 18 bytes
 #define HEADER_SIZE (4 + 8 + 4 + 2)
 
 #define ARG_ERROR                 1

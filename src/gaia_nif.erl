@@ -1,5 +1,5 @@
 -module(gaia_nif).
--export([start/0, start/1, stop/0, set_params/1]).
+-export([start/1, stop/0, set_params/1]).
 -export([init/0, preloaded_atoms/0]). % internal
 -on_load(init/0).
 
@@ -35,11 +35,6 @@ preloaded_atoms() ->
 
 -spec start(params()) -> ok.
 
-start() ->
-    start({#{addr_port => {?DEFAULT_ADDR_STRING, ?DEFAULT_PORT},
-             opus_enabled => false},
-           #{pcm_name => "hw:0,0",
-             opus_enabled => false}}).
 
 start(_Params) ->
     exit(nif_library_not_loaded).

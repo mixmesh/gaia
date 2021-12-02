@@ -115,7 +115,7 @@ void *network_receiver(void *arg) {
         }
         DEBUGP("Socket receive buffer has been drained");
 
-        uint64_t userid = 0;
+        uint64_t gaia_id = 0;
         jb_t *jb = NULL;
         double latency = 0;
         uint64_t last_latency_printout = 0;
@@ -146,27 +146,27 @@ void *network_receiver(void *arg) {
                               NULL)) < 0) {
 #ifdef DEBUG
                 perror("recvfrom: Failed to peek into socket and extract \
-userid");
+gaia-id");
 #endif
                 goto bail_out;
             } else if (n != HEADER_SIZE) {
                 DEBUGP("Ignored truncated UDP packet!");
                 break;
             }
-            uint32_t new_userid = ntohl(*(uint32_t *)&header_buf[0]);
+            uint32_t new_gaia_id = ntohl(*(uint32_t *)&header_buf[0]);
             uint16_t packet_len = ntohs(*(uint16_t *)&header_buf[16]);
 
             // Get jitter buffer
-            if (userid != new_userid) {
+            if (gaia_id != new_gaia_id) {
                 jb_table_take_rdlock(jb_table);
-                if ((jb = jb_table_find(jb_table, new_userid)) == NULL) {
-                    jb = jb_new(new_userid, params->opus_enabled);
+                if ((jb = jb_table_find(jb_table, new_gaia_id)) == NULL) {
+                    jb = jb_new(new_gaia_id, params->opus_enabled);
                     jb_table_upgrade_to_wrlock(jb_table);
                     assert(jb_table_add(jb_table, jb) == JB_TABLE_SUCCESS);
                     jb_table_downgrade_to_rdlock(jb_table);
                 }
                 jb_table_release_rdlock(jb_table);
-                userid = new_userid;
+                gaia_id = new_gaia_id;
             }
 
             // Jitter buffer is exhausted according to audio sink

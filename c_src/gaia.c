@@ -19,7 +19,7 @@ jb_table_t *jb_table;
 void usage(char *argv[]) {
     fprintf(stderr,
             "\
-Usage: %s [-D device] [-E device] [-L] [-s addr[:port]] [-d addr[:port] -d ...] [-x] userid\n\
+Usage: %s [-D device] [-E device] [-L] [-s addr[:port]] [-d addr[:port] -d ...] [-x] gaia-id\n\
 \n\
 Example: \n\
   sudo %s -D hw:1,0 -d 172.16.0.95 -d 172.16.0.95:2356 -s 172.16.0.116:2305 1000\n\
@@ -111,14 +111,14 @@ int main (int argc, char *argv[]) {
         usage(argv);
     }
 
-    uint32_t userid;
+    uint32_t gaia_id;
     long value;
     if (string_to_long(argv[optind], &value) < 0) {
         usage(argv);
     }
-    userid = value;
+    gaia_id = value;
 
-    if (userid == 0) {
+    if (gaia_id == 0) {
         usage(argv);
     }
 
@@ -130,7 +130,7 @@ int main (int argc, char *argv[]) {
     if (!disable_network_sender) {
         sender_params = malloc(sizeof(network_sender_params_t));
         sender_params->pcm_name = capture_pcm_name;
-        sender_params->userid = userid;
+        sender_params->gaia_id = gaia_id;
         sender_params->naddr_ports = ndest_addr_ports;
         sender_params->addr_ports = dest_addr_ports;
         sender_params->opus_enabled = opus_enabled;
