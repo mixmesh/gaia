@@ -23,61 +23,64 @@ start() ->
     start(#{}).
 start(Params) ->
     VoskPid = start_vosk(Params),
-    command_query(VoskPid).
+    receive 
+	{vosk_start, VoskPid, Params1} ->
+	    command_query(VoskPid, Params1)
+    end.
 
-command_query(VoskPid) ->
+command_query(VoskPid, Params1) ->
     receive
 	{vosk, VoskPid, VoskData} ->
 	    io:format("VoskData: ~p\n", [VoskData]),
 	    case maps:get("text", VoskData, "") of
 		"" ->
-		    command_query(VoskPid);
+		    command_query(VoskPid, Params1);
 		Text ->
 		    case action(string:tokens(Text, " \t\n\r")) of
 			{'?', [], _} ->
-			    command_query(VoskPid);
+			    command_query(VoskPid, Params1);
 			{'?', [Word|_Cs], _} ->
 			    Response = "I do not understand " ++ join([Word]),
-			    flite:aplay(Response),
-			    command_query(VoskPid);
+			    flite:say(Response, Params1),
+			    command_query(VoskPid, Params1);
 			{'say', Cs, _} ->
 			    Response = join(Cs),
-			    flite:aplay(Response),
-			    command_query(VoskPid);
+			    flite:say(Response, Params1),
+			    command_query(VoskPid, Params1);
 			Cmd = {Command, Args, _More} ->
 			    io:format("~p\n", [Cmd]),
 			    Query = "Do you really want to " ++ 
 				join([Command | Args]) ++ "?",
-			    flite:aplay(Query),
-			    command_ack(VoskPid, Cmd)
+			    flite:say(Query, Params1),
+			    command_ack(VoskPid, Cmd, Params1)
 		    end
 	    end
     end.
 
-command_ack(VoskPid, Cmd={Command,Args,_}) ->
+command_ack(VoskPid, Cmd={Command,Args,_}, Params1) ->
     receive
 	{vosk, VoskPid, Response} ->
 	    io:format("Response: ~p\n", [Response]),
 	    case string:tokens(maps:get("text", Response, ""), "\s\t") of
 		"" -> %% wait
-		    command_ack(VoskPid, Cmd);
+		    command_ack(VoskPid, Cmd, Params1);
 		["yes"|_] ->
 		    Ack = join(["execute",Command | Args]),
-		    flite:aplay(Ack),
+		    flite:say(Ack, Params1),
 		    if Command =:= exit ->
 			    VoskPid ! stop,
 			    ok;
 		       true ->
-			    command_query(VoskPid)
+			    command_query(VoskPid, Params1)
 		    end;
 		["no"|_] ->
 		    Ack = join(["aborting",Command | Args]),
-		    flite:aplay(Ack),
-		    command_query(VoskPid);
+		    flite:say(Ack, Params1),
+		    command_query(VoskPid, Params1);
 		_ ->
 		    Ack = "please respond with yes or no",
-		    flite:aplay(Ack),
-		    command_ack(VoskPid, Cmd)
+		    flite:say(Ack, Params1),
+		    command_ack(VoskPid, Cmd, Params1)
 	    end
     end.
 
@@ -110,6 +113,7 @@ action_(Cs0) ->
 	["bye"|Cs]        -> {exit, [], Cs};
 	["exit"|Cs]       -> {exit, [], Cs};
 	["say"|Cs]        -> {say, Cs, []};
+	["call"|Cs]       -> {call, Cs, []};
 	_ -> {'?', Cs0, []}
     end.
 
@@ -134,6 +138,7 @@ obj_(Cs0, Command, Form) ->
 	["back","door"|Cs] -> jobj(Command,Form,['back-door'],Cs);
 	["window"|Cs] -> jobj(Command,Form,['window'],Cs);
 	["door"|Cs] -> jobj(Command,Form,["door"],Cs);
+	["phone"|Cs] -> jobj(Command,Form,["phone"],Cs);
 	["car","door"|Cs] -> jobj(Command,Form,["car-door"],Cs);
 	["gate"|Cs] -> jobj(Command,Form,["gate"],Cs);
 	["lamp"|Cs] -> jobj(Command,Form,["lamp"],Cs);
@@ -149,7 +154,7 @@ obj_(Cs0, Command, Form) ->
 	["floppy", "drive" | Cs] -> jobj(Command,Form,["floppy-drive"], Cs);
 	["C","colon" | Cs] -> jobj(Command,Form,["C:"],Cs);
 	["D","colon" | Cs] -> jobj(Command,Form,["D:"],Cs);
-	Cs -> {'?',[Command|Cs]}
+	Cs -> {'?',[Command], Cs}
     end.
 
 jobj(Command,Form,Obj,Cs) ->
@@ -179,6 +184,7 @@ start_vosk(Params0) ->
 		     true ->
 			  fun (X) -> X end
 		  end,
+	      Parent ! {vosk_start, self(), Params},
 	      alsa_loop(Parent, AlsaHandle, PeriodFrames, Transform,
 			Vosk, Model)
       end).
@@ -233,6 +239,7 @@ alsa_loop(Parent, AlsaHandle, PeriodFrames,  Transform, Vosk, Model) ->
 		1 ->
 		    Result = vosk:recognizer_result(Vosk),
 		    Parent ! {vosk,self(),Result},
+		    vosk:recognizer_reset(Vosk),
 		    alsa_loop(Parent, AlsaHandle, PeriodFrames,  Transform,
 			      Vosk, Model);
 		-1 ->
