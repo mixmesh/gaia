@@ -3,7 +3,7 @@
 
 -include_lib("alsa/include/alsa.hrl").
 
--define(DEFAULT_PCM_NAME, "hw:0,0").
+-define(DEFAULT_PCM_NAME, "plughw:0,0").
 -define(DEFAULT_ADDR, {127, 0, 0, 1}).
 -define(DEFAULT_ADDR_STRING, "127.0.0.1").
 -define(DEFAULT_PORT, 2305).
