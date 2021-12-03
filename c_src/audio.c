@@ -67,6 +67,8 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
                desired_period_size_in_frames, period_size_in_frames);
     }
 
+    /*
+    NOTE: For some reason it is notallowed to set the buffer size on PI
     snd_pcm_uframes_t desired_buffer_size_in_frames =
         period_size_in_frames * buffer_multiplicator;
     snd_pcm_uframes_t buffer_size_in_frames = desired_buffer_size_in_frames;
@@ -80,6 +82,7 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
         DEBUGF("NOTE: Desired buffer size was %ld bytes but it was set to %ld",
                desired_buffer_size_in_frames, buffer_size_in_frames);
     }
+    */
 
     if ((err = snd_pcm_hw_params(pcm, hw_params)) < 0) {
         snd_pcm_hw_params_free(hw_params);

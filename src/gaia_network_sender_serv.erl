@@ -152,8 +152,10 @@ start_sender(GaiaId, Socket, DestAddresses) ->
         #{format => ?FORMAT,
           channels => ?CHANNELS,
           rate => ?RATE_IN_HZ,
-          period_size => ?PERIOD_SIZE_IN_FRAMES,
-          buffer_size => ?PERIOD_SIZE_IN_FRAMES * ?BUFFER_MULTIPLICATOR},
+          period_size => ?PERIOD_SIZE_IN_FRAMES
+%          NOTE: For some reason it is notallowed to set the buffer size on PI
+%          buffer_size => ?PERIOD_SIZE_IN_FRAMES * ?BUFFER_MULTIPLICATOR
+         },
     case alsa:open(?DEFAULT_PCM_NAME, capture, WantedHwParams, #{}) of
         {ok, AlsaHandle, _ActualHwParams, _ActualSwParams} ->
             sender_loop(GaiaId, Socket, DestAddresses, AlsaHandle, 1);
