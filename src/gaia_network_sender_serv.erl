@@ -86,7 +86,8 @@ message_handler(#{parent := Parent,
                     {noreply, State#{config => NewConfig}};
                 {_, #{dest_addresses := []}} ->
                     ok = gaia_audio_source_serv:unsubscribe(Subscription),
-                    {noreply, State#{config => NewConfig, subscription => false}};
+                    {noreply, State#{config => NewConfig,
+                                     subscription => false}};
                 {#{dest_addresses := []}, _} ->
                     {ok, NewSubscription} = gaia_audio_source_serv:subscribe(),
                     {noreply, State#{config => NewConfig,
@@ -105,7 +106,8 @@ message_handler(#{parent := Parent,
                     exit(SenderPid, die),
                     {noreply, State#{sender_pid => not_started,
                                      config => NewConfig}};
-                {#{dest_addresses := []}, #{dest_addresses := DestAddresses}} ->
+                {#{dest_addresses := []},
+                 #{dest_addresses := DestAddresses}} ->
                     NewSenderPid =
                         start_sender(GaiaId, Socket, SenderPid, DestAddresses),
                     {noreply, State#{sender_pid => NewSenderPid,
@@ -157,7 +159,9 @@ start_sender(GaiaId, Socket, DestAddresses) ->
 %          buffer_size => ?PERIOD_SIZE_IN_FRAMES * ?BUFFER_MULTIPLICATOR
          },
     case alsa:open(?DEFAULT_PCM_NAME, capture, WantedHwParams, #{}) of
-        {ok, AlsaHandle, _ActualHwParams, _ActualSwParams} ->
+        {ok, AlsaHandle, ActualHwParams, ActualSwParams} ->
+            ?LOG_INFO(#{actual_hw_params => ActualHwParams,
+                        actual_sw_params => ActualSwParams}),
             sender_loop(GaiaId, Socket, DestAddresses, AlsaHandle, 1);
         {error, Reason} ->
             exit(alsa:strerror(Reason))
@@ -166,13 +170,16 @@ start_sender(GaiaId, Socket, DestAddresses) ->
 sender_loop(GaiaId, Socket, DestAddresses, AlsaHandle, Seqnum) ->
     case alsa:read(AlsaHandle, ?PERIOD_SIZE_IN_FRAMES) of
         {ok, Packet} when is_binary(Packet) ->
-            ok = send_packet(GaiaId, Socket, Socket, Seqnum, DestAddresses, Packet),
+            ok = send_packet(GaiaId, Socket, Socket, Seqnum, DestAddresses,
+                             Packet),
             sender_loop(GaiaId, Socket, DestAddresses, AlsaHandle, Seqnum + 1);
         {ok, overrun} ->
-            ?LOG_WARNING(#{module => ?MODULE, reason => alsa:strerror(overrun)}),
+            ?LOG_WARNING(#{module => ?MODULE,
+                           reason => alsa:strerror(overrun)}),
             sender_loop(GaiaId, DestAddresses, Socket, AlsaHandle, Seqnum);
         {ok, suspend_event} ->
-            ?LOG_WARNING(#{module => ?MODULE, reason => alsa:strerror(suspend_event)}),
+            ?LOG_WARNING(#{module => ?MODULE,
+                           reason => alsa:strerror(suspend_event)}),
             sender_loop(GaiaId, DestAddresses, Socket, AlsaHandle, Seqnum);
         {error, Reason} ->
             alsa:close(AlsaHandle),
