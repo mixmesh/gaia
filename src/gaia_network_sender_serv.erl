@@ -151,9 +151,9 @@ start_sender(GaiaId, Socket, DestAddresses) ->
     WantedHwParams =
         #{format => ?FORMAT,
           channels => ?CHANNELS,
-          rate => ?RATE_IN_HZ,
+          sample_rate => ?RATE_IN_HZ,
           period_size => ?PERIOD_SIZE_IN_FRAMES
-%          NOTE: For some reason it is notallowed to set the buffer size on PI
+%          NOTE: For some reason it is not allowed to set the buffer size on PI
 %          buffer_size => ?PERIOD_SIZE_IN_FRAMES * ?BUFFER_MULTIPLICATOR
          },
     case alsa:open(?DEFAULT_PCM_NAME, capture, WantedHwParams, #{}) of

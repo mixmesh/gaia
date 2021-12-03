@@ -6,8 +6,8 @@
 #include <inttypes.h>
 
 #ifdef DEBUG
-#define DEBUGF(f, a...) fprintf(stderr, f "\n", a)
-#define DEBUGP(s) fprintf(stderr, s "\n")
+#define DEBUGF(f, a...) fprintf(stderr, f "\r\n", a)
+#define DEBUGP(s) fprintf(stderr, s "\r\n")
 #else
 #define DEBUGF(f, a...)
 #define DEBUGP(s)
