@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <assert.h>
-#include "../jb.h"
-#include "../jb_table.h"
-#include "../bits.h"
+#include "jb.h"
+#include "jb_table.h"
+#include "bits.h"
 
 #define UDP_BUF_SIZE 16
 

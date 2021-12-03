@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <assert.h>
-#include "../jb_table.h"
+#include "jb_table.h"
 
 int main (int argc, char *argv[]) {
   fprintf(stderr, "========================================================================\n");
@@ -26,7 +26,7 @@ int main (int argc, char *argv[]) {
   assert(jb == NULL);
 
   for (jb = jb_table->jb; jb != NULL; jb = jb->hh.next) {
-    printf("Jitter buffer %d (%d)\n", jb->userid, jb->nentries);
+    printf("Jitter buffer %d (%d)\n", jb->gaia_id, jb->nentries);
   }
 
   jb_table_delete(jb_table, 1);

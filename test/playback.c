@@ -4,8 +4,8 @@
 #include <signal.h>
 #include <math.h>
 #include <alsa/asoundlib.h>
-#include "../audio.h"
-#include "../globals.h"
+#include "audio.h"
+#include "globals.h"
 
 // $ ./capture test.dat
 // $ ./playback test.dat
