@@ -8,7 +8,7 @@
 -define(DEFAULT_ADDR_STRING, "127.0.0.1").
 -define(DEFAULT_PORT, 2305).
 
--define(FORMAT, ?SND_PCM_FORMAT_S16_LE).
+-define(FORMAT, s16_le).
 -define(CHANNELS, 2).
 -define(SAMPLE_SIZE_IN_BYTES, 2).
 -define(FRAME_SIZE_IN_BYTES, (?CHANNELS * ?SAMPLE_SIZE_IN_BYTES)).
