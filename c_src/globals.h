@@ -5,7 +5,7 @@
 
 #define MAX_MEMBERS 128
 
-#define DEFAULT_PCM_NAME "hw:0,0"
+#define DEFAULT_PCM_NAME "plughw:0,0"
 #define DEFAULT_ADDR "127.0.0.1"
 #define DEFAULT_PORT 2305
 
