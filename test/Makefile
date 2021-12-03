@@ -1,6 +1,6 @@
 ERL=$(shell readlink -f `which erl`)
 ERL_TOP=$(ERL:%/bin/erl=%)
-CFLAGS=-std=c18 -Werror -D_POSIX_C_SOURCE=200809L $(shell pkg-config --cflags alsa) -I ../c_src
+CFLAGS=-std=c18 -Werror -D_POSIX_C_SOURCE=200809L $(shell pkg-config --cflags alsa) -I$(ERL_TOP)/usr/include -I ../c_src
 LDLIBS=$(shell pkg-config --libs alsa) $(ERL_TOP)/usr/lib/libei.a -lm -lpthread -lrt
 
 EXECS=capture display opus_example playback test_jb test_jb_table
