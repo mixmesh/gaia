@@ -108,22 +108,24 @@ message_handler(#{parent := Parent,
 
 update_neighbours(Neighbours, Address, Info) ->
     case lists:keysearch(gaia, 1, Info) of
-        {gaia, #{id := GaiaId,
+        {value, {gaia, #{id := GaiaId,
                  ip_address := GaiaIpAddressString,
-                 port := GaiaPort} = GaiaInfo}
+                 port := GaiaPort} = GaiaInfo}}
           when is_integer(GaiaId) andalso
                GaiaId > 0 andalso GaiaId < 65536 andalso
                is_integer(GaiaPort) andalso
                GaiaPort >= 1024 andalso GaiaPort < 65536 ->
             case inet:parse_address(GaiaIpAddressString) of
                 {ok, GaiaIpAddress} ->
-                    Neighbours#{Address => GaiaInfo};
+                    Neighbours#{Address =>
+                                    GaiaInfo#{ip_address =>
+                                                  GaiaIpAddress}};
                 {error, _Reason} ->
                     ?LOG_WARNING(#{module => ?MODULE,
                                    bad_gaia_info => GaiaInfo}),
                     not_updated
             end;
-        {gaia, GaiaInfo} when is_map(GaiaInfo) ->
+        {value, {gaia, GaiaInfo}} when is_map(GaiaInfo) ->
             ?LOG_WARNING(#{module => ?MODULE, bad_gaia_info => GaiaInfo}),
             not_updated;
         false ->
