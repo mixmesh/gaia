@@ -86,7 +86,7 @@ message_handler(#{parent := Parent,
                     noreply;
                 UpdatedNeighbours ->
                     DestAddresses =
-                        maps:foldl(
+                        maps:fold(
                           fun(_Address,
                               #{ip_address := GaiaIpAddress, port := GaiaPort},
                               Acc) ->
@@ -110,7 +110,7 @@ update_neighbours(Neighbours, Address, Info) ->
     case lists:keysearch(gaia, 1, Info) of
         {value, {gaia, #{id := GaiaId,
                          ip_address := GaiaIpAddressString,
-                         port := GaiaPort} = GaiaInfo}, _PreviousGaiaInfo}
+                         port := GaiaPort} = GaiaInfo, _PreviousGaiaInfo}}
           when is_integer(GaiaId) andalso
                GaiaId > 0 andalso GaiaId < 65536 andalso
                is_integer(GaiaPort) andalso
