@@ -22,17 +22,25 @@ void jb_table_free(jb_table_t *jb_table, bool free_list_only) {
     jb_table_take_wrlock(jb_table);
     jb_t *jb, *tmp;
     HASH_ITER(hh, jb_table->jb, jb, tmp) {
+        fprintf(stderr, "0\r\n");
         jb_free(jb, false);
+        fprintf(stderr, "0after\r\n");
     }
     jb_table_release_wrlock(jb_table);
     if (free_list_only) {
         jb_table->jb = NULL;
     } else {
+        fprintf(stderr, "1\r\n");
         assert(thread_rwlock_destroy(jb_table->rwlock) == 0);
+        fprintf(stderr, "2\r\n");
         free(jb_table->rwlock);
+        fprintf(stderr, "3\r\n");
         assert(thread_mutex_destroy(jb_table->lock_mutex) == 0);
+        fprintf(stderr, "4\r\n");
         free(jb_table->lock_mutex);
+        fprintf(stderr, "5\r\n");
         free(jb_table);
+        fprintf(stderr, "6\r\n");
     }
 }
 
