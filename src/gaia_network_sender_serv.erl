@@ -1,5 +1,5 @@
 -module(gaia_network_sender_serv).
--export([start_link/4, stop/1, update_config/2]).
+-export([start_link/4, stop/1, set_dest_addresses/2]).
 -export([message_handler/1]).
 
 -include_lib("apptools/include/serv.hrl").
@@ -27,11 +27,11 @@ stop(Pid) ->
     serv:call(Pid, stop).
 
 %%
-%% Exported: update_config
+%% Exported: set_dest_addresses
 %%
 
-update_config(Pid, Config) ->
-    serv:cast(Pid, {update_config, Config}).
+set_dest_addresses(Pid, DestAddresses) ->
+    serv:cast(Pid, {set_dest_addresses, DestAddresses}).
 
 %%
 %% Server
@@ -48,7 +48,7 @@ init(Parent, GaiaId, {IpAddress, _Port}, PcmName, UseAudioSource) ->
                    use_audio_source => UseAudioSource,
                    socket => Socket,
                    sender_pid => not_started,
-                   config => not_set,
+                   dest_addresses => [],
                    seqnum => 1,
                    subscription => false}};
         {error, Reason} ->
@@ -71,7 +71,7 @@ message_handler(#{parent := Parent,
                   use_audio_source := UseAudioSource,
                   socket := Socket,
                   sender_pid := SenderPid,
-                  config := Config,
+                  dest_addresses := DestAddresses,
                   seqnum := Seqnum,
                   subscription := Subscription} = State) ->
     receive
@@ -79,51 +79,48 @@ message_handler(#{parent := Parent,
             ?LOG_DEBUG(#{module => ?MODULE, call => stop}),
             exit(SenderPid, die),
             {stop, From, ok};
-        {cast, {update_config, NewConfig}} when UseAudioSource ->
+        {cast, {set_dest_addresses, NewDestAddresses}} when UseAudioSource ->
             ?LOG_DEBUG(#{module => ?MODULE,
-                         call => {update_config, Config, NewConfig}}),
-            case {Config, NewConfig} of
-                {#{dest_addresses := DestAddresses},
-                 #{dest_addresses := DestAddresses}} ->
-                    {noreply, State#{config => NewConfig}};
-                {_, #{dest_addresses := []}} ->
+                         call => {set_dest_addresses, DestAddresses, NewDestAddresses}}),
+            case {DestAddresses, lists:sort(NewDestAddresses)} of
+                {_, DestAddresses} ->
+                    noreply;
+                {_, []} ->
                     ok = gaia_audio_source_serv:unsubscribe(Subscription),
-                    {noreply, State#{config => NewConfig,
+                    {noreply, State#{dest_addresses => [],
                                      subscription => false}};
-                {#{dest_addresses := []}, _} ->
+                {[], SortedNewDestAddresses} ->
                     {ok, NewSubscription} = gaia_audio_source_serv:subscribe(),
-                    {noreply, State#{config => NewConfig,
+                    {noreply, State#{dest_addresses => SortedNewDestAddresses,
                                      subscription => NewSubscription}};
-                _ ->
-                    {noreply, State#{config => NewConfig}}
+                {_, SortedNewDestAddresses} ->
+                    {noreply, State#{dest_addresses => SortedNewDestAddresses}}
             end;
-        {cast, {update_config, NewConfig}} ->
+        {cast, {set_dest_addresses, NewDestAddresses}} ->
             ?LOG_DEBUG(#{module => ?MODULE,
-                         call => {update_config, Config, NewConfig}}),
-            case {Config, NewConfig} of
-                {#{dest_addresses := DestAddresses},
-                 #{dest_addresses := DestAddresses}} ->
-                    {noreply, State#{config => NewConfig}};
-                {_, #{dest_addresses := []}} when SenderPid /= not_started ->
+                         call => {set_dest_addresses, DestAddresses, NewDestAddresses}}),
+            case {DestAddresses, lists:sort(NewDestAddresses)} of
+                {_, DestAddresses} ->
+                    noreply;
+                {_, []} when SenderPid /= not_started ->
+                    ?LOG_DEBUG(#{module => ?MODULE, event => killing_sender}),
                     exit(SenderPid, die),
                     {noreply, State#{sender_pid => not_started,
-                                     config => NewConfig}};
-                {#{dest_addresses := []},
-                 #{dest_addresses := DestAddresses}} ->
+                                     dest_addresses => []}};
+                {[], SortedNewDestAddresses} ->
                     NewSenderPid =
                         start_sender(GaiaId, PcmName, Socket, SenderPid,
-                                     DestAddresses),
+                                     SortedNewDestAddresses),
                     {noreply, State#{sender_pid => NewSenderPid,
-                                     config => NewConfig}};
-                {not_set, #{dest_addresses := DestAddresses}} ->
+                                     dest_addresses => SortedNewDestAddresses}};
+                {_, SortedNewDestAddresses} ->
                     NewSenderPid =
                         start_sender(GaiaId, PcmName, Socket, SenderPid,
-                                     DestAddresses),
+                                     SortedNewDestAddresses),
                     {noreply, State#{sender_pid => NewSenderPid,
-                                     config => NewConfig}}
+                                     dest_addresses => SortedNewDestAddresses}}
             end;
         {subscription_packet, Packet} ->
-            #{dest_addresses := DestAddresses} = Config,
             ok = send_packet(GaiaId, Socket, Socket, Seqnum, DestAddresses,
                              Packet),
             {noreply, State#{seqnum => Seqnum + 1}};
@@ -133,7 +130,7 @@ message_handler(#{parent := Parent,
         {'EXIT', Parent, Reason} ->
             exit(Reason);
         {'EXIT', SenderPid, normal} ->
-            ?LOG_DEBUG(#{module => ?MODULE, exitreason => sender_died}),
+            ?LOG_DEBUG(#{module => ?MODULE, exit_reason => sender_died}),
             noreply;
         {'EXIT', SenderPid, Reason} ->
             ?LOG_ERROR(#{module => ?MODULE, exit_reason => Reason}),
@@ -144,6 +141,7 @@ message_handler(#{parent := Parent,
     end.
 
 start_sender(GaiaId, PcmName, Socket, not_started, DestAddresses) ->
+    ?LOG_DEBUG(#{module => ?MODULE, event => starting_sender}),
     spawn_link(fun() -> sender(GaiaId, PcmName, Socket, DestAddresses) end);
 start_sender(GaiaId, PcmName, Socket, SenderPid, DestAddresses) ->
     exit(SenderPid, die),

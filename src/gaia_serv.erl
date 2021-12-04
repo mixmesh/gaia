@@ -26,7 +26,6 @@ stop(Pid) ->
 %%
 
 init(Parent, GaiaId, {IpAddress, Port}, PcmName) ->
-    {ok, NodisSubscription} = nodis_serv:subscribe(),
     ?LOG_INFO("Gaia NIF is initializing..."),
     ok = gaia_nif:start({#{addr_port => {inet_parse:ntoa(IpAddress), Port},
                            opus_enabled => false},
@@ -35,8 +34,11 @@ init(Parent, GaiaId, {IpAddress, Port}, PcmName) ->
     ?LOG_INFO("Gaia NIF has been initialized"),
     ?LOG_DEBUG(#{module => ?MODULE, gaia_address => IpAddress}),
     ok = nodis:set_node_info(
-           #{gaia => #{id => GaiaId, address => inet:ntoa(IpAddress)}}),
+           #{gaia => #{id => GaiaId,
+                       ip_address => inet:ntoa(IpAddress),
+                       port => Port}}),
     ?LOG_INFO("Gaia server has been started"),
+    {ok, NodisSubscription} = nodis_serv:subscribe(),
     {ok, #{parent => Parent,
            gaia_id => GaiaId,
            nodis_subscription => NodisSubscription,
@@ -49,14 +51,15 @@ initial_message_handler(State) ->
                 supervisor_helper:get_selected_worker_pids(
                   [gaia_network_sender_serv], NeighbourWorkers),
             %% DEBUG
-            %ok = gaia_network_sender_serv:update_config(
+            %ok = gaia_network_sender_serv:set_addresses(
             %       NetworkSenderPid,
-            %       #{dest_addresses => [{?DEFAULT_ADDR, ?DEFAULT_PORT}]}),
+            %       [{?DEFAULT_ADDR, ?DEFAULT_PORT}]),
             {swap_message_handler, fun ?MODULE:message_handler/1,
              State#{network_sender_pid => NetworkSenderPid}}
     end.
 
 message_handler(#{parent := Parent,
+                  network_sender_pid := NetworkSenderPid,
                   nodis_subscription := NodisSubscription,
                   neighbours := Neighbours} = State) ->
     receive
@@ -66,19 +69,33 @@ message_handler(#{parent := Parent,
             {stop, From, ok};
         {nodis, NodisSubscription, {pending, Address}} ->
             ?LOG_DEBUG(#{module => ?MODULE, nodis => {pending, Address}}),
-            {noreply, State#{neighbours => Neighbours#{Address => pending}}};
+            noreply;
         {nodis, NodisSubscription, {up, Address}} ->
             ?LOG_DEBUG(#{module => ?MODULE, nodis => {up, Address}}),
-            {noreply, State#{neighbours => Neighbours#{Address => up}}};
+            noreply;
         {nodis, NodisSubscription, {down, Address}} ->
             ?LOG_DEBUG(#{module => ?MODULE, nodis => {down, Address}}),
             {noreply, State#{neighbours => maps:remove(Address, Neighbours)}};
         {nodis, NodisSubscription, {wait, Address}} ->
             ?LOG_DEBUG(#{module => ?MODULE, nodis => {wait, Address}}),
-            {noreply, State#{neighbours => Neighbours#{Address => wait}}};
+            noreply;
         {nodis, NodisSubscription, {change, Address, Info}} ->
             ?LOG_DEBUG(#{module => ?MODULE, nodis => {change, Address, Info}}),
-            noreply;
+            case update_neighbours(Neighbours, Address, Info) of
+                not_updated ->
+                    noreply;
+                UpdatedNeighbours ->
+                    DestAddresses =
+                        maps:foldl(
+                          fun(_Address,
+                              #{ip_address := GaiaIpAddress, port := GaiaPort},
+                              Acc) ->
+                                  [{GaiaIpAddress, GaiaPort}|Acc]
+                          end, [], UpdatedNeighbours),
+                    ok = gaia_network_sender_serv:set_dest_addresses(
+                           NetworkSenderPid, DestAddresses),
+                    {noreply, State#{neighbours => UpdatedNeighbours}}
+            end;
         {system, From, Request} ->
             ?LOG_DEBUG(#{module => ?MODULE, system => Request}),
             {system, From, Request};
@@ -87,4 +104,28 @@ message_handler(#{parent := Parent,
         UnknownMessage ->
             ?LOG_ERROR(#{module => ?MODULE, unknown_message => UnknownMessage}),
             noreply
+    end.
+
+update_neighbours(Neighbours, Address, Info) ->
+    case lists:keysearch(gaia, 1, Info) of
+        {gaia, #{id := GaiaId,
+                 ip_address := GaiaIpAddressString,
+                 port := GaiaPort} = GaiaInfo}
+          when is_integer(GaiaId) andalso
+               GaiaId > 0 andalso GaiaId < 65536 andalso
+               is_integer(GaiaPort) andalso
+               GaiaPort >= 1024 andalso GaiaPort < 65536 ->
+            case inet:parse_address(GaiaIpAddressString) of
+                {ok, GaiaIpAddress} ->
+                    Neighbours#{Address => GaiaInfo};
+                {error, _Reason} ->
+                    ?LOG_WARNING(#{module => ?MODULE,
+                                   bad_gaia_info => GaiaInfo}),
+                    not_updated
+            end;
+        {gaia, GaiaInfo} when is_map(GaiaInfo) ->
+            ?LOG_WARNING(#{module => ?MODULE, bad_gaia_info => GaiaInfo}),
+            not_updated;
+        false ->
+            not_updated
     end.
