@@ -48,6 +48,10 @@ initial_message_handler(State) ->
             [NetworkSenderPid] =
                 supervisor_helper:get_selected_worker_pids(
                   [gaia_network_sender_serv], NeighbourWorkers),
+            %% DEBUG
+            %ok = gaia_network_sender_serv:update_config(
+            %       NetworkSenderPid,
+            %       #{dest_addresses => [{?DEFAULT_ADDR, ?DEFAULT_PORT}]}),
             {swap_message_handler, fun ?MODULE:message_handler/1,
              State#{network_sender_pid => NetworkSenderPid}}
     end.
@@ -65,10 +69,6 @@ message_handler(#{parent := Parent,
             {noreply, State#{neighbours => Neighbours#{Address => pending}}};
         {nodis, NodisSubscription, {up, Address}} ->
             ?LOG_DEBUG(#{module => ?MODULE, nodis => {up, Address}}),
-            %% FIMXE: REMOVE!!!
-%            ok = gaia_network_sender_serv:update_config(
-%                   NetworkSenderPid,
-%                   #{dest_addresses => [{?DEFAULT_ADDR, ?DEFAULT_PORT}]}),
             {noreply, State#{neighbours => Neighbours#{Address => up}}};
         {nodis, NodisSubscription, {down, Address}} ->
             ?LOG_DEBUG(#{module => ?MODULE, nodis => {down, Address}}),
