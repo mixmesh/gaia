@@ -3,6 +3,8 @@
 -export([start_link/0]).
 -export([init/1]). %% Used by supervisor:start_link/2
 
+-include_lib("apptools/include/shorthand.hrl").
+
 %%
 %% Exported: start_link
 %%
@@ -28,17 +30,19 @@ start_link() ->
 
 init([]) ->
     GaiaId = config:lookup([gaia, 'gaia-id']),
-    InterfaceIpAddress = config:lookup([gaia, 'interface-ip-address']),
     BindAddress = config:lookup([gaia, 'bind-address']),
+    CapturePcmName = ?b2l(config:lookup([gaia, 'capture-pcm-name'])),
+    PlaybackPcmName = ?b2l(config:lookup([gaia, 'playback-pcm-name'])),
     GaiaServ =
 	#{id => gaia_serv,
-          start => {gaia_serv, start_link, [BindAddress]}},
+          start => {gaia_serv, start_link,
+                    [GaiaId, BindAddress, PlaybackPcmName]}},
     GaiaAudioSourceServ =
 	#{id => gaia_audio_source_serv,
-          start => {gaia_audio_source_serv, start_link, []}},
+          start => {gaia_audio_source_serv, start_link, [CapturePcmName]}},
     GaiaNetworkSenderServ =
 	#{id => gaia_network_sender_serv,
           start => {gaia_network_sender_serv, start_link,
-		    [GaiaId, InterfaceIpAddress, false]}},
+                    [GaiaId, BindAddress, CapturePcmName, false]}},
     {ok, {#{strategy => one_for_all},
           [GaiaServ, GaiaAudioSourceServ, GaiaNetworkSenderServ]}}.

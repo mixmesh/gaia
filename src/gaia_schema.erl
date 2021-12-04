@@ -16,13 +16,18 @@ get() ->
            name = {integer, 1, 65535},
            typical = 1,
            reloadable = false}},
-       {'interface-ip-address',
-        #json_type{
-           name = ip_address,
-           typical = {242, 45, 0, 34},
-           reloadable = false}},
        {'bind-address',
         #json_type{
            name = ip_address_port,
            typical = {{242, 45, 0, 34}, 10000},
+           reloadable = false}},
+       {'capture-pcm-name',
+        #json_type{
+           name = string,
+           typical = <<"plughw:0,0">>,
+           reloadable = false}},
+       {'playback-pcm-name',
+        #json_type{
+           name = string,
+           typical = <<"plughw:0,0">>,
            reloadable = false}}]}].

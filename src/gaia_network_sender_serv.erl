@@ -1,5 +1,5 @@
 -module(gaia_network_sender_serv).
--export([start_link/3, stop/1, update_config/2]).
+-export([start_link/4, stop/1, update_config/2]).
 -export([message_handler/1]).
 
 -include_lib("apptools/include/serv.hrl").
@@ -12,10 +12,10 @@
 %% Exported: start_link
 %%
 
-start_link(GaiaId, InterfaceIpAddress, UseAudioSource) ->
+start_link(GaiaId, BindAddress, PcmName, UseAudioSource) ->
     ?spawn_server(
        fun(Parent) ->
-               init(Parent, GaiaId, InterfaceIpAddress, UseAudioSource)
+               init(Parent, GaiaId, BindAddress, PcmName, UseAudioSource)
        end,
        fun initial_message_handler/1).
 
@@ -37,13 +37,14 @@ update_config(Pid, Config) ->
 %% Server
 %%
 
-init(Parent, GaiaId, InterfaceIpAddress, UseAudioSource) ->
-    case gen_udp:open(0, [{ifaddr, InterfaceIpAddress}, {mode, binary},
+init(Parent, GaiaId, {IpAddress, _Port}, PcmName, UseAudioSource) ->
+    case gen_udp:open(0, [{ifaddr, IpAddress}, {mode, binary},
                           {active, false}]) of
         {ok, Socket} ->
             ?LOG_INFO("Gaia network sender server has been started"),
             {ok, #{parent => Parent,
                    gaia_id => GaiaId,
+                   pcm_name => PcmName,
                    use_audio_source => UseAudioSource,
                    socket => Socket,
                    sender_pid => not_started,
@@ -66,6 +67,7 @@ initial_message_handler(State) ->
 
 message_handler(#{parent := Parent,
                   gaia_id := GaiaId,
+                  pcm_name := PcmName,
                   use_audio_source := UseAudioSource,
                   socket := Socket,
                   sender_pid := SenderPid,
@@ -109,12 +111,14 @@ message_handler(#{parent := Parent,
                 {#{dest_addresses := []},
                  #{dest_addresses := DestAddresses}} ->
                     NewSenderPid =
-                        start_sender(GaiaId, Socket, SenderPid, DestAddresses),
+                        start_sender(GaiaId, PcmName, Socket, SenderPid,
+                                     DestAddresses),
                     {noreply, State#{sender_pid => NewSenderPid,
                                      config => NewConfig}};
                 {not_set, #{dest_addresses := DestAddresses}} ->
                     NewSenderPid =
-                        start_sender(GaiaId, Socket, SenderPid, DestAddresses),
+                        start_sender(GaiaId, PcmName, Socket, SenderPid,
+                                     DestAddresses),
                     {noreply, State#{sender_pid => NewSenderPid,
                                      config => NewConfig}}
             end;
@@ -139,17 +143,17 @@ message_handler(#{parent := Parent,
             noreply
     end.
 
-start_sender(GaiaId, Socket, not_started, DestAddresses) ->
-    spawn_link(fun() -> start_sender(GaiaId, Socket, DestAddresses) end);
-start_sender(GaiaId, Socket, SenderPid, DestAddresses) ->
+start_sender(GaiaId, PcmName, Socket, not_started, DestAddresses) ->
+    spawn_link(fun() -> sender(GaiaId, PcmName, Socket, DestAddresses) end);
+start_sender(GaiaId, PcmName, Socket, SenderPid, DestAddresses) ->
     exit(SenderPid, die),
-    start_sender(GaiaId, Socket, not_started, DestAddresses).
+    start_sender(GaiaId, PcmName, Socket, not_started, DestAddresses).
 
 %%
 %% Sender
 %%
 
-start_sender(GaiaId, Socket, DestAddresses) ->
+sender(GaiaId, PcmName, Socket, DestAddresses) ->
     WantedHwParams =
         #{format => ?FORMAT,
           channels => ?CHANNELS,
@@ -158,7 +162,7 @@ start_sender(GaiaId, Socket, DestAddresses) ->
 %          NOTE: For some reason it is not allowed to set the buffer size on PI
 %          buffer_size => ?PERIOD_SIZE_IN_FRAMES * ?BUFFER_MULTIPLICATOR
          },
-    case alsa:open(?DEFAULT_PCM_NAME, capture, WantedHwParams, #{}) of
+    case alsa:open(PcmName, capture, WantedHwParams, #{}) of
         {ok, AlsaHandle, ActualHwParams, ActualSwParams} ->
             ?LOG_INFO(#{actual_hw_params => ActualHwParams,
                         actual_sw_params => ActualSwParams}),

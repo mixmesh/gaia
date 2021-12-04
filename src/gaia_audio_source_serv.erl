@@ -1,5 +1,5 @@
 -module(gaia_audio_source_serv).
--export([start_link/0, stop/1]).
+-export([start_link/1, stop/1]).
 -export([message_handler/1]).
 
 -include_lib("apptools/include/serv.hrl").
@@ -9,10 +9,8 @@
 %% Exported: start_link
 %%
 
-start_link() ->
-    ?spawn_server(fun(Parent) ->
-                          init(Parent)
-                  end,
+start_link(PcmName) ->
+    ?spawn_server(fun(Parent) -> init(Parent, PcmName) end,
                   fun initial_message_handler/1).
 
 %%
@@ -26,9 +24,9 @@ stop(Pid) ->
 %% Server
 %%
 
-init(Parent) ->
+init(Parent, PcmName) ->
     ?LOG_INFO("Gaia audio source server has been started"),
-    {ok, #{parent => Parent}}.
+    {ok, #{parent => Parent, pcm_name => PcmName}}.
 
 initial_message_handler(State) ->
     receive
