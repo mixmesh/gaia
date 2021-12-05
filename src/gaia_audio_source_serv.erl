@@ -1,5 +1,5 @@
 -module(gaia_audio_source_serv).
--export([start_link/1, stop/1, subscribe/1, unsubscribe/1]).
+-export([start_link/1, stop/1, subscribe/1, subscribe/2, unsubscribe/1]).
 -export([message_handler/1]).
 
 -include_lib("apptools/include/serv.hrl").
@@ -25,8 +25,11 @@ stop(Pid) ->
 %% Exported: subscribe
 %%
 
+subscribe(Pid, Callback) ->
+    serv:call(Pid, {subscribe, self(), Callback}).
+
 subscribe(Pid) ->
-    serv:call(Pid, {subscribe, self()}).
+    serv:call(Pid, {subscribe, self(), bang}).
 
 %%
 %% Exported: unsubscribe
@@ -44,7 +47,7 @@ init(Parent, PcmName) ->
     AudioProducerPid = spawn_link(fun() -> audio_producer(PcmName) end),
     {ok, #{parent => Parent,
            audio_producer_pid => AudioProducerPid,
-           subscriber_pids => []}}.
+           subscribers => []}}.
 
 initial_message_handler(State) ->
     receive
@@ -54,40 +57,41 @@ initial_message_handler(State) ->
 
 message_handler(#{parent := Parent,
                   audio_producer_pid := AudioProducerPid,
-                  subscriber_pids := SubscriberPids} = State) ->
+                  subscribers := Subscribers} = State) ->
     receive
         {call, From, stop} ->
             ?LOG_DEBUG(#{module => ?MODULE, call => stop}),
             {stop, From, ok};
-        {call, From, {subscribe, Pid}} ->
+        {call, From, {subscribe, Pid, Callback}} ->
             ?LOG_DEBUG(#{module => ?MODULE, call => subscribe}),
-            case lists:member(Pid, SubscriberPids) of
+            case lists:keymember(Pid, 1, Subscribers) of
                 true ->
                     {reply, From, {error, already_subscribed}};
                 false ->
-                    UpdatedSubscriberPids = [Pid|SubscriberPids],
-                    AudioProducerPid ! {subscribers, UpdatedSubscriberPids},
-                    _ = monitor(process, Pid),
+                    MonitorRef = monitor(process, Pid),
+                    UpdatedSubscribers =
+                        [{Pid, MonitorRef, Callback}|Subscribers],
+                    AudioProducerPid ! {subscribers, UpdatedSubscribers},
                     {reply, From, ok,
-                     State#{subscriber_pids => UpdatedSubscriberPids}}
+                     State#{subscribers => UpdatedSubscribers}}
             end;
         {call, From, {unsubscribe, Pid}} ->
             ?LOG_DEBUG(#{module => ?MODULE, call => unsubscribe}),
-            case lists:member(Pid, SubscriberPids) of
-                true ->
-                    UpdatedSubscriberPids = lists:delete(Pid, SubscriberPids),
-                    AudioProducerPid ! {subscribers, UpdatedSubscriberPids},
-                    true = demonitor(Pid),
+            case lists:keysearch(Pid, 1, Subscribers) of
+                {value, {_Pid, MonitorRef, _Callback}} ->
+                    UpdatedSubscribers = lists:keydelete(Pid, 1, Subscribers),
+                    AudioProducerPid ! {subscribers, UpdatedSubscribers},
+                    true = demonitor(MonitorRef),
                     {reply, From, ok,
-                     State#{subscriber_pids => UpdatedSubscriberPids}};
+                     State#{subscribers => UpdatedSubscribers}};
                 false ->
                     {reply, From, {error, not_subscribed}}
             end;
-        {'DOWN', _MonitorRef, process, SubscriberPid, _Info} ->
+        {'DOWN', _Ref, process, Pid, _Info} ->
             ?LOG_DEBUG(#{module => ?MODULE, event => subscriber_down}),
-            UpdatedSubscriberPids = lists:delete(SubscriberPid, SubscriberPids),
-            AudioProducerPid ! {subscribers, UpdatedSubscriberPids},
-            {noreply, State#{subscriber_pids => UpdatedSubscriberPids}};
+            UpdatedSubscribers = lists:keydelete(Pid, 1, Subscribers),
+            AudioProducerPid ! {subscribers, UpdatedSubscribers},
+            {noreply, State#{subscribers => UpdatedSubscribers}};
         {system, From, Request} ->
             ?LOG_DEBUG(#{module => ?MODULE, system => Request}),
             {system, From, Request};
@@ -121,30 +125,43 @@ audio_producer(PcmName) ->
 
 audio_producer(AlsaHandle, []) ->
     receive
-        {subscribers, SubscriberPids} ->
-            audio_producer(AlsaHandle, SubscriberPids)
+        {subscribers, Subscribers} ->
+            audio_producer(AlsaHandle, Subscribers)
     end;
-audio_producer(AlsaHandle, CurrentSubscriberPids) ->
-    SubscriberPids =
+audio_producer(AlsaHandle, CurrentSubscribers) ->
+    Subscribers =
         receive
-            {subscribers, UpdatedSubscriberPids} ->
-                UpdatedSubscriberPids
+            {subscribers, UpdatedSubscribers} ->
+                lists:map(
+                  fun({Pid, MonitorRef, Callback} = Subscriber) ->
+                          case lists:keysearch(Pid, 1, CurrentSubscribers) of
+                              {value, {Pid, MonitorRef, OldCallback}} ->
+                                  {Pid, MonitorRef, Callback(OldCallback)};
+                              false ->
+                                  Subscriber
+                          end
+                  end, UpdatedSubscribers)
         after
             0 ->
-                CurrentSubscriberPids
+                CurrentSubscribers
         end,
     case alsa:read(AlsaHandle, ?PERIOD_SIZE_IN_FRAMES) of
         {ok, Packet} when is_binary(Packet) ->
-            lists:foreach(fun(Pid) ->
-                                  Pid ! {subscription_packet, Packet}
-                          end, SubscriberPids),
-            audio_producer(AlsaHandle, SubscriberPids);
+            MergedSubscribers =
+                lists:map(fun({Pid, _MonitorRef, bang} = Subscriber) ->
+                                  Pid ! {subscription_packet, Packet},
+                                  Subscriber;
+                             ({Pid, MonitorRef, Callback}) ->
+                                  NextCallback = Callback(Packet),
+                                  {Pid, MonitorRef, NextCallback}
+                          end, Subscribers),
+            audio_producer(AlsaHandle, MergedSubscribers);
         {ok, overrun} ->
             ?LOG_WARNING(#{module => ?MODULE, reason => overrun}),
-            audio_producer(AlsaHandle, SubscriberPids);
+            audio_producer(AlsaHandle, Subscribers);
         {ok, suspend_event} ->
             ?LOG_WARNING(#{module => ?MODULE, reason => suspend_event}),
-            audio_producer(AlsaHandle, SubscriberPids);
+            audio_producer(AlsaHandle, Subscribers);
         {error, Reason} ->
             alsa:close(AlsaHandle),
             exit(Reason)

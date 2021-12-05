@@ -43,6 +43,6 @@ init([]) ->
     GaiaNetworkSenderServ =
 	#{id => gaia_network_sender_serv,
           start => {gaia_network_sender_serv, start_link,
-                    [GaiaId, BindAddress, CapturePcmName, false]}},
+                    [GaiaId, BindAddress, true]}},
     {ok, {#{strategy => one_for_all},
           [GaiaServ, GaiaAudioSourceServ, GaiaNetworkSenderServ]}}.
