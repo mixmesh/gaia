@@ -77,7 +77,7 @@ message_handler(#{parent := Parent,
                 true ->
                     UpdatedSubscriberPids = lists:delete(Pid, SubscriberPids),
                     AudioProducerPid ! {subscribers, UpdatedSubscriberPids},
-                    ok = demonitor(Pid),
+                    true = demonitor(Pid),
                     {reply, From, ok,
                      State#{subscriber_pids => UpdatedSubscriberPids}};
                 false ->
