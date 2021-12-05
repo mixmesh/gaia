@@ -121,29 +121,32 @@ audio_producer(PcmName) ->
             exit(Reason)
     end.
 
-audio_producer(AlsaHandle, SubscriberPids) ->
-    CurrentSubscriberPids =
+audio_producer(AlsaHandle, []) ->
+    receive
+        {subscribers, SubscriberPids} ->
+            audio_producer(AlsaHandle, SubscriberPids)
+    end;
+audio_producer(AlsaHandle, CurrentSubscriberPids) ->
+    SubscriberPids =
         receive
-            {subscribers, []} ->
-                audio_producer(AlsaHandle, []);
-            {subscribers, UpdatedSubscribers} ->
-                UpdatedSubscribers
+            {subscribers, UpdatedSubscriberPids} ->
+                UpdatedSubscriberPids
         after
             0 ->
-                SubscriberPids
+                CurrentSubscriberPids
         end,
     case alsa:read(AlsaHandle, ?PERIOD_SIZE_IN_FRAMES) of
         {ok, Packet} when is_binary(Packet) ->
             lists:foreach(fun(Pid) ->
                                   Pid ! {subscription_packet, Packet}
-                          end, CurrentSubscriberPids),
-            audio_producer(AlsaHandle, CurrentSubscriberPids);
+                          end, SubscriberPids),
+            audio_producer(AlsaHandle, SubscriberPids);
         {ok, overrun} ->
             ?LOG_WARNING(#{module => ?MODULE, reason => overrun}),
-            audio_producer(AlsaHandle, CurrentSubscriberPids);
+            audio_producer(AlsaHandle, SubscriberPids);
         {ok, suspend_event} ->
             ?LOG_WARNING(#{module => ?MODULE, reason => suspend_event}),
-            audio_producer(AlsaHandle, CurrentSubscriberPids);
+            audio_producer(AlsaHandle, SubscriberPids);
         {error, Reason} ->
             alsa:close(AlsaHandle),
             exit(Reason)
