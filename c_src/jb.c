@@ -35,12 +35,24 @@ jb_t *jb_new(uint32_t gaia_id, bool opus_enabled) {
     }
 
 void jb_free(jb_t *jb, bool free_entries_only) {
+    fprintf(stderr, "-1-1: %d\r\n", jb->nentries);
+    if (jb->nentries == 0) {
+        fprintf(stderr, "11AA\r\n");
+        return;
+    }
     fprintf(stderr, "00\r\n");
     jb_take_wrlock(jb);
     jb_entry_t *jb_entry = jb->tail;
     while (jb_entry != NULL) {
-        fprintf(stderr, "001\r\n");
         jb_entry_t *next_jb_entry = jb_entry->next;
+
+
+
+        fprintf(stderr, "001\r\n");
+        fprintf(stderr, "%d\r\n", jb->exhausted);
+
+
+
         jb_entry_free(jb_entry);
         jb_entry = next_jb_entry;
         fprintf(stderr, "002\r\n");
