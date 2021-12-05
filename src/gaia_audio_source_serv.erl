@@ -1,5 +1,5 @@
 -module(gaia_audio_source_serv).
--export([start_link/1, stop/1, subscribe/1, unsubscribe/2]).
+-export([start_link/1, stop/1, subscribe/1, unsubscribe/1]).
 -export([message_handler/1]).
 
 -include_lib("apptools/include/serv.hrl").
@@ -32,8 +32,8 @@ subscribe(Pid) ->
 %% Exported: unsubscribe
 %%
 
-unsubscribe(Pid, SubscriptionRef) ->
-    serv:call(Pid, {unsubscribe, self(), SubscriptionRef}).
+unsubscribe(Pid) ->
+    serv:call(Pid, {unsubscribe, self()}).
 
 %%
 %% Server
@@ -44,7 +44,7 @@ init(Parent, PcmName) ->
     AudioProducerPid = spawn_link(fun() -> audio_producer(PcmName) end),
     {ok, #{parent => Parent,
            audio_producer_pid => AudioProducerPid,
-           subscriptions => #{}}}.
+           subscriber_pids => []}}.
 
 initial_message_handler(State) ->
     receive
@@ -54,42 +54,35 @@ initial_message_handler(State) ->
 
 message_handler(#{parent := Parent,
                   audio_producer_pid := AudioProducerPid,
-                  subscriptions := Subscriptions} = State) ->
+                  subscriber_pids := SubscriberPids} = State) ->
     receive
         {call, From, stop} ->
             ?LOG_DEBUG(#{module => ?MODULE, call => stop}),
             {stop, From, ok};
-        {call, From, {subscribe, SubscriberPid}} ->
+        {call, From, {subscribe, Pid}} ->
             ?LOG_DEBUG(#{module => ?MODULE, call => subscribe}),
-            case maps:get(SubscriberPid, Subscriptions, not_subscriber) of
-                not_subscriber ->
-                    SubscriptionRef = monitor(process, SubscriberPid),
-                    UpdatedSubscriptions =
-                        Subscriptions#{SubscriberPid => SubscriptionRef},
-                    AudioProducerPid !
-                        {subscribers, maps:keys(UpdatedSubscriptions)},
-                    {reply, From, {ok, SubscriptionRef},
-                     State#{subscriptions => UpdatedSubscriptions}};
-                _ ->
-                    {reply, From, {error, already_subscribed}}
-            end;
-        {call, From, {unsubscribe, SubscriberPid, UnsubscriptionRef}} ->
-            ?LOG_DEBUG(#{module => ?MODULE, call => unsubscribe}),
-            case maps:filter(
-                   fun(_, SubscriptionRef) ->
-                           SubscriptionRef == UnsubscriptionRef
-                   end, Subscriptions) of
-                #{SubscriberPid := SubscriptionRef} ->
-                    ok = demonitor(SubscriptionRef),
-                    UpdatedSubscriptions =
-                        maps:remove(SubscriberPid, Subscriptions),
-                    AudioProducerPid !
-                        {subscribers, maps:keys(UpdatedSubscriptions)},
+            case lists:member(Pid, SubscriberPids) of
+                true ->
+                    {reply, From, {error, already_subscribed}};
+                false ->
+                    UpdatedSubscriberPids = [Pid|SubscriberPids],
+                    AudioProducerPid ! {subscribers, UpdatedSubscriberPids},
+                    _ = monitor(process, Pid),
                     {reply, From, ok,
-                     State#{subscriptions => UpdatedSubscriptions}};
-                _ ->
-                    {reply, From, {error, not_subscriber}}
+                     State#{subscriber_pids => UpdatedSubscriberPids}}
             end;
+        {call, From, {unsubscribe, Pid}} ->
+            ?LOG_DEBUG(#{module => ?MODULE, call => unsubscribe}),
+            case lists:member(Pid, SubscriberPids) of
+                true ->
+                    UpdatedSubscriberPids = lists:delete(Pid, SubscriberPids),
+                    AudioProducerPid ! {subscribers, UpdatedSubscriberPids},
+                    ok = demonitor(Pid),
+                    {reply, From, ok,
+                     State#{subscriber_pids => UpdatedSubscriberPids}};
+                false ->
+                    {reply, From, {error, not_subscribed}}
+                end;
         {system, From, Request} ->
             ?LOG_DEBUG(#{module => ?MODULE, system => Request}),
             {system, From, Request};

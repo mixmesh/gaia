@@ -67,6 +67,7 @@ initial_message_handler(State) ->
     end.
 
 message_handler(#{parent := Parent,
+                  audio_source_pid := AudioSourcePid,
                   gaia_id := GaiaId,
                   pcm_name := PcmName,
                   use_audio_source := UseAudioSource,
@@ -74,7 +75,6 @@ message_handler(#{parent := Parent,
                   sender_pid := SenderPid,
                   dest_addresses := DestAddresses,
                   seqnum := Seqnum,
-                  subscription := Subscription,
                   sender_alsa_handle := SenderAlsaHandle} = State) ->
     receive
         {call, From, stop} ->
@@ -88,13 +88,12 @@ message_handler(#{parent := Parent,
                 {_, DestAddresses} ->
                     noreply;
                 {_, []} ->
-                    ok = gaia_audio_source_serv:unsubscribe(Subscription),
+                    ok = gaia_audio_source_serv:unsubscribe(AudioSourcePid),
                     {noreply, State#{dest_addresses => [],
                                      subscription => false}};
                 {[], SortedNewDestAddresses} ->
-                    {ok, NewSubscription} = gaia_audio_source_serv:subscribe(),
-                    {noreply, State#{dest_addresses => SortedNewDestAddresses,
-                                     subscription => NewSubscription}};
+                    ok = gaia_audio_source_serv:unsubscribe(AudioSourcePid),
+                    {noreply, State#{dest_addresses => SortedNewDestAddresses}};
                 {_, SortedNewDestAddresses} ->
                     {noreply, State#{dest_addresses => SortedNewDestAddresses}}
             end;
