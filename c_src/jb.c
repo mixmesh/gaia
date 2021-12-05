@@ -36,7 +36,8 @@ jb_t *jb_new(uint32_t gaia_id, bool opus_enabled) {
 
 void jb_free(jb_t *jb, bool free_entries_only) {
     fprintf(stderr, "-1-1: %d\r\n", jb->nentries);
-    if (jb->nentries == 0) {
+    fprintf(stderr, "-1-1-1: %d\r\n", jb->exhausted);
+    if (jb->nentries == 0 || jb->exhausted) {
         fprintf(stderr, "11AA\r\n");
         return;
     }
