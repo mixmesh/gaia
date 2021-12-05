@@ -1,9 +1,10 @@
 -module(gaia_audio_source_serv).
--export([start_link/1, stop/1]).
+-export([start_link/1, stop/1, subscribe/1, unsubscribe/2]).
 -export([message_handler/1]).
 
 -include_lib("apptools/include/serv.hrl").
 -include_lib("kernel/include/logger.hrl").
+-include("gaia.hrl").
 
 %%
 %% Exported: start_link
@@ -21,12 +22,29 @@ stop(Pid) ->
     serv:call(Pid, stop).
 
 %%
+%% Exported: subscribe
+%%
+
+subscribe(Pid) ->
+    serv:call(Pid, {subscribe, self()}).
+
+%%
+%% Exported: unsubscribe
+%%
+
+unsubscribe(Pid, SubscriptionRef) ->
+    serv:call(Pid, {unsubscribe, self(), SubscriptionRef}).
+
+%%
 %% Server
 %%
 
 init(Parent, PcmName) ->
     ?LOG_INFO("Gaia audio source server has been started"),
-    {ok, #{parent => Parent, pcm_name => PcmName}}.
+    AudioProducerPid = spawn_link(fun() -> audio_producer(PcmName) end),
+    {ok, #{parent => Parent,
+           audio_producer_pid => AudioProducerPid,
+           subscriptions => #{}}}.
 
 initial_message_handler(State) ->
     receive
@@ -34,17 +52,99 @@ initial_message_handler(State) ->
             {swap_message_handler, fun ?MODULE:message_handler/1, State}
     end.
 
-message_handler(#{parent := Parent}) ->
+message_handler(#{parent := Parent,
+                  audio_producer_pid := AudioProducerPid,
+                  subscriptions := Subscriptions} = State) ->
     receive
         {call, From, stop} ->
             ?LOG_DEBUG(#{module => ?MODULE, call => stop}),
             {stop, From, ok};
+        {call, From, {subscribe, SubscriberPid}} ->
+            ?LOG_DEBUG(#{module => ?MODULE, call => subscribe}),
+            case maps:get(SubscriberPid, Subscriptions, not_subscriber) of
+                not_subscriber ->
+                    SubscriptionRef = monitor(process, SubscriberPid),
+                    UpdatedSubscriptions =
+                        Subscriptions#{SubscriberPid => SubscriptionRef},
+                    AudioProducerPid !
+                        {subscribers, maps:keys(UpdatedSubscriptions)},
+                    {reply, From, {ok, SubscriptionRef},
+                     State#{subscriptions => UpdatedSubscriptions}};
+                _ ->
+                    {reply, From, {error, already_subscribed}}
+            end;
+        {call, From, {unsubscribe, SubscriberPid, UnsubscriptionRef}} ->
+            ?LOG_DEBUG(#{module => ?MODULE, call => unsubscribe}),
+            case maps:filter(
+                   fun(_, SubscriptionRef) ->
+                           SubscriptionRef == UnsubscriptionRef
+                   end, Subscriptions) of
+                #{SubscriberPid := SubscriptionRef} ->
+                    ok = demonitor(SubscriptionRef),
+                    UpdatedSubscriptions =
+                        maps:remove(SubscriberPid, Subscriptions),
+                    AudioProducerPid !
+                        {subscribers, maps:keys(UpdatedSubscriptions)},
+                    {reply, From, ok,
+                     State#{subscriptions => UpdatedSubscriptions}};
+                _ ->
+                    {reply, From, {error, not_subscriber}}
+            end;
         {system, From, Request} ->
             ?LOG_DEBUG(#{module => ?MODULE, system => Request}),
             {system, From, Request};
+        {'EXIT', AudioProducerPid, Reason} ->
+            ?LOG_DEBUG(#{module => ?MODULE, audio_producer_died => Reason}),
+            noreply;
         {'EXIT', Parent, Reason} ->
             exit(Reason);
         UnknownMessage ->
             ?LOG_ERROR(#{module => ?MODULE, unknown_message => UnknownMessage}),
             noreply
+    end.
+
+audio_producer(PcmName) ->
+    WantedHwParams =
+        #{format => ?FORMAT,
+          channels => ?CHANNELS,
+          sample_rate => ?RATE_IN_HZ,
+          period_size => ?PERIOD_SIZE_IN_FRAMES
+%          NOTE: For some reason it is not allowed to set the buffer size on PI
+%          buffer_size => ?PERIOD_SIZE_IN_FRAMES * ?BUFFER_MULTIPLICATOR
+         },
+    case alsa:open(PcmName, capture, WantedHwParams, #{}) of
+        {ok, AlsaHandle, ActualHwParams, ActualSwParams} ->
+            ?LOG_INFO(#{actual_hw_params => ActualHwParams,
+                        actual_sw_params => ActualSwParams}),
+            audio_producer(AlsaHandle, []);
+        {error, Reason} ->
+            exit(Reason)
+    end.
+
+audio_producer(AlsaHandle, SubscriberPids) ->
+    CurrentSubscriberPids =
+        receive
+            {subscribers, []} ->
+                audio_producer(AlsaHandle, []);
+            {subscribers, UpdatedSubscribers} ->
+                UpdatedSubscribers
+        after
+            0 ->
+                SubscriberPids
+        end,
+    case alsa:read(AlsaHandle, ?PERIOD_SIZE_IN_FRAMES) of
+        {ok, Packet} when is_binary(Packet) ->
+            lists:foreach(fun(Pid) ->
+                                  Pid ! {subscription_packet, Packet}
+                          end, CurrentSubscriberPids),
+            audio_producer(AlsaHandle, CurrentSubscriberPids);
+        {ok, overrun} ->
+            ?LOG_WARNING(#{module => ?MODULE, reason => overrun}),
+            audio_producer(AlsaHandle, CurrentSubscriberPids);
+        {ok, suspend_event} ->
+            ?LOG_WARNING(#{module => ?MODULE, reason => suspend_event}),
+            audio_producer(AlsaHandle, CurrentSubscriberPids);
+        {error, Reason} ->
+            alsa:close(AlsaHandle),
+            exit(Reason)
     end.
