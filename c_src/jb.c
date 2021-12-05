@@ -39,9 +39,7 @@ void jb_free(jb_t *jb, bool free_entries_only) {
     jb_entry_t *jb_entry = jb->tail;
     while (jb_entry != NULL) {
         jb_entry_t *next_jb_entry = jb_entry->next;
-        fprintf(stderr, "0\r\n");
         jb_entry_free(jb_entry);
-        fprintf(stderr, "1\r\n");
         jb_entry = next_jb_entry;
     }
     if (jb->opus_decoder != NULL) {
@@ -58,13 +56,9 @@ void jb_free(jb_t *jb, bool free_entries_only) {
     } else {
         jb_release_wrlock(jb);
         assert(thread_rwlock_destroy(jb->rwlock) == 0);
-        fprintf(stderr, "2\r\n");
         free(jb->rwlock);
-        fprintf(stderr, "3\r\n");
         free(jb->peak_values);
-        fprintf(stderr, "4\r\n");
         free(jb);
-        fprintf(stderr, "4\r\n");
     }
 }
 

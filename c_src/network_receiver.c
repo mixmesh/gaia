@@ -115,6 +115,9 @@ void *network_receiver(void *arg) {
         }
         DEBUGP("Socket receive buffer has been drained");
 
+        DEBUGP("Erase all stale jitter buffers");
+        jb_table_free(jb_table, true);
+
         uint64_t gaia_id = 0;
         jb_t *jb = NULL;
         double latency = 0;
@@ -252,9 +255,6 @@ gaia-id");
             assert(jb_insert(jb, jb_entry) != 0);
             jb_release_wrlock(jb);
         }
-
-        DEBUGP("Erase all jitter buffers");
-        jb_table_free(jb_table, true);
     }
 
  bail_out:
