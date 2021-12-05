@@ -82,7 +82,11 @@ message_handler(#{parent := Parent,
                      State#{subscriber_pids => UpdatedSubscriberPids}};
                 false ->
                     {reply, From, {error, not_subscribed}}
-                end;
+            end;
+        {'DOWN', _MonitorRef, process, SubscriberPid, _Info} ->
+            UpdatedSubscriberPids = lists:delete(SubscriberPid, SubscriberPids),
+            AudioProducerPid ! {subscribers, UpdatedSubscriberPids},
+            {noreply, State#{subscriber_pids => UpdatedSubscriberPids}};
         {system, From, Request} ->
             ?LOG_DEBUG(#{module => ?MODULE, system => Request}),
             {system, From, Request};
