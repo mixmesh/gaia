@@ -174,9 +174,7 @@ gaia-id");
 
             // Jitter buffer is exhausted according to audio sink
             if (jb->exhausted) {
-                jb_take_wrlock(jb);
                 jb_free(jb, true);
-                jb_release_wrlock(jb);
             }
 
             // Prepare new jitter buffer entry
