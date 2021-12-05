@@ -50,7 +50,8 @@ init(Parent, GaiaId, {IpAddress, _Port}, PcmName, UseAudioSource) ->
                    sender_pid => not_started,
                    dest_addresses => [],
                    seqnum => 1,
-                   subscription => false}};
+                   subscription => false,
+                   sender_alsa_handle => not_set}};
         {error, Reason} ->
             {error, Reason}
     end.
@@ -73,11 +74,12 @@ message_handler(#{parent := Parent,
                   sender_pid := SenderPid,
                   dest_addresses := DestAddresses,
                   seqnum := Seqnum,
-                  subscription := Subscription} = State) ->
+                  subscription := Subscription,
+                  sender_alsa_handle := SenderAlsaHandle} = State) ->
     receive
         {call, From, stop} ->
             ?LOG_DEBUG(#{module => ?MODULE, call => stop}),
-            exit(SenderPid, die),
+            true = kill_sender(SenderPid, SenderAlsaHandle),
             {stop, From, ok};
         {cast, {set_dest_addresses, NewDestAddresses}} when UseAudioSource ->
             ?LOG_DEBUG(#{module => ?MODULE,
@@ -102,11 +104,10 @@ message_handler(#{parent := Parent,
             case {DestAddresses, lists:sort(NewDestAddresses)} of
                 {_, DestAddresses} ->
                     noreply;
-                {_, []} when SenderPid /= not_started ->
+                {_, []} ->
                     ?LOG_DEBUG(#{module => ?MODULE, event => killing_sender}),
-                    exit(SenderPid, die),
-                    {noreply, State#{sender_pid => not_started,
-                                     dest_addresses => []}};
+                    true = kill_sender(SenderPid, SenderAlsaHandle),
+                    {noreply, State#{dest_addresses => []}};
                 {[], SortedNewDestAddresses} ->
                     NewSenderPid =
                         start_sender(GaiaId, PcmName, Socket, SenderPid,
@@ -124,34 +125,45 @@ message_handler(#{parent := Parent,
             ok = send_packet(GaiaId, Socket, Socket, Seqnum, DestAddresses,
                              Packet),
             {noreply, State#{seqnum => Seqnum + 1}};
+        {sender_alsa_handle, AlsaHandle} ->
+            {noreply, State#{sender_alsa_handle => AlsaHandle}};
         {system, From, Request} ->
             ?LOG_DEBUG(#{module => ?MODULE, system => Request}),
             {system, From, Request};
         {'EXIT', Parent, Reason} ->
+            true = kill_sender(SenderPid, SenderAlsaHandle),
             exit(Reason);
-        {'EXIT', SenderPid, normal} ->
-            ?LOG_DEBUG(#{module => ?MODULE, exit_reason => sender_died}),
+        {'EXIT', SenderPid, killed} ->
+            ?LOG_DEBUG(#{module => ?MODULE, exit_reason => sender_killed}),
             noreply;
         {'EXIT', SenderPid, Reason} ->
             ?LOG_ERROR(#{module => ?MODULE, exit_reason => Reason}),
-            noreply;
+            {noreply, State#{sender_pid => not_started}};
         UnknownMessage ->
             ?LOG_ERROR(#{module => ?MODULE, unknown_message => UnknownMessage}),
             noreply
     end.
 
-start_sender(GaiaId, PcmName, Socket, not_started, DestAddresses) ->
-    ?LOG_DEBUG(#{module => ?MODULE, event => starting_sender}),
-    spawn_link(fun() -> sender(GaiaId, PcmName, Socket, DestAddresses) end);
+kill_sender(not_started, _SenderAlsaHandle) ->
+    true;
+kill_sender(SenderPid, not_set) ->
+    exit(SenderPid, kill);
+kill_sender(SenderPid, SenderAlsaHandle) ->
+    alsa:close(SenderAlsaHandle),
+    exit(SenderPid, kill).
+
 start_sender(GaiaId, PcmName, Socket, SenderPid, DestAddresses) ->
-    exit(SenderPid, die),
-    start_sender(GaiaId, PcmName, Socket, not_started, DestAddresses).
+    ?LOG_DEBUG(#{module => ?MODULE, event => starting_sender}),
+    true = kill_sender(SenderPid, not_set),
+    Parent = self(),
+    spawn_link(
+      fun() -> sender(Parent, GaiaId, PcmName, Socket, DestAddresses) end).
 
 %%
 %% Sender
 %%
 
-sender(GaiaId, PcmName, Socket, DestAddresses) ->
+sender(Parent, GaiaId, PcmName, Socket, DestAddresses) ->
     WantedHwParams =
         #{format => ?FORMAT,
           channels => ?CHANNELS,
@@ -164,6 +176,7 @@ sender(GaiaId, PcmName, Socket, DestAddresses) ->
         {ok, AlsaHandle, ActualHwParams, ActualSwParams} ->
             ?LOG_INFO(#{actual_hw_params => ActualHwParams,
                         actual_sw_params => ActualSwParams}),
+            Parent ! {sender_alsa_handle, AlsaHandle},
             sender_loop(GaiaId, Socket, DestAddresses, AlsaHandle, 1);
         {error, Reason} ->
             exit(alsa:strerror(Reason))

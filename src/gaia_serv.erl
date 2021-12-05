@@ -75,7 +75,16 @@ message_handler(#{parent := Parent,
             noreply;
         {nodis, NodisSubscription, {down, Address}} ->
             ?LOG_DEBUG(#{module => ?MODULE, nodis => {down, Address}}),
-            {noreply, State#{neighbours => maps:remove(Address, Neighbours)}};
+            UpdatedNeighbours = maps:remove(Address, Neighbours),
+            DestAddresses =
+                maps:fold(
+                  fun(_Address,
+                      #{ip_address := GaiaIpAddress, port := GaiaPort}, Acc) ->
+                          [{GaiaIpAddress, GaiaPort}|Acc]
+                  end, [], UpdatedNeighbours),
+            ok = gaia_network_sender_serv:set_dest_addresses(
+                   NetworkSenderPid, DestAddresses),
+            {noreply, State#{neighbours => UpdatedNeighbours}};
         {nodis, NodisSubscription, {wait, Address}} ->
             ?LOG_DEBUG(#{module => ?MODULE, nodis => {wait, Address}}),
             noreply;
