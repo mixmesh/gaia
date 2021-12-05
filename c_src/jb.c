@@ -35,18 +35,22 @@ jb_t *jb_new(uint32_t gaia_id, bool opus_enabled) {
     }
 
 void jb_free(jb_t *jb, bool free_entries_only) {
+    fprintf(stderr, "00\r\n");
     jb_take_wrlock(jb);
     jb_entry_t *jb_entry = jb->tail;
     while (jb_entry != NULL) {
+        fprintf(stderr, "001\r\n");
         jb_entry_t *next_jb_entry = jb_entry->next;
         jb_entry_free(jb_entry);
         jb_entry = next_jb_entry;
+        fprintf(stderr, "002\r\n");
     }
     if (jb->opus_decoder != NULL) {
         opus_decoder_destroy(jb->opus_decoder);
     }
     jb->tail = NULL;
     jb->head = NULL;
+    fprintf(stderr, "002\r\n");
     if (free_entries_only) {
         jb->playback = NULL;
         jb->playback_seqnum = 0;
