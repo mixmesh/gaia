@@ -80,7 +80,7 @@ we assume that the connected Bleutooth device address is
 
 On success try this:
 
-$ aplay -D bluealsa:DEV=20:74:CF:C4:F4:A0,PROFILE=a2dp 
+$ aplay -D bluealsa:DEV=20:74:CF:C4:F4:A0,PROFILE=a2dp /usr/share/sounds/alsa/Front_Center.wav
 $ arecord -d 5 -D bluealsa:DEV=20:74:CF:C4:F4:A0,PROFILE=sco test.wav
 $ aplay -D bluealsa:DEV=20:74:CF:C4:F4:A0,PROFILE=a2dp test.wav
 
