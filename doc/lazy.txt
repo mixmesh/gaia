@@ -30,27 +30,72 @@ Core file
 $ ulimit -c unlimited
 $ ulimit -a
 
-aplay
------
-$ arecord -f cd -d 5 -D bluealsa:DEV=20:74:CF:72:85:82,PROFILE=sco test.wav
-$ aplay -D bluealsa:DEV=20:74:CF:72:85:82,PROFILE=a2dp test.wav
+Bluez-alsa on Raspbian (bullseye)
+---------------------------------
+Uninstall pulseaudio:
 
-with this .asoundrc:
+# sudo apt remove pulseaudio
+# sudo apt autoremove
+
+Install and build bluez-alsa (on Raspbian Bullseye and later):
+
+# cd /usr/local/src
+# apt install build-essential autoconf libbluetooth-dev libdbus-1-dev libglib2.0-dev libsbc-dev libasound2-dev libtool
+# git clone https://github.com/Arkq/bluez-alsa.git
+# cd bluez-alsa
+# autoreconf --install
+# mkdir build && cd build
+# ../configure
+# make && make install
+
+Make sure that the systemd bluealsa script looks like this::
+
+====
+
+# systemctl cat bluealsa
+[Unit]
+Description=BluezALSA proxy
+Requires=bluetooth.service
+After=bluetooth.service
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/bluealsa -p a2dp-sink -p a2dp-source -p hfp-ag -p hsp-ag
+
+====
+
+Start bluealsa:
+
+# systemctl start bluealsa
+# systemctl status bluealsa
+<Check if it is OK>
+
+Do this:
+
+Use bluetoothctrl to pair, connect and trust a Bluetooth device. Do it
+now (left as an excercise to the reader)! In the forthcoming examples
+we assume that the connected Bleutooth device address is
+20:74:CF:C4:F4:A0.
+
+On success try this:
+
+$ aplay -D bluealsa:DEV=20:74:CF:C4:F4:A0,PROFILE=a2dp 
+$ arecord -d 5 -D bluealsa:DEV=20:74:CF:C4:F4:A0,PROFILE=sco test.wav
+$ aplay -D bluealsa:DEV=20:74:CF:C4:F4:A0,PROFILE=a2dp test.wav
+
+Add the following ~/.asoundrc:
+
+====
 
 defaults.bluealsa.service "org.bluealsa"
-defaults.bluealsa.device "20:74:CF:72:85:82"
+defaults.bluealsa.device "20:74:CF:C4:F4:A0"
 defaults.bluealsa.profile "a2dp"
 defaults.bluealsa.delay 10000
 
-in that case this works as well:
+====
 
-$ arecord -f cd -d 5 -D bluealsa:PROFILE=sco test.wav
+Now you can try this:
+
+$ arecord -d 5 -D bluealsa:PROFILE=sco test.wav
 $ aplay -D bluealsa test.wav
-
-.asoundrc could probably be written to be even better
-
-Make sure that:
-
-systemctl cat bluealsa
-...
-ExecStart=/usr/bin/bluealsa -p a2dp-sink -p a2dp-source -p hfp-ag -p hsp-ag

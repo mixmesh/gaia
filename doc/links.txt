@@ -24,6 +24,11 @@ https://github.com/Arkq/bluez-alsa/issues/352
 https://forums.raspberrypi.com/viewtopic.php?t=206565
 https://github.com/Arkq/bluez-alsa/wiki/Using-the-bluealsa-ALSA-pcm-plugin
 https://stackoverflow.com/questions/62291143/record-audio-from-bluetooth-headset-using-bluealsa-on-linux
+https://www.sigmdel.ca/michel/ha/rpi/bluetooth_n_buster_01_en.html
+https://introt.github.io/docs/raspberrypi/bluealsa.html
+https://www.sigmdel.ca/michel/ha/rpi/bluetooth_in_rpios_01_en.html
+
+ssh black.mixmesh
 
 Speech recognition
 ------------------
