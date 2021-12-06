@@ -48,7 +48,7 @@ Install and build bluez-alsa (on Raspbian Bullseye and later):
 # ../configure
 # make && make install
 
-Make sure that the systemd bluealsa script looks like this::
+Make sure that the systemd bluealsa script looks like this:
 
 ====
 
@@ -84,7 +84,7 @@ $ aplay -D bluealsa:DEV=20:74:CF:C4:F4:A0,PROFILE=a2dp /usr/share/sounds/alsa/Fr
 $ arecord -d 5 -D bluealsa:DEV=20:74:CF:C4:F4:A0,PROFILE=sco test.wav
 $ aplay -D bluealsa:DEV=20:74:CF:C4:F4:A0,PROFILE=a2dp test.wav
 
-Add the following ~/.asoundrc:
+Add the following to ~/.asoundrc:
 
 ====
 
