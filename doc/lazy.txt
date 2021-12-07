@@ -50,22 +50,19 @@ Install and build bluez-alsa (on Raspbian Bullseye and later):
 
 Make sure that the systemd bluealsa script looks like this:
 
-====
+  # systemctl cat bluealsa
+  [Unit]
+  Description=BluezALSA proxy
+  Requires=bluetooth.service
+  After=bluetooth.service
 
-# systemctl cat bluealsa
-[Unit]
-Description=BluezALSA proxy
-Requires=bluetooth.service
-After=bluetooth.service
+  [Service]
+  Type=simple
+  User=root
+  ExecStart=/usr/bin/bluealsa -p a2dp-sink -p a2dp-source -p hfp-ag -p hsp-ag
 
-[Service]
-Type=simple
-User=root
-ExecStart=/usr/bin/bluealsa -p a2dp-sink -p a2dp-source -p hfp-ag -p hsp-ag
-
-[Install]
-WantedBy=multi-user.target
-====
+  [Install]
+  WantedBy=multi-user.target
 
 Start bluealsa and enable it on reboot:
 
@@ -88,23 +85,14 @@ $ aplay -D bluealsa:DEV=20:74:CF:C4:F4:A0,PROFILE=a2dp test.wav
 
 Add the following /etc/rc.local:
 
-====
-
-bluetoothctl connect 20:74:CF:C4:F4:A0
-
-====
-
+  bluetoothctl connect 20:74:CF:C4:F4:A0
 
 Add the following to ~/.asoundrc:
 
-====
-
-defaults.bluealsa.service "org.bluealsa"
-defaults.bluealsa.device "20:74:CF:C4:F4:A0"
-defaults.bluealsa.profile "a2dp"
-defaults.bluealsa.delay 10000
-
-====
+  defaults.bluealsa.service "org.bluealsa"
+  defaults.bluealsa.device "20:74:CF:C4:F4:A0"
+  defaults.bluealsa.profile "a2dp"
+  defaults.bluealsa.delay 10000
 
 Now you can try this:
 
