@@ -9,13 +9,12 @@
 -export([start/0, start/1]).
 -compile(export_all).
 
-
 -define(DEFAULT_FORMAT, s16_le).
 -define(DEFAULT_SAMPLE_RATE, 48000).
 -define(DEFAULT_CHANNELS, 2).
 -define(PERIOD_SIZE_IN_FRAMES, 4800).  %% 100 ms
 -define(BUFFER_PERIODS, 2).
--define(DEFAULT_DEVICE, "hw:0,0").
+-define(DEFAULT_DEVICE, "plughw:1,0").
 
 -define(MODEL, "vosk-model-small-en-us-0.15").
 
@@ -28,7 +27,16 @@ start(Params) ->
 	    command_query(VoskPid, Params1)
     end.
 
-command_query(VoskPid, Params1) ->
+
+command_query(VoskPid, Params) ->
+    receive
+	{vosk, VoskPid, _VoskData} ->	
+	    command_query(VoskPid, Params)
+    after 0 ->
+	    command_query_(VoskPid, Params)
+    end.
+
+command_query_(VoskPid, Params1) ->
     receive
 	{vosk, VoskPid, VoskData} ->
 	    io:format("VoskData: ~p\n", [VoskData]),
@@ -57,7 +65,17 @@ command_query(VoskPid, Params1) ->
 	    end
     end.
 
-command_ack(VoskPid, Cmd={Command,Args,_}, Params1) ->
+%% flush vosk data and the start process
+command_ack(VoskPid, Cmd, Params) ->
+    receive
+	{vosk, VoskPid, _VoskData} ->	
+	    command_ack(VoskPid, Cmd, Params)
+    after 0 ->
+	    command_ack_(VoskPid, Cmd, Params)
+    end.
+
+
+command_ack_(VoskPid, Cmd={Command,Args,_}, Params1) ->
     receive
 	{vosk, VoskPid, Response} ->
 	    io:format("Response: ~p\n", [Response]),
@@ -207,8 +225,9 @@ alsa_open(Params) ->
 	 {buffer_size,BufferSizeInFrames}],
     io:format("gaia_command: alsa_open device=~s, wanted_hw_params = ~p\n",
 	      [Device, WantedHwParams]),
-    WantedSwParams =
-	[{start_threshold,PeriodSizeInFrames}],
+    WantedSwParams = [],
+    %% WantedSwParams = [{avail_min, 1}],
+    %% [{start_threshold,PeriodSizeInFrames}],
     case alsa:open(Device, capture, WantedHwParams, WantedSwParams) of
 	{ok, Handle, ActualHwParams, ActualSwParams} ->
 	    io:format("gaia_command: alsa_open actual_hw_params = ~p\n",

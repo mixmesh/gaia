@@ -1,17 +1,27 @@
 -module(gaia_audio_source_serv).
--export([start_link/1, stop/1, subscribe/1, subscribe/2, unsubscribe/1]).
+-export([start_link/0, start_link/1,
+	 stop/1, subscribe/1, subscribe/2, unsubscribe/1]).
 -export([message_handler/1]).
 
 -include_lib("apptools/include/serv.hrl").
 -include_lib("kernel/include/logger.hrl").
 -include("gaia.hrl").
 
+%% default values
+-define(DEFAULT_FORMAT,        s16_le).
+-define(DEFAULT_RATE,          48000).
+-define(DEFAULT_CHANNELS,      2).
+-define(PERIOD_SIZE_IN_FRAMES, 4800).  %% 100ms
+-define(BUFFER_PERIODS,        8).
+-define(DEFAULT_DEVICE,        "plughw:0,0").
+
 %%
 %% Exported: start_link
 %%
-
-start_link(PcmName) ->
-    ?spawn_server(fun(Parent) -> init(Parent, PcmName) end,
+start_link() ->
+    start_link([]).
+start_link(Params) ->
+    ?spawn_server(fun(Parent) -> init(Parent, Params) end,
                   fun initial_message_handler/1).
 
 %%
@@ -42,9 +52,11 @@ unsubscribe(Pid) ->
 %% Server
 %%
 
-init(Parent, PcmName) ->
+init(Parent, Params) ->
     ?LOG_INFO("Gaia audio source server has been started"),
-    AudioProducerPid = spawn_link(fun() -> audio_producer(PcmName) end),
+    AudioProducerPid = spawn_link(fun() -> 
+					  audio_producer_init(Params) 
+				  end),
     {ok, #{parent => Parent,
            audio_producer_pid => AudioProducerPid,
            subscribers => []}}.
@@ -105,30 +117,38 @@ message_handler(#{parent := Parent,
             noreply
     end.
 
-audio_producer(PcmName) ->
+audio_producer_init(Params) ->
+    PeriodSizeInFrames = 
+	proplists:get_value(period_size, Params, ?PERIOD_SIZE_IN_FRAMES),
+    NumBufferPeriods =
+	proplists:get_value(buffer_periods, Params, ?BUFFER_PERIODS),
+    BufferSizeInFrames = PeriodSizeInFrames * NumBufferPeriods,
+    Format = proplists:get_value(format, Params, ?DEFAULT_FORMAT),
+    Channels = proplists:get_value(channels, Params, ?DEFAULT_CHANNELS),
+    Rate = proplists:get_value(rate, Params, ?DEFAULT_RATE),
+    Device = proplists:get_value(device, Params, ?DEFAULT_DEVICE),
     WantedHwParams =
-        #{format => ?FORMAT,
-          channels => ?CHANNELS,
-          sample_rate => ?RATE_IN_HZ,
-          period_size => ?PERIOD_SIZE_IN_FRAMES
-%          NOTE: For some reason it is not allowed to set the buffer size on PI
-%          buffer_size => ?PERIOD_SIZE_IN_FRAMES * ?BUFFER_MULTIPLICATOR
-         },
-    case alsa:open(PcmName, capture, WantedHwParams, #{}) of
+        [{format, Format},
+	 {channels, Channels},
+	 {rate, Rate},
+	 {period_size, PeriodSizeInFrames},
+	 {buffer_size, BufferSizeInFrames}],
+    ?LOG_DEBUG("WantedHwParams=~w\n", [WantedHwParams]),
+    case alsa:open(Device, capture, WantedHwParams, []) of
         {ok, AlsaHandle, ActualHwParams, ActualSwParams} ->
             ?LOG_INFO(#{actual_hw_params => ActualHwParams,
                         actual_sw_params => ActualSwParams}),
-            audio_producer(AlsaHandle, []);
+            audio_producer(AlsaHandle, PeriodSizeInFrames, []);
         {error, Reason} ->
             exit(Reason)
     end.
 
-audio_producer(AlsaHandle, []) ->
+audio_producer(AlsaHandle, PeriodSizeInFrames, []) ->
     receive
         {subscribers, Subscribers} ->
-            audio_producer(AlsaHandle, Subscribers)
+            audio_producer(AlsaHandle, PeriodSizeInFrames, Subscribers)
     end;
-audio_producer(AlsaHandle, CurrentSubscribers) ->
+audio_producer(AlsaHandle, PeriodSizeInFrames, CurrentSubscribers) ->
     Subscribers =
         receive
             {subscribers, UpdatedSubscribers} ->
@@ -145,7 +165,7 @@ audio_producer(AlsaHandle, CurrentSubscribers) ->
             0 ->
                 CurrentSubscribers
         end,
-    case alsa:read(AlsaHandle, ?PERIOD_SIZE_IN_FRAMES) of
+    case alsa:read(AlsaHandle, PeriodSizeInFrames) of
         {ok, Packet} when is_binary(Packet) ->
             MergedSubscribers =
                 lists:map(fun({Pid, _MonitorRef, bang} = Subscriber) ->
@@ -155,13 +175,13 @@ audio_producer(AlsaHandle, CurrentSubscribers) ->
                                   NextCallback = Callback(Packet),
                                   {Pid, MonitorRef, NextCallback}
                           end, Subscribers),
-            audio_producer(AlsaHandle, MergedSubscribers);
+            audio_producer(AlsaHandle, PeriodSizeInFrames, MergedSubscribers);
         {ok, overrun} ->
             ?LOG_WARNING(#{module => ?MODULE, reason => overrun}),
-            audio_producer(AlsaHandle, Subscribers);
+            audio_producer(AlsaHandle, PeriodSizeInFrames, Subscribers);
         {ok, suspend_event} ->
             ?LOG_WARNING(#{module => ?MODULE, reason => suspend_event}),
-            audio_producer(AlsaHandle, Subscribers);
+            audio_producer(AlsaHandle, PeriodSizeInFrames, Subscribers);
         {error, Reason} ->
             alsa:close(AlsaHandle),
             exit(Reason)

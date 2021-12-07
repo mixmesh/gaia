@@ -39,7 +39,8 @@ init([]) ->
                     [GaiaId, BindAddress, PlaybackPcmName]}},
     GaiaAudioSourceServ =
 	#{id => gaia_audio_source_serv,
-          start => {gaia_audio_source_serv, start_link, [CapturePcmName]}},
+          start => {gaia_audio_source_serv, start_link, 
+		    [{device,CapturePcmName}]}},
     GaiaNetworkSenderServ =
 	#{id => gaia_network_sender_serv,
           start => {gaia_network_sender_serv, start_link,
