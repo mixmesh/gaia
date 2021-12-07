@@ -136,7 +136,7 @@ audio_producer_init(Params) ->
                         actual_sw_params => ActualSwParams}),
             audio_producer(AlsaHandle, PeriodSizeInFrames, []);
         {error, Reason} ->
-            exit(Reason)
+            exit(alsa:sterror(Reason))
     end.
 
 audio_producer(AlsaHandle, PeriodSizeInFrames, []) ->
@@ -180,5 +180,5 @@ audio_producer(AlsaHandle, PeriodSizeInFrames, CurrentSubscribers) ->
             audio_producer(AlsaHandle, PeriodSizeInFrames, Subscribers);
         {error, Reason} ->
             alsa:close(AlsaHandle),
-            exit(Reason)
+            exit(alsa:sterror(Reason))
     end.
