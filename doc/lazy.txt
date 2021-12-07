@@ -90,7 +90,7 @@ Add the following /etc/rc.local:
 
 ====
 
-bluetoothctrl connect 20:74:CF:C4:F4:A0
+bluetoothctl connect 20:74:CF:C4:F4:A0
 
 ====
 
