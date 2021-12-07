@@ -3,7 +3,7 @@
 -export([init/0, preloaded_atoms/0]). % internal
 -on_load(init/0).
 
--include("gaia.hrl").
+-include("globals.hrl").
 
 -type network_receiver_params() ::
         #{addr_port := {inet:ip_address(), inet:port_number()},

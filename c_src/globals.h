@@ -1,6 +1,8 @@
 #ifndef _GLOBALS_H_
 #define _GLOBALS_H_
 
+// NOTE: This file *must* be kept in harmony with ../src/globals.hrl
+
 #include <arpa/inet.h>
 
 #define MAX_MEMBERS 128
@@ -19,7 +21,7 @@
 #define PERIOD_SIZE_IN_BYTES (PERIOD_SIZE_IN_FRAMES * FRAME_SIZE_IN_BYTES)
 #define PERIOD_SIZE_IN_MS (PERIOD_SIZE_IN_FRAMES / (RATE_IN_HZ / 1000.0))
 #define PERIOD_SIZE_IN_NS (PERIOD_SIZE_IN_FRAMES / (RATE_IN_HZ / 1000000000.0))
-#define BUFFER_MULTIPLICATOR 8
+#define BUFFER_PERIODS 8
 #define start_threshold(period_size_in_frames, buffer_multiplicator) \
     (period_size_in_frames * (buffer_multiplicator - 1))
 

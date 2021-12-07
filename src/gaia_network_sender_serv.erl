@@ -3,7 +3,7 @@
 -export([message_handler/1]).
 -include_lib("apptools/include/serv.hrl").
 -include_lib("kernel/include/logger.hrl").
--include("gaia.hrl").
+-include("globals.hrl").
 
 -define(SECONDS_BETWEEN_1970_and_2021, 1609459200).
 

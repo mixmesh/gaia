@@ -4,7 +4,7 @@
 
 -include_lib("apptools/include/serv.hrl").
 -include_lib("kernel/include/logger.hrl").
--include("gaia.hrl").
+-include("globals.hrl").
 
 %%
 %% Exported: start_link

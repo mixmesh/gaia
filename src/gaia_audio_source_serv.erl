@@ -5,15 +5,9 @@
 
 -include_lib("apptools/include/serv.hrl").
 -include_lib("kernel/include/logger.hrl").
--include("gaia.hrl").
+-include("globals.hrl").
 
 %% default values
--define(DEFAULT_FORMAT,        s16_le).
--define(DEFAULT_RATE,          48000).
--define(DEFAULT_CHANNELS,      2).
--define(PERIOD_SIZE_IN_FRAMES, 4800).  %% 100ms
--define(BUFFER_PERIODS,        8).
--define(DEFAULT_DEVICE,        "plughw:0,0").
 
 %%
 %% Exported: start_link
@@ -55,10 +49,10 @@ unsubscribe(Pid) ->
 %%
 
 init(Parent, Params) ->
-    ?LOG_INFO("Gaia audio source server has been started"),
     AudioProducerPid = spawn_link(fun() ->
 					  audio_producer_init(Params)
 				  end),
+    ?LOG_INFO("Gaia audio source server has been started"),
     {ok, #{parent => Parent,
            audio_producer_pid => AudioProducerPid,
            subscribers => []}}.
@@ -125,10 +119,10 @@ audio_producer_init(Params) ->
     NumBufferPeriods =
 	proplists:get_value(buffer_periods, Params, ?BUFFER_PERIODS),
     BufferSizeInFrames = PeriodSizeInFrames * NumBufferPeriods,
-    Format = proplists:get_value(format, Params, ?DEFAULT_FORMAT),
-    Channels = proplists:get_value(channels, Params, ?DEFAULT_CHANNELS),
-    Rate = proplists:get_value(rate, Params, ?DEFAULT_RATE),
-    Device = proplists:get_value(device, Params, ?DEFAULT_DEVICE),
+    Format = proplists:get_value(format, Params, ?FORMAT),
+    Channels = proplists:get_value(channels, Params, ?CHANNELS),
+    Rate = proplists:get_value(rate, Params, ?RATE_IN_HZ),
+    Device = proplists:get_value(device, Params, ?DEFAULT_PCM_NAME),
     WantedHwParams =
         [{format, Format},
 	 {channels, Channels},

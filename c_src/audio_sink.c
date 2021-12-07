@@ -111,7 +111,7 @@ playback entry %d but got %d (%d will be reused as %d!)",
                                      0, FORMAT, CHANNELS, RATE_IN_HZ,
                                      SAMPLE_SIZE_IN_BYTES,
                                      PERIOD_SIZE_IN_FRAMES,
-                                     BUFFER_MULTIPLICATOR, &audio_info)) < 0) {
+                                     BUFFER_PERIODS, &audio_info)) < 0) {
                     DEBUGF("audio_new: Could not initialize audio: %s",
                            snd_strerror(err));
                     int retval = AUDIO_ERROR;
