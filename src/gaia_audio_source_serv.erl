@@ -18,8 +18,10 @@
 %%
 %% Exported: start_link
 %%
+
 start_link() ->
     start_link([]).
+
 start_link(Params) ->
     ?spawn_server(fun(Parent) -> init(Parent, Params) end,
                   fun initial_message_handler/1).
@@ -54,8 +56,8 @@ unsubscribe(Pid) ->
 
 init(Parent, Params) ->
     ?LOG_INFO("Gaia audio source server has been started"),
-    AudioProducerPid = spawn_link(fun() -> 
-					  audio_producer_init(Params) 
+    AudioProducerPid = spawn_link(fun() ->
+					  audio_producer_init(Params)
 				  end),
     {ok, #{parent => Parent,
            audio_producer_pid => AudioProducerPid,
@@ -118,7 +120,7 @@ message_handler(#{parent := Parent,
     end.
 
 audio_producer_init(Params) ->
-    PeriodSizeInFrames = 
+    PeriodSizeInFrames =
 	proplists:get_value(period_size, Params, ?PERIOD_SIZE_IN_FRAMES),
     NumBufferPeriods =
 	proplists:get_value(buffer_periods, Params, ?BUFFER_PERIODS),
@@ -133,7 +135,7 @@ audio_producer_init(Params) ->
 	 {rate, Rate},
 	 {period_size, PeriodSizeInFrames},
 	 {buffer_size, BufferSizeInFrames}],
-    ?LOG_DEBUG("WantedHwParams=~w\n", [WantedHwParams]),
+    ?LOG_DEBUG("WantedHwParams = ~w", [WantedHwParams]),
     case alsa:open(Device, capture, WantedHwParams, []) of
         {ok, AlsaHandle, ActualHwParams, ActualSwParams} ->
             ?LOG_INFO(#{actual_hw_params => ActualHwParams,
