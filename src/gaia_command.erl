@@ -20,7 +20,7 @@
 -define(MODEL, "vosk-model-small-en-us-0.15").
 
 start() ->
-    start(#{}).
+    start([]).
 start(Params) ->
     VoskPid = start_vosk(Params),
     receive 
@@ -164,16 +164,16 @@ start_vosk(Params0) ->
     Parent = self(),
     spawn(
       fun() ->
-	      SampleRate0 = 16000,
-	      Params1 = #{ device => "default",
-			   sample_rate => SampleRate0,
-			   format => s16_le,
-			   channels => 1 },
-	      Params = maps:merge(Params1, Params0),
+	      Rate0 = 16000,
+	      Params1 = [{device,"default"},
+			 {rate,Rate0},
+			 {format,s16_le},
+			 {channels,1}],
+	      Params = Params0 ++ Params1,
 	      {ok, {AlsaHandle,PeriodFrames,Header}} = alsa_open(Params),
-	      Channels = maps:get(channels, Header),
-	      Format   = maps:get(format, Header),
-	      SampleRate = maps:get(sample_rate, Header),
+	      Channels = proplists:get_value(channels, Header),
+	      Format   = proplists:get_value(format, Header),
+	      SampleRate = proplists:get_value(rate, Header),
 
 	      Model = vosk:model_new(filename:join(code:priv_dir(vosk),?MODEL)),
 	      Vosk = vosk:recognizer_new(Model, SampleRate),
@@ -191,37 +191,38 @@ start_vosk(Params0) ->
 
 alsa_open(Params) ->
     PeriodSizeInFrames = 
-	maps:get(period_size, Params, ?PERIOD_SIZE_IN_FRAMES),
+	proplists:get_value(period_size, Params, ?PERIOD_SIZE_IN_FRAMES),
     NumBufferPeriods =
-	maps:get(buffer_periods, Params, ?BUFFER_PERIODS),
+	proplists:get_value(buffer_periods, Params, ?BUFFER_PERIODS),
     BufferSizeInFrames = PeriodSizeInFrames * NumBufferPeriods,
-    Format = maps:get(format, Params, ?DEFAULT_FORMAT),
-    Channels = maps:get(channels, Params, ?DEFAULT_CHANNELS),
-    SampleRate = maps:get(sample_rate, Params, ?DEFAULT_SAMPLE_RATE),
-    Device = maps:get(device, Params, ?DEFAULT_DEVICE),
+    Format = proplists:get_value(format, Params, ?DEFAULT_FORMAT),
+    Channels = proplists:get_value(channels, Params, ?DEFAULT_CHANNELS),
+    SampleRate = proplists:get_value(rate, Params, ?DEFAULT_SAMPLE_RATE),
+    Device = proplists:get_value(device, Params, ?DEFAULT_DEVICE),
     WantedHwParams =
-	#{format => Format,
-	  channels => Channels,
-	  sample_rate => SampleRate,
-	  period_size => PeriodSizeInFrames,
-	  buffer_size => BufferSizeInFrames},
+	[{format,Format},
+	 {channels, Channels},
+	 {rate,SampleRate},
+	 {period_size,PeriodSizeInFrames},
+	 {buffer_size,BufferSizeInFrames}],
     io:format("gaia_command: alsa_open device=~s, wanted_hw_params = ~p\n",
 	      [Device, WantedHwParams]),
     WantedSwParams =
-	#{start_threshold => PeriodSizeInFrames },
+	[{start_threshold,PeriodSizeInFrames}],
     case alsa:open(Device, capture, WantedHwParams, WantedSwParams) of
 	{ok, Handle, ActualHwParams, ActualSwParams} ->
 	    io:format("gaia_command: alsa_open actual_hw_params = ~p\n",
 		      [ActualHwParams]),
 	    io:format("gaia_command: alsa_open actual_sw_params = ~p\n",
 		      [ActualSwParams]),
-	    Format1 = maps:get(format, ActualHwParams),
-	    Channels1 = maps:get(channels, ActualHwParams),
-	    SampleRate1 = maps:get(sample_rate, ActualHwParams),
-	    PeriodSizeInFrames1 = maps:get(period_size, ActualHwParams),
-	    Header = #{ format => Format1,
-			channels => Channels1,
-			sample_rate => SampleRate1 },
+	    Format1 = proplists:get_value(format, ActualHwParams),
+	    Channels1 = proplists:get_value(channels, ActualHwParams),
+	    SampleRate1 = proplists:get_value(rate, ActualHwParams),
+	    PeriodSizeInFrames1 = proplists:get_value(period_size, 
+						      ActualHwParams),
+	    Header = [{format,Format1},
+		      {channels,Channels1},
+		      {rate,SampleRate1}],
 	    {ok,{Handle,PeriodSizeInFrames1, Header}};
 	Error ->
 	    Error
