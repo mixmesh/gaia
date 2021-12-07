@@ -50,50 +50,49 @@ Install and build bluez-alsa (on Raspbian Bullseye and later):
 
 Make sure that the systemd bluealsa script looks like this:
 
-====
+  # systemctl cat bluealsa
+  [Unit]
+  Description=BluezALSA proxy
+  Requires=bluetooth.service
+  After=bluetooth.service
 
-# systemctl cat bluealsa
-[Unit]
-Description=BluezALSA proxy
-Requires=bluetooth.service
-After=bluetooth.service
+  [Service]
+  Type=simple
+  User=root
+  ExecStart=/usr/bin/bluealsa -p a2dp-sink -p a2dp-source -p hfp-ag -p hsp-ag
 
-[Service]
-Type=simple
-User=root
-ExecStart=/usr/bin/bluealsa -p a2dp-sink -p a2dp-source -p hfp-ag -p hsp-ag
+  [Install]
+  WantedBy=multi-user.target
 
-====
-
-Start bluealsa:
+Start bluealsa and enable it on reboot:
 
 # systemctl start bluealsa
 # systemctl status bluealsa
 <Check if it is OK>
+# systemctl enable bluealsa
 
 Do this:
 
 Use bluetoothctrl to pair, connect and trust a Bluetooth device. Do it
 now (left as an excercise to the reader)! In the forthcoming examples
 we assume that the connected Bleutooth device address is
-20:74:CF:C4:F4:A0.
 
 On success try this:
 
 $ aplay -D bluealsa:DEV=20:74:CF:C4:F4:A0,PROFILE=a2dp /usr/share/sounds/alsa/Front_Center.wav
-$ arecord -d 5 -D bluealsa:DEV=20:74:CF:C4:F4:A0,PROFILE=sco test.wav
+$ arecord -r 48000 -c 2 -f S16_LE -r 16000 -d 5 -D bluealsa:DEV=20:74:CF:C4:F4:A0,PROFILE=sco test.wav
 $ aplay -D bluealsa:DEV=20:74:CF:C4:F4:A0,PROFILE=a2dp test.wav
+
+Add the following /etc/rc.local:
+
+  bluetoothctl connect 20:74:CF:C4:F4:A0
 
 Add the following to ~/.asoundrc:
 
-====
-
-defaults.bluealsa.service "org.bluealsa"
-defaults.bluealsa.device "20:74:CF:C4:F4:A0"
-defaults.bluealsa.profile "a2dp"
-defaults.bluealsa.delay 10000
-
-====
+  defaults.bluealsa.service "org.bluealsa"
+  defaults.bluealsa.device "20:74:CF:C4:F4:A0"
+  defaults.bluealsa.profile "a2dp"
+  defaults.bluealsa.delay 10000
 
 Now you can try this:
 
