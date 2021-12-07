@@ -29,7 +29,7 @@ void *network_sender(void *arg) {
     // Resize socket send buffer
     /*
     // NOTE: This was a bad idea for some reason. Disable for now.
-    int snd_buf_size = PERIOD_SIZE_IN_BYTES * BUFFER_MULTIPLICATOR;
+    int snd_buf_size = PERIOD_SIZE_IN_BYTES * BUFFER_PERIODS;
     assert(setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &snd_buf_size,
     sizeof(snd_buf_size)) == 0);
     */
@@ -77,7 +77,7 @@ void *network_sender(void *arg) {
 
     if ((err = audio_new(params->pcm_name, SND_PCM_STREAM_CAPTURE, 0,
                          FORMAT, CHANNELS, RATE_IN_HZ, SAMPLE_SIZE_IN_BYTES,
-                         PERIOD_SIZE_IN_FRAMES, BUFFER_MULTIPLICATOR,
+                         PERIOD_SIZE_IN_FRAMES, BUFFER_PERIODS,
                          &audio_info)) < 0) {
         DEBUGF("audio_new: Could not initialize audio: %s", snd_strerror(err));
         int retval = AUDIO_ERROR;
