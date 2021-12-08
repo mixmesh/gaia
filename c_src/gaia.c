@@ -41,6 +41,36 @@ Options:\n\
     exit(ARG_ERROR);
 }
 
+int start_thread(void *(*start_routine)(void *), void *restrict arg,
+                 pthread_t *thread) {
+    int err;
+    pthread_attr_t attr;
+    if ((err = pthread_attr_init(&attr)) != 0) {
+        fprintf(stderr,
+                "pthread_attr_init: Failed to initialize thread attribute \
+(%d)\n", err);
+        return THREAD_ERROR;
+    }
+
+    if (geteuid() == 0) {
+        if ((err = set_fifo_scheduling(&attr, 0)) != 0) {
+            fprintf(stderr, "set_fifo_scheduling: Failed to set FIFO \
+scheduling (%d)\n",  err);
+            return SCHED_ERROR;
+        }
+    } else {
+        fprintf(stderr, "WARNING: Failed to set FIFO scheduling, i.e. euid not \
+root!\n");
+    }
+
+    if ((err = pthread_create(thread, &attr, start_routine, arg)) < 0) {
+        fprintf(stderr, "pthread_create: Failed to start sender thread (%d)\n",
+                err);
+        return THREAD_ERROR;
+    }
+    return 0;
+}
+
 int main (int argc, char *argv[]) {
     int err;
 
@@ -144,37 +174,9 @@ int main (int argc, char *argv[]) {
         sender_params->naddr_ports = ndest_addr_ports;
         sender_params->addr_ports = dest_addr_ports;
         sender_params->opus_enabled = opus_enabled;
-
-        pthread_attr_t sender_attr;
-        if ((err = pthread_attr_init(&sender_attr)) != 0) {
-            fprintf(stderr,
-                    "pthread_attr_init: Failed to initialize sender thread \
-attribute (%d)\n",
-                    err);
-            exit(THREAD_ERROR);
-        }
-
-        if (geteuid() == 0) {
-            if ((err = set_fifo_scheduling(&sender_attr, 0)) != 0) {
-                fprintf(stderr,
-                        "set_fifo_scheduling: Failed to set FIFO scheduling \
-(%d)\n",
-                        err);
-                exit(SCHED_ERROR);
-            }
-        } else {
-            fprintf(stderr,
-                    "WARNING: Failed to set FIFO scheduling, i.e. euid not \
-root!\n");
-        }
-
-        if ((err = pthread_create(&sender_thread, &sender_attr,
-                                  network_sender,
-                                  (void *)sender_params)) < 0) {
-            fprintf(stderr, "pthread_create: Failed to start sender thread \
-(%d)\n",
-                    err);
-            exit(THREAD_ERROR);
+        if ((err = start_thread(network_sender, (void *)sender_params,
+                                &sender_thread)) != 0) {
+            exit(err);
         }
     }
 
@@ -185,37 +187,9 @@ root!\n");
         receiver_params = malloc(sizeof(network_receiver_params_t));
         receiver_params->addr_port = &src_addr_port;
         receiver_params->opus_enabled = opus_enabled;
-
-        pthread_attr_t receiver_attr;
-        if ((err = pthread_attr_init(&receiver_attr)) != 0) {
-            fprintf(stderr,
-                    "pthread_attr_init: Failed to initialize receiver thread \
-attribute (%d)\n",
-                    err);
-            exit(THREAD_ERROR);
-        }
-
-        if (geteuid() == 0) {
-            if ((err = set_fifo_scheduling(&receiver_attr, 0)) != 0) {
-                fprintf(stderr,
-                        "set_fifo_scheduling: Failed to set FIFO scheduling \
-(%d)\n",
-                        err);
-                exit(SCHED_ERROR);
-            }
-        } else {
-            fprintf(stderr,
-                    "WARNING: Failed to set FIFO scheduling, i.e. euid not \
-root!\n");
-        }
-
-        if ((err = pthread_create(&receiver_thread, &receiver_attr,
-                                  network_receiver,
-                                  (void *)receiver_params)) < 0) {
-            fprintf(stderr, "pthread_create: Failed to start receiver thread \
-(%d)\n",
-                    err);
-            exit(THREAD_ERROR);
+        if ((err = start_thread(network_receiver, (void *)receiver_params,
+                                &receiver_thread)) != 0) {
+            exit(err);
         }
     }
 
@@ -228,38 +202,9 @@ root!\n");
         audio_sink_params = malloc(sizeof(audio_sink_params_t));
         audio_sink_params->pcm_name = playback_pcm_name;
         audio_sink_params->opus_enabled = opus_enabled;
-
-        pthread_attr_t audio_sink_attr;
-        if ((err = pthread_attr_init(&audio_sink_attr)) != 0) {
-            fprintf(stderr,
-                    "pthread_attr_init: Failed to initialize audio sink thread \
-attribute (%d)\n",
-                    err);
-            exit(THREAD_ERROR);
-        }
-
-        if (geteuid() == 0) {
-            if ((err = set_fifo_scheduling(&audio_sink_attr, 0)) != 0) {
-                fprintf(stderr,
-                        "set_fifo_scheduling: Failed to set FIFO scheduling \
-(%d)\n",
-                        err);
-                exit(SCHED_ERROR);
-            }
-        } else {
-            fprintf(stderr,
-                    "WARNING: Failed to set FIFO scheduling, i.e. euid not \
-root!\n");
-        }
-
-        if ((err = pthread_create(&audio_sink_thread, &audio_sink_attr,
-                                  audio_sink,
-                                  (void *)audio_sink_params)) < 0) {
-            fprintf(stderr,
-                    "pthread_create: Failed to start network audio sink thread \
-(%d)\n",
-                    err);
-            exit(THREAD_ERROR);
+        if ((err = start_thread(audio_sink, (void *)audio_sink_params,
+                                &audio_sink_thread)) != 0) {
+            exit(err);
         }
     }
 
