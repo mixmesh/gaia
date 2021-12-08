@@ -35,7 +35,7 @@ init(Parent, Params) ->
     ?LOG_INFO("Gaia audio sink server has been started"),
     {ok, #{parent => Parent, audio_consumer_pid => AudioConsumerPid}}.
 
-message_handler(#{parent := Parent} = State) ->
+message_handler(#{parent := Parent}) ->
     receive
         {neighbour_workers, _NeighbourWorkers} ->
             noreply;
@@ -45,9 +45,6 @@ message_handler(#{parent := Parent} = State) ->
         {system, From, Request} ->
             ?LOG_DEBUG(#{module => ?MODULE, system => Request}),
             {system, From, Request};
-        {'EXIT', AudioProducerPid, Reason} ->
-            ?LOG_DEBUG(#{module => ?MODULE, audio_producer_died => Reason}),
-            noreply;
         {'EXIT', Parent, Reason} ->
             exit(Reason);
         UnknownMessage ->
