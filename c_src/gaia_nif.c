@@ -261,6 +261,19 @@ static ERL_NIF_TERM _set_params(ErlNifEnv* env, int argc, const ERL_NIF_TERM arg
 }
 
 /*
+ * set_params
+ */
+
+static ERL_NIF_TERM _read_packet(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
+    assert(thread_mutex_lock(playback_packet_mutex) == 0);
+    ErlNifTerm bin;
+    int8_t *data = enif_make_new_binary(env, PERIOD_SIZE_IN_BYTES, bin);
+    memcpy(data, playback_packet, PERIOD_SIZE_IN_BYTES);
+    assert(thread_mutex_unlock(playback_packet_mutex) == 0);
+    return bin;
+}
+
+/*
  * load
  */
 
@@ -275,11 +288,6 @@ static int load(ErlNifEnv *env, void **priv_data, ERL_NIF_TERM load_info) {
     LOAD_ATOM(addr_port);
     LOAD_ATOM(opus_enabled);
     LOAD_ATOM(pcm_name);
-
-
-
-
-
     return 0;
 }
 
@@ -299,6 +307,7 @@ static ErlNifFunc nif_funcs[] =
      {"start", 1, _start, 0},
      {"stop", 0, _stop, ERL_NIF_DIRTY_JOB_IO_BOUND},
      {"set_params", 1, _set_params, 0},
+     {"read_packet", 1, _read_packet, ERL_NIF_DIRTY_JOB_IO_BOUND}
     };
 
 ERL_NIF_INIT(gaia_nif, nif_funcs, load, NULL, NULL, unload);
