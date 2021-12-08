@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <stdio.h>
+#include <assert.h>
 #include "network_sender.h"
 #include "network_receiver.h"
 #include "audio_sink.h"
@@ -10,11 +11,13 @@
 
 #define MAX_NETWORK_SENDER_ADDR_PORTS 256
 
+// Shared data (same as in gaia_nif.c)
+jb_table_t *jb_table;
 bool kill_network_sender = false;
 bool kill_network_receiver = false;
 bool kill_audio_sink = false;
-
-jb_table_t *jb_table;
+uint8_t *playback_packet;
+thread_mutex_t *playback_packet_mutex;
 
 void usage(char *argv[]) {
     fprintf(stderr,
@@ -122,7 +125,14 @@ int main (int argc, char *argv[]) {
         usage(argv);
     }
 
+    // Create jitter buffer table
     jb_table = jb_table_new();
+
+    // Create playback packet data and mutex
+    playback_packet = malloc(PERIOD_SIZE_IN_BYTES);
+    playback_packet_mutex = malloc(sizeof(thread_mutex_t));
+    assert(thread_mutex_init(playback_packet_mutex,
+                             "playback_packet_mutex") == 0);
 
     // Start sender thread
     pthread_t sender_thread;
@@ -265,6 +275,17 @@ root!\n");
         pthread_join(audio_sink_thread, NULL);
         free(audio_sink_params);
     }
+
+    // Remove jitter buffer table
     jb_table_free(jb_table, false);
+
+    // Remove playback packet data and mutex
+    assert(thread_mutex_lock(playback_packet_mutex) == 0);
+    free(playback_packet);
+    assert(thread_mutex_unlock(playback_packet_mutex) == 0);
+    assert(thread_mutex_destroy(playback_packet_mutex) == 0);
+    free(playback_packet_mutex);
+
+    fprintf(stderr, "All is good. We can die in peace.");
     return 0;
 }
