@@ -28,9 +28,9 @@ stop(Pid) ->
 init(Parent, GaiaId, {IpAddress, Port}, PcmName) ->
     ?LOG_INFO("Gaia NIF is initializing..."),
     ok = gaia_nif:start({#{addr_port => {inet_parse:ntoa(IpAddress), Port},
-                           opus_enabled => false},
+                           opus_enabled => ?OPUS_ENABLED},
                          #{pcm_name => PcmName,
-                           opus_enabled => false}}),
+                           opus_enabled => ?OPUS_ENABLED}}),
     ?LOG_INFO("Gaia NIF has been initialized"),
     ?LOG_DEBUG(#{module => ?MODULE, gaia_address => IpAddress}),
     ok = nodis:set_node_info(
@@ -51,9 +51,8 @@ initial_message_handler(State) ->
                 supervisor_helper:get_selected_worker_pids(
                   [gaia_network_sender_serv], NeighbourWorkers),
             %% DEBUG
-            %ok = gaia_network_sender_serv:set_addresses(
-            %       NetworkSenderPid,
-            %       [{?DEFAULT_ADDR, ?DEFAULT_PORT}]),
+            %%ok = gaia_network_sender_serv:set_dest_addresses(
+            %%       NetworkSenderPid, [{?DEFAULT_ADDR, ?DEFAULT_PORT}]),
             {swap_message_handler, fun ?MODULE:message_handler/1,
              State#{network_sender_pid => NetworkSenderPid}}
     end.

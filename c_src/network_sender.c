@@ -70,6 +70,8 @@ void *network_sender(void *arg) {
                    opus_strerror(err));
         }
         assert(err == 0);
+        opus_encoder_ctl(opus_encoder,
+                         OPUS_SET_COMPLEXITY(OPUS_COMPLEXITY));
     }
 
     // Open audio device
@@ -120,7 +122,7 @@ void *network_sender(void *arg) {
         memcpy(&udp_buf[12], &seqnum_nl, sizeof(uint32_t));
 
         // Add audio packet to UDP buffer
-        uint16_t packet_len;
+        int packet_len;
         if (params->opus_enabled) {
             snd_pcm_uframes_t frames;
             if ((frames = audio_read(audio_info, period_buf,
@@ -146,8 +148,7 @@ void *network_sender(void *arg) {
         }
 
         // Add packet length to UDP buffer header
-
-        uint16_t packet_len_ns = htons(packet_len);
+        uint16_t packet_len_ns = htons((uint16_t)packet_len);
         memcpy(&udp_buf[16], &packet_len_ns, sizeof(uint16_t));
 
         // Write to non-blocking socket
@@ -171,6 +172,9 @@ void *network_sender(void *arg) {
     audio_free(audio_info);
     free(udp_buf);
     close(sockfd);
+    if (params->opus_enabled) {
+        opus_encoder_destroy(opus_encoder);
+    }
     int retval = NETWORK_SENDER_DIED;
     thread_exit(&retval);
     return NULL;

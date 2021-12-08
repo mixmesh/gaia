@@ -21,4 +21,8 @@
 -define(start_threshold(PeriodSizeInFrames, BufferPeriods),
         (PeriodSizeInFrames * (BufferPeriods - 1))).
 
+-define(OPUS_ENABLED, false).
+-define(OPUS_COMPLEXITY, 5).
+-define(OPUS_MAX_PACKET_LEN_IN_BYTES, 1276).
+
 -endif.

@@ -4,6 +4,7 @@
 -export([init/1]). %% Used by supervisor:start_link/2
 
 -include_lib("apptools/include/shorthand.hrl").
+-include("globals.hrl").
 
 %%
 %% Exported: start_link
@@ -50,6 +51,7 @@ init([]) ->
     GaiaNetworkSenderServ =
 	#{id => gaia_network_sender_serv,
           start => {gaia_network_sender_serv, start_link,
-                    [GaiaId, BindAddress, true]}},
+                    [GaiaId, BindAddress, _UseCallback = true,
+                     ?OPUS_ENABLED]}},
     {ok, {#{strategy => one_for_all},
           [GaiaServ, GaiaAudioSourceServ, GaiaNetworkSenderServ]}}.

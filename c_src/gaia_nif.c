@@ -309,7 +309,7 @@ static ErlNifFunc nif_funcs[] =
      {"start", 1, _start, 0},
      {"stop", 0, _stop, ERL_NIF_DIRTY_JOB_IO_BOUND},
      {"set_params", 1, _set_params, 0},
-     {"read_packet", 1, _read_packet, ERL_NIF_DIRTY_JOB_IO_BOUND}
+     {"read_packet", 0, _read_packet, ERL_NIF_DIRTY_JOB_IO_BOUND}
     };
 
 ERL_NIF_INIT(gaia_nif, nif_funcs, load, NULL, NULL, unload);

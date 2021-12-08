@@ -72,8 +72,7 @@ entry %d but got %d (%d will be reused as %d!)",
 
             if (!skip_packet) {
                 if (params->opus_enabled) {
-                    uint16_t packet_len =
-                        *(uint16_t *)&jb->playback->udp_buf[16];
+                    uint16_t packet_len = ntohs(*(uint16_t *)&jb->playback->udp_buf[16]);
                     int frames;
                     if ((frames =
                          opus_decode(jb->opus_decoder,
@@ -83,9 +82,10 @@ entry %d but got %d (%d will be reused as %d!)",
                                      OPUS_MAX_PACKET_LEN_IN_BYTES,
                                      0)) < 0) {
                         DEBUGF("Failed to Opus decode: %s", opus_strerror(frames));
+                    } else {
+                        assert(frames == PERIOD_SIZE_IN_FRAMES);
+                        packet[npackets++] = jb->playback->period_buf;
                     }
-                    assert(frames == PERIOD_SIZE_IN_FRAMES);
-                    packet[npackets++] = jb->playback->period_buf;
                 } else {
                     packet[npackets++] = &jb->playback->udp_buf[HEADER_SIZE];
                 }
