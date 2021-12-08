@@ -11,7 +11,7 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
               snd_pcm_format_t format, uint8_t channels, uint32_t rate_in_hz,
               uint8_t sample_size_in_bytes,
               snd_pcm_uframes_t period_size_in_frames,
-              uint8_t buffer_multiplicator, audio_info_t **audio_info) {
+              uint8_t buffer_periods, audio_info_t **audio_info) {
     int err;
 
     // Open audio device
@@ -68,7 +68,7 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
     }
 
     snd_pcm_uframes_t desired_buffer_size_in_frames =
-        period_size_in_frames * buffer_multiplicator;
+        period_size_in_frames * buffer_periods;
     snd_pcm_uframes_t buffer_size_in_frames = desired_buffer_size_in_frames;
     if ((err = snd_pcm_hw_params_set_buffer_size_near(pcm, hw_params,
                                                       &buffer_size_in_frames)) <
@@ -101,7 +101,7 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
         }
 
         snd_pcm_uframes_t start_threshold =
-            start_threshold(period_size_in_frames, buffer_multiplicator);
+            start_threshold(period_size_in_frames, buffer_periods);
         if ((err =
              snd_pcm_sw_params_set_start_threshold(pcm, sw_params,
                                                    start_threshold)) < 0) {

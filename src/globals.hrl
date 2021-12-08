@@ -18,5 +18,7 @@
 -define(PERIOD_SIZE_IN_BYTES, (?PERIOD_SIZE_IN_FRAMES * ?FRAME_SIZE_IN_BYTES)).
 -define(PERIOD_SIZE_IN_MS, (?PERIOD_SIZE_IN_FRAMES / (?RATE_IN_HZ / 1000.0))).
 -define(BUFFER_PERIODS, 8).
+-define(start_threshold(PeriodSizeInFrames, BufferPeriods),
+        (PeriodSizeInFrames * (BufferPeriods - 1))).
 
 -endif.

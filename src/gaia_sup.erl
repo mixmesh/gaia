@@ -41,6 +41,12 @@ init([]) ->
 	#{id => gaia_audio_source_serv,
           start => {gaia_audio_source_serv, start_link,
 		    [[{device, CapturePcmName}]]}},
+    %% WARNING: To start the audio sink server playback_audio *must* be
+    %% set to false in ../c_src/audio_sink.c
+    _GaiaAudioSinkServ =
+	#{id => gaia_audio_sink_serv,
+          start => {gaia_audio_sink_serv, start_link,
+		    [[{device, PlaybackPcmName}]]}},
     GaiaNetworkSenderServ =
 	#{id => gaia_network_sender_serv,
           start => {gaia_network_sender_serv, start_link,

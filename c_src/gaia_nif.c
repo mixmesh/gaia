@@ -264,10 +264,12 @@ static ERL_NIF_TERM _set_params(ErlNifEnv* env, int argc, const ERL_NIF_TERM arg
  * set_params
  */
 
-static ERL_NIF_TERM _read_packet(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
+static ERL_NIF_TERM _read_packet(ErlNifEnv* env, int argc,
+                                 const ERL_NIF_TERM argv[]) {
     assert(thread_mutex_lock(playback_packet_mutex) == 0);
-    ErlNifTerm bin;
-    int8_t *data = enif_make_new_binary(env, PERIOD_SIZE_IN_BYTES, bin);
+    ERL_NIF_TERM bin;
+    uint8_t *data =
+        (uint8_t *)enif_make_new_binary(env, PERIOD_SIZE_IN_BYTES, &bin);
     memcpy(data, playback_packet, PERIOD_SIZE_IN_BYTES);
     assert(thread_mutex_unlock(playback_packet_mutex) == 0);
     return bin;

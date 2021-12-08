@@ -7,8 +7,6 @@
 -include_lib("kernel/include/logger.hrl").
 -include("globals.hrl").
 
-%% default values
-
 %%
 %% Exported: start_link
 %%
@@ -18,7 +16,7 @@ start_link() ->
 
 start_link(Params) ->
     ?spawn_server(fun(Parent) -> init(Parent, Params) end,
-                  fun initial_message_handler/1).
+                  fun message_handler/1).
 
 %%
 %% Exported: stop
@@ -57,16 +55,12 @@ init(Parent, Params) ->
            audio_producer_pid => AudioProducerPid,
            subscribers => []}}.
 
-initial_message_handler(State) ->
-    receive
-        {neighbour_workers, _NeighbourWorkers} ->
-            {swap_message_handler, fun ?MODULE:message_handler/1, State}
-    end.
-
 message_handler(#{parent := Parent,
                   audio_producer_pid := AudioProducerPid,
                   subscribers := Subscribers} = State) ->
     receive
+        {neighbour_workers, _NeighbourWorkers} ->
+            noreply;
         {call, From, stop} ->
             ?LOG_DEBUG(#{module => ?MODULE, call => stop}),
             {stop, From, ok};
@@ -116,9 +110,9 @@ message_handler(#{parent := Parent,
 audio_producer_init(Params) ->
     PeriodSizeInFrames =
 	proplists:get_value(period_size, Params, ?PERIOD_SIZE_IN_FRAMES),
-    NumBufferPeriods =
+    BufferPeriods =
 	proplists:get_value(buffer_periods, Params, ?BUFFER_PERIODS),
-    BufferSizeInFrames = PeriodSizeInFrames * NumBufferPeriods,
+    BufferSizeInFrames = PeriodSizeInFrames * BufferPeriods,
     Format = proplists:get_value(format, Params, ?FORMAT),
     Channels = proplists:get_value(channels, Params, ?CHANNELS),
     Rate = proplists:get_value(rate, Params, ?RATE_IN_HZ),
