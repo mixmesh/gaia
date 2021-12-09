@@ -1,5 +1,5 @@
 -module(opus).
--export([create_encoder/4, encode/3]).
+-export([create_encoder/4, encode/5]).
 -export([init/0, preloaded_atoms/0]). % internal
 -on_load(init/0).
 
@@ -35,8 +35,8 @@ create_encoder(_RateInHz, _Channels, _Application, _Complexity) ->
 %% Exported: encode
 %%
 
--spec encode(encoder(), integer(), binary()) ->
+-spec encode(encoder(), integer(), integer(), integer(), binary()) ->
           {ok, binary()}.
 
-encode(_OpusEncoder, _MaxPacketSize, _Packet) ->
+encode(_OpusEncoder, _MaxPacketSize, _Channels, _SampleSizeInBytes, _Packet) ->
     exit(nif_library_not_loaded).

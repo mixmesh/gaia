@@ -134,7 +134,8 @@ create_callback(GaiaId, OpusEncoder, Socket, Seqnum, DestAddresses) ->
 send_packet(GaiaId, {opus_encoder, OpusEncoder}, Socket, Seqnum,
             DestAddresses, Packet) ->
     {ok, EncodedPacket} =
-        opus:encode(OpusEncoder, ?OPUS_MAX_PACKET_LEN_IN_BYTES, Packet),
+        opus:encode(OpusEncoder, ?OPUS_MAX_PACKET_LEN_IN_BYTES, ?CHANNELS,
+                    ?SAMPLE_SIZE_IN_BYTES, Packet),
     send_packet(GaiaId, opus_encoded, Socket, Seqnum, DestAddresses,
                 EncodedPacket);
 send_packet(GaiaId, _OpusEncoder, Socket, Seqnum, DestAddresses, Packet) ->

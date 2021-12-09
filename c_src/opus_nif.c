@@ -1,7 +1,7 @@
 #include <string.h>
+#include <stdio.h>
 #include <erl_nif.h>
 #include <opus/opus.h>
-#include "globals.h"
 
 // Read: https://wiki.xiph.org/OpusFAQ
 // Read: https://wiki.xiph.org/Opus_Recommended_Settings
@@ -81,20 +81,29 @@ static ERL_NIF_TERM _encode(ErlNifEnv* env, int argc,
     if (!enif_get_int(env, argv[1], &max_packet_size)) {
         return enif_make_badarg(env);
     }
+    int channels;
+    if (!enif_get_int(env, argv[2], &channels)) {
+        return enif_make_badarg(env);
+    }
+    int sample_size_in_bytes;
+    if (!enif_get_int(env, argv[3], &sample_size_in_bytes)) {
+        return enif_make_badarg(env);
+    }
     ErlNifBinary pcm_bin;
-    if (enif_inspect_binary(env, argv[2], &pcm_bin)) {
+    if (enif_inspect_binary(env, argv[4], &pcm_bin)) {
         uint8_t opus_buf[max_packet_size];
         int packet_len;
+        int period_size_in_frames =
+            pcm_bin.size / channels / sample_size_in_bytes;
         if ((packet_len = opus_encode(encoder, (opus_int16 *)pcm_bin.data,
-                                      PERIOD_SIZE_IN_FRAMES, opus_buf,
+                                      period_size_in_frames, opus_buf,
                                       max_packet_size)) < 0) {
             return enif_make_tuple2(env, ATOM(error),
                                     enif_make_int(env, packet_len));
         } else {
             ERL_NIF_TERM bin;
             uint8_t *data =
-                (uint8_t *)enif_make_new_binary(env, PERIOD_SIZE_IN_BYTES,
-                                                &bin);
+                (uint8_t *)enif_make_new_binary(env, packet_len, &bin);
             memcpy(data, opus_buf, packet_len);
             return enif_make_tuple2(env, ATOM(ok), bin);
         }
@@ -142,7 +151,7 @@ static void unload(ErlNifEnv* env, void* priv_data) {
 static ErlNifFunc nif_funcs[] =
     {
      {"create_encoder", 4, _create_encoder, 0},
-     {"encode", 3, _encode, 0},
+     {"encode", 5, _encode, 0},
     };
 
 ERL_NIF_INIT(opus, nif_funcs, load, NULL, NULL, unload);
