@@ -179,9 +179,12 @@ int audio_write(audio_info_t *audio_info, uint8_t *data,
 
 
     int r;
-    struct pollfd fds[1];
-    assert(snd_pcm_poll_descriptors_count(audio_info->pcm) == 1);
-    r = snd_pcm_poll_descriptors(audio_info->pcm, fds, 1);
+
+    int t = snd_pcm_poll_descriptors_count(audio_info->pcm);
+
+    struct pollfd fds[t];
+
+    r = snd_pcm_poll_descriptors(audio_info->pcm, fds, t);
     //assert(r == 1);
 
 
