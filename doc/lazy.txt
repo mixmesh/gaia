@@ -23,9 +23,15 @@ $ sudo iw wlp2s0 set power_save off
 
 sox
 ---
-sox file.mp3 -c 2 -r 48000 -b 16 -e signed-integer --endian little -t raw file.s16
+$ sox file.mp3 -c 2 -r 48000 -b 16 -e signed-integer --endian little -t raw file.s16
 
 Core file
 ---------
 $ ulimit -c unlimited
 $ ulimit -a
+
+Alsa/Bluetooth
+--------------
+$ aplay -D bluealsa /usr/share/sounds/alsa/Front_Center.wav
+$ sudo ./gaia -D bluealsa:PROFILE=sco -E bluealsa -s 192.168.99.175:2305 -d 192.168.99.182 1000
+$ sudo ./gaia -D plughw:1,0 -E plughw:1,0 -s 192.168.99.175:2305 -d 192.168.99.182 1000

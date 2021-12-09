@@ -127,16 +127,16 @@ entry %d but got %d (%d will be reused as %d!)",
             // Open audio device (if needed)
             if (playback_audio && audio_info == NULL) {
                 if ((err = audio_new(params->pcm_name, SND_PCM_STREAM_PLAYBACK,
-                                     0, FORMAT, CHANNELS, RATE_IN_HZ,
-                                     SAMPLE_SIZE_IN_BYTES,
-                                     PERIOD_SIZE_IN_FRAMES,
-                                     BUFFER_PERIODS, &audio_info)) < 0) {
+                                     SND_PCM_NONBLOCK, FORMAT, CHANNELS,
+                                     RATE_IN_HZ, SAMPLE_SIZE_IN_BYTES,
+                                     PERIOD_SIZE_IN_FRAMES, BUFFER_PERIODS,
+                                     &audio_info)) < 0) {
                     DEBUGF("audio_new: Could not initialize audio: %s",
                            snd_strerror(err));
                     int retval = AUDIO_ERROR;
                     thread_exit(&retval);
                 }
-                //audio_print_parameters(audio_info, "sink");
+                audio_print_parameters(audio_info, "sink");
                 assert(PERIOD_SIZE_IN_FRAMES ==
                        audio_info->period_size_in_frames);
                 DEBUGP("Audio device has been opened for playback");
@@ -155,15 +155,15 @@ entry %d but got %d (%d will be reused as %d!)",
 
             if (playback_audio) {
                 audio_write(audio_info, playback_packet, PERIOD_SIZE_IN_FRAMES);
-            } else {
-                // Sleep (very carefully)
-                struct timespec next_time;
-                timespecadd(&time, &period_size_as_tsp, &next_time);
-                struct timespec rem;
-                assert(clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME,
-                                       &next_time, &rem) == 0);
-                memcpy(&time, &next_time, sizeof(struct timespec));
             }
+
+            // Sleep (very carefully)
+            struct timespec next_time;
+            timespecadd(&time, &period_size_as_tsp, &next_time);
+            struct timespec rem;
+            assert(clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME,
+                                   &next_time, &rem) == 0);
+            memcpy(&time, &next_time, sizeof(struct timespec));
 
             assert(thread_mutex_unlock(playback_packet_mutex) == 0);
             holding_playback_packet_mutex = false;
