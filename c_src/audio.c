@@ -194,7 +194,7 @@ int audio_write(audio_info_t *audio_info, uint8_t *data,
 
 
     while (written_frames < nframes) {
-        r = poll(fds, 1, -1);
+        r = poll(fds, t, -1);
         //assert(r == 1);
         r = snd_pcm_poll_descriptors_revents(audio_info->pcm, fds, 1, &revents);
         //assert(r == 0);
