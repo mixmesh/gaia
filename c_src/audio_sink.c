@@ -136,7 +136,7 @@ entry %d but got %d (%d will be reused as %d!)",
                     int retval = AUDIO_ERROR;
                     thread_exit(&retval);
                 }
-                audio_print_parameters(audio_info, "sink");
+                //audio_print_parameters(audio_info, "sink");
                 assert(PERIOD_SIZE_IN_FRAMES ==
                        audio_info->period_size_in_frames);
                 DEBUGP("Audio device has been opened for playback");

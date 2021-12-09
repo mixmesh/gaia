@@ -86,9 +86,14 @@ void *network_sender(void *arg) {
         thread_exit(&retval);
     }
     audio_print_parameters(audio_info, "sender");
+
+
+    fprintf(stderr, "Vad: %d, %ld\n", PERIOD_SIZE_IN_FRAMES,
+            audio_info->period_size_in_frames);
+
     assert(PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
 
-    DEBUGF("Period size is %d bytes (%fms)", PERIOD_SIZE_IN_BYTES,
+    DEBUGF("Period size is %d bytes (%dms)", PERIOD_SIZE_IN_BYTES,
            PERIOD_SIZE_IN_MS);
 
     // Allocate memory for UDP buffer

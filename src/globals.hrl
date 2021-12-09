@@ -9,15 +9,16 @@
 -define(DEFAULT_PORT, 2305).
 
 -define(FORMAT, s16_le).
--define(CHANNELS, 2).
+-define(CHANNELS, 1).
 -define(SAMPLE_SIZE_IN_BYTES, 2).
 -define(FRAME_SIZE_IN_BYTES, (?CHANNELS * ?SAMPLE_SIZE_IN_BYTES)).
--define(RATE_IN_HZ, 48000).
+-define(RATE_IN_HZ, 16000).
 
-%% 20ms latency
--define(PERIOD_SIZE_IN_FRAMES, 960).
+-define(PERIOD_SIZE_IN_MS, 20).
+-define(PERIOD_SIZE_IN_FRAMES,
+        trunc(?PERIOD_SIZE_IN_MS / 1000.0 * ?RATE_IN_HZ)).
 -define(PERIOD_SIZE_IN_BYTES, (?PERIOD_SIZE_IN_FRAMES * ?FRAME_SIZE_IN_BYTES)).
--define(PERIOD_SIZE_IN_MS, (?PERIOD_SIZE_IN_FRAMES / (?RATE_IN_HZ / 1000.0))).
+
 -define(BUFFER_PERIODS, 8).
 -define(start_threshold(PeriodSizeInFrames, BufferPeriods),
         (PeriodSizeInFrames * (BufferPeriods - 1))).
