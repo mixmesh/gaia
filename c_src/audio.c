@@ -182,7 +182,7 @@ int audio_write(audio_info_t *audio_info, uint8_t *data,
     struct pollfd fds[1];
     assert(snd_pcm_poll_descriptors_count(audio_info->pcm) == 1);
     r = snd_pcm_poll_descriptors(audio_info->pcm, fds, 1);
-    assert(r == 1);
+    //assert(r == 1);
 
 
     unsigned short revents;
@@ -192,13 +192,15 @@ int audio_write(audio_info_t *audio_info, uint8_t *data,
 
     while (written_frames < nframes) {
         r = poll(fds, 1, -1);
-        assert(r == 1);
+        //assert(r == 1);
         r = snd_pcm_poll_descriptors_revents(audio_info->pcm, fds, 1, &revents);
-        assert(r == 0);
+        //assert(r == 0);
 
         /* XXX: Change leading 0 to 1 to trust converted revents. */
-        if (0 && revents == 0)
+        if (0 && revents == 0) {
+            printf("a: %d\n", r);
             continue;
+        }
 
 
         snd_pcm_uframes_t frames =
