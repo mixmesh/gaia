@@ -175,12 +175,43 @@ int audio_write(audio_info_t *audio_info, uint8_t *data,
                 snd_pcm_uframes_t nframes) {
     ssize_t frame_size_in_bytes = snd_pcm_frames_to_bytes(audio_info->pcm, 1);
     snd_pcm_uframes_t written_frames = 0;
+
+
+
+    int r;
+    struct pollfd fds[1];
+    assert(snd_pcm_poll_descriptors_count(audio_info->pcm) == 1);
+    r = snd_pcm_poll_descriptors(audio_info->pcm, fds, 1);
+    assert(r == 1);
+
+
+    unsigned short revents;
+
+
+
+
     while (written_frames < nframes) {
+        r = poll(fds, 1, -1);
+        assert(r == 1);
+        r = snd_pcm_poll_descriptors_revents(audio_info->pcm, fds, 1, &revents);
+        assert(r == 0);
+
+        /* XXX: Change leading 0 to 1 to trust converted revents. */
+        if (0 && revents == 0)
+            continue;
+
+
         snd_pcm_uframes_t frames =
             snd_pcm_writei(audio_info->pcm,
                            &data[written_frames * frame_size_in_bytes],
                            nframes - written_frames);
+
+
+
         if (frames == -EAGAIN) {
+
+
+
             return frames;
         } else if (frames < 0) {
             DEBUGF("snd_pcm_readi: Failed to write to audio device: %s",
