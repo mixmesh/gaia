@@ -208,12 +208,7 @@ int audio_write(audio_info_t *audio_info, uint8_t *data,
 
 
 
-        if (frames == -EAGAIN) {
-
-
-
-            return frames;
-        } else if (frames < 0) {
+        if (frames < 0) {
             DEBUGF("snd_pcm_readi: Failed to write to audio device: %s",
                    snd_strerror(frames));
             if (snd_pcm_recover(audio_info->pcm, frames, 0) < 0) {
