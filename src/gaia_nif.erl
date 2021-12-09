@@ -1,9 +1,9 @@
 -module(gaia_nif).
--export([start/1, stop/0, set_params/1]).
+-export([start/1, stop/0, set_params/1, read_packet/0]).
 -export([init/0, preloaded_atoms/0]). % internal
 -on_load(init/0).
 
--include("gaia.hrl").
+-include("globals.hrl").
 
 -type network_receiver_params() ::
         #{addr_port := {inet:ip_address(), inet:port_number()},
@@ -55,4 +55,13 @@ stop() ->
 -spec set_params(params()) -> ok.
 
 set_params(_Params) ->
+    exit(nif_library_not_loaded).
+
+%%
+%% Exported: read_packet
+%%
+
+-spec read_packet() -> binary().
+
+read_packet() ->
     exit(nif_library_not_loaded).

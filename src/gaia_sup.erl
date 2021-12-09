@@ -4,6 +4,7 @@
 -export([init/1]). %% Used by supervisor:start_link/2
 
 -include_lib("apptools/include/shorthand.hrl").
+-include("globals.hrl").
 
 %%
 %% Exported: start_link
@@ -39,11 +40,18 @@ init([]) ->
                     [GaiaId, BindAddress, PlaybackPcmName]}},
     GaiaAudioSourceServ =
 	#{id => gaia_audio_source_serv,
-          start => {gaia_audio_source_serv, start_link, 
-		    [[{device,CapturePcmName}]]}},
+          start => {gaia_audio_source_serv, start_link,
+		    [[{device, CapturePcmName}]]}},
+    %% WARNING: To start the audio sink server playback_audio *must* be
+    %% set to false in ../c_src/audio_sink.c
+    _GaiaAudioSinkServ =
+	#{id => gaia_audio_sink_serv,
+          start => {gaia_audio_sink_serv, start_link,
+		    [[{device, PlaybackPcmName}]]}},
     GaiaNetworkSenderServ =
 	#{id => gaia_network_sender_serv,
           start => {gaia_network_sender_serv, start_link,
-                    [GaiaId, BindAddress, true]}},
+                    [GaiaId, BindAddress, _UseCallback = true,
+                     ?OPUS_ENABLED]}},
     {ok, {#{strategy => one_for_all},
           [GaiaServ, GaiaAudioSourceServ, GaiaNetworkSenderServ]}}.

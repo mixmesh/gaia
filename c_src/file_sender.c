@@ -103,7 +103,8 @@ void *file_sender(void *arg) {
     char file_cache[FILE_CACHE_SIZE];
     uint32_t file_cache_index = FILE_CACHE_SIZE;
 
-    printf("Period size is %d bytes (%ldns)\n", PERIOD_SIZE_IN_BYTES,
+    printf("Period size is %d bytes (%d frames, %ldns)\n",
+           PERIOD_SIZE_IN_BYTES, PERIOD_SIZE_IN_FRAMES,
            period_size_as_tsp.tv_nsec);
 
     // Read from file and write to socket

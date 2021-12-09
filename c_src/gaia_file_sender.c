@@ -17,7 +17,7 @@ Example:\n\
 Options:\n\
   -d Send audio streams to this destination address and port (%s:%d)\n\
   -u Use this gaia-id as a base, i.e. will be increased one step for each -d option (1)\n\
-  -x Enable use of Opus audio codec\n",
+  -x Enable Opus audio codec\n",
             argv[0], argv[0], DEFAULT_ADDR, DEFAULT_PORT);
     exit(ARG_ERROR);
 }

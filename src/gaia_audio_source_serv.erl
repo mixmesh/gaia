@@ -5,24 +5,18 @@
 
 -include_lib("apptools/include/serv.hrl").
 -include_lib("kernel/include/logger.hrl").
--include("gaia.hrl").
-
-%% default values
--define(DEFAULT_FORMAT,        s16_le).
--define(DEFAULT_RATE,          48000).
--define(DEFAULT_CHANNELS,      2).
--define(PERIOD_SIZE_IN_FRAMES, 4800).  %% 100ms
--define(BUFFER_PERIODS,        8).
--define(DEFAULT_DEVICE,        "plughw:0,0").
+-include("globals.hrl").
 
 %%
 %% Exported: start_link
 %%
+
 start_link() ->
     start_link([]).
+
 start_link(Params) ->
     ?spawn_server(fun(Parent) -> init(Parent, Params) end,
-                  fun initial_message_handler/1).
+                  fun message_handler/1).
 
 %%
 %% Exported: stop
@@ -53,24 +47,20 @@ unsubscribe(Pid) ->
 %%
 
 init(Parent, Params) ->
-    ?LOG_INFO("Gaia audio source server has been started"),
-    AudioProducerPid = spawn_link(fun() -> 
-					  audio_producer_init(Params) 
+    AudioProducerPid = spawn_link(fun() ->
+					  audio_producer_init(Params)
 				  end),
+    ?LOG_INFO("Gaia audio source server has been started"),
     {ok, #{parent => Parent,
            audio_producer_pid => AudioProducerPid,
            subscribers => []}}.
-
-initial_message_handler(State) ->
-    receive
-        {neighbour_workers, _NeighbourWorkers} ->
-            {swap_message_handler, fun ?MODULE:message_handler/1, State}
-    end.
 
 message_handler(#{parent := Parent,
                   audio_producer_pid := AudioProducerPid,
                   subscribers := Subscribers} = State) ->
     receive
+        {neighbour_workers, _NeighbourWorkers} ->
+            noreply;
         {call, From, stop} ->
             ?LOG_DEBUG(#{module => ?MODULE, call => stop}),
             {stop, From, ok};
@@ -118,29 +108,29 @@ message_handler(#{parent := Parent,
     end.
 
 audio_producer_init(Params) ->
-    PeriodSizeInFrames = 
+    PeriodSizeInFrames =
 	proplists:get_value(period_size, Params, ?PERIOD_SIZE_IN_FRAMES),
-    NumBufferPeriods =
+    BufferPeriods =
 	proplists:get_value(buffer_periods, Params, ?BUFFER_PERIODS),
-    BufferSizeInFrames = PeriodSizeInFrames * NumBufferPeriods,
-    Format = proplists:get_value(format, Params, ?DEFAULT_FORMAT),
-    Channels = proplists:get_value(channels, Params, ?DEFAULT_CHANNELS),
-    Rate = proplists:get_value(rate, Params, ?DEFAULT_RATE),
-    Device = proplists:get_value(device, Params, ?DEFAULT_DEVICE),
+    BufferSizeInFrames = PeriodSizeInFrames * BufferPeriods,
+    Format = proplists:get_value(format, Params, ?FORMAT),
+    Channels = proplists:get_value(channels, Params, ?CHANNELS),
+    Rate = proplists:get_value(rate, Params, ?RATE_IN_HZ),
+    Device = proplists:get_value(device, Params, ?DEFAULT_PCM_NAME),
     WantedHwParams =
         [{format, Format},
 	 {channels, Channels},
 	 {rate, Rate},
 	 {period_size, PeriodSizeInFrames},
 	 {buffer_size, BufferSizeInFrames}],
-    ?LOG_DEBUG("WantedHwParams=~w\n", [WantedHwParams]),
+    ?LOG_DEBUG("WantedHwParams = ~w", [WantedHwParams]),
     case alsa:open(Device, capture, WantedHwParams, []) of
         {ok, AlsaHandle, ActualHwParams, ActualSwParams} ->
             ?LOG_INFO(#{actual_hw_params => ActualHwParams,
                         actual_sw_params => ActualSwParams}),
             audio_producer(AlsaHandle, PeriodSizeInFrames, []);
         {error, Reason} ->
-            exit(Reason)
+            exit({alsa, open, alsa:strerror(Reason)})
     end.
 
 audio_producer(AlsaHandle, PeriodSizeInFrames, []) ->
@@ -184,5 +174,5 @@ audio_producer(AlsaHandle, PeriodSizeInFrames, CurrentSubscribers) ->
             audio_producer(AlsaHandle, PeriodSizeInFrames, Subscribers);
         {error, Reason} ->
             alsa:close(AlsaHandle),
-            exit(Reason)
+            exit({alsa, read, alsa:strerror(Reason)})
     end.

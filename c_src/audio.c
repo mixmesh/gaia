@@ -11,7 +11,7 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
               snd_pcm_format_t format, uint8_t channels, uint32_t rate_in_hz,
               uint8_t sample_size_in_bytes,
               snd_pcm_uframes_t period_size_in_frames,
-              uint8_t buffer_multiplicator, audio_info_t **audio_info) {
+              uint8_t buffer_periods, audio_info_t **audio_info) {
     int err;
 
     // Open audio device
@@ -68,7 +68,7 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
     }
 
     snd_pcm_uframes_t desired_buffer_size_in_frames =
-        period_size_in_frames * buffer_multiplicator;
+        period_size_in_frames * buffer_periods;
     snd_pcm_uframes_t buffer_size_in_frames = desired_buffer_size_in_frames;
     if ((err = snd_pcm_hw_params_set_buffer_size_near(pcm, hw_params,
                                                       &buffer_size_in_frames)) <
@@ -101,7 +101,7 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
         }
 
         snd_pcm_uframes_t start_threshold =
-            start_threshold(period_size_in_frames, buffer_multiplicator);
+            start_threshold(period_size_in_frames, buffer_periods);
         if ((err =
              snd_pcm_sw_params_set_start_threshold(pcm, sw_params,
                                                    start_threshold)) < 0) {
@@ -156,23 +156,8 @@ void audio_print_parameters(audio_info_t *audio_info, char *who) {
 #endif
 }
 
-snd_pcm_uframes_t audio_write(audio_info_t *audio_info, uint8_t *data,
-                              snd_pcm_uframes_t nframes) {
-    snd_pcm_uframes_t frames = snd_pcm_writei(audio_info->pcm, data, nframes);
-    if (frames < 0) {
-        DEBUGF("snd_pcm_readi: Failed to write to audio device: %s",
-               snd_strerror(frames));
-        if (snd_pcm_recover(audio_info->pcm, frames, 0) < 0) {
-            DEBUGF("snd_pcm_readi: Failed to recover audio device: %s",
-                   snd_strerror(frames));
-            return AUDIO_NOT_RECOVERED;
-        }
-    }
-    return frames;
-}
-
-int audio_read(audio_info_t *audio_info, uint8_t *data,
-               snd_pcm_uframes_t nframes) {
+snd_pcm_uframes_t audio_read(audio_info_t *audio_info, uint8_t *data,
+                             snd_pcm_uframes_t nframes) {
     snd_pcm_uframes_t frames = snd_pcm_readi(audio_info->pcm, data, nframes);
     if (frames < 0) {
         DEBUGF("snd_pcm_readi: Failed to read from audio device: %s",
@@ -180,10 +165,66 @@ int audio_read(audio_info_t *audio_info, uint8_t *data,
         if (snd_pcm_recover(audio_info->pcm, frames, 0) < 0) {
             DEBUGF("snd_pcm_readi: Failed to recover audio device: %s",
                    snd_strerror(frames));
-            return AUDIO_NOT_RECOVERED;
+            return frames;
         }
     }
     return frames;
+}
+
+int audio_write(audio_info_t *audio_info, uint8_t *data,
+                snd_pcm_uframes_t nframes) {
+    ssize_t frame_size_in_bytes = snd_pcm_frames_to_bytes(audio_info->pcm, 1);
+    snd_pcm_uframes_t written_frames = 0;
+
+
+
+    int r;
+
+    int t = snd_pcm_poll_descriptors_count(audio_info->pcm);
+
+    struct pollfd fds[t];
+
+    r = snd_pcm_poll_descriptors(audio_info->pcm, fds, t);
+    //assert(r == 1);
+
+
+    unsigned short revents;
+
+
+
+
+    while (written_frames < nframes) {
+        r = poll(fds, t, -1);
+        //assert(r == 1);
+        r = snd_pcm_poll_descriptors_revents(audio_info->pcm, fds, 1, &revents);
+        //assert(r == 0);
+
+        /* XXX: Change leading 0 to 1 to trust converted revents. */
+        if (0 && revents == 0) {
+            printf("a: %d\n", r);
+            continue;
+        }
+
+
+        snd_pcm_uframes_t frames =
+            snd_pcm_writei(audio_info->pcm,
+                           &data[written_frames * frame_size_in_bytes],
+                           nframes - written_frames);
+
+
+
+        if (frames < 0) {
+            DEBUGF("snd_pcm_readi: Failed to write to audio device: %s",
+                   snd_strerror(frames));
+            if (snd_pcm_recover(audio_info->pcm, frames, 0) < 0) {
+                DEBUGF("snd_pcm_readi: Failed to recover audio device: %s",
+                       snd_strerror(frames));
+                return frames;
+            }
+        }
+        written_frames += frames;
+    }
+    return 0;
 }
 
 // http://www.vttoth.com/CMS/index.php/technical-notes/68

@@ -1,4 +1,5 @@
 #include "threadlib.h"
+#include "globals.h"
 
 int thread_rwlock_init(thread_rwlock_t *rwlock, char *name) {
 #ifdef NIF
@@ -100,6 +101,7 @@ void thread_exit(void *retval) {
 #ifdef NIF
     enif_thread_exit(retval);
 #else
-    pthread_exit(retval);
+    exit(INTERNAL_ERROR);
+    //pthread_exit(retval);
 #endif
 }

@@ -6,12 +6,11 @@
 #include "audio_sink.h"
 #include "network_receiver.h"
 #include "timing.h"
+#include "globals.h"
 #include "gaia_utils.h"
 
 #define ATOM(name) atm_##name
-
 #define DECL_ATOM(name) ERL_NIF_TERM atm_##name = 0
-
 #define LOAD_ATOM(name)                         \
     do {                                                                \
         if (!enif_make_existing_atom(env, #name, &atm_##name, ERL_NIF_LATIN1)) \
@@ -29,20 +28,24 @@ DECL_ATOM(addr_port);
 DECL_ATOM(opus_enabled);
 DECL_ATOM(pcm_name);
 
-bool started = false;
+#define MAX_ADDR_LEN 64
+#define MAX_PCM_NAME_LEN 64
 
+bool started = false;
+pthread_rwlock_t *params_rwlock;
+uint64_t params_last_updated;
 ErlNifTid network_receiver_tid;
+network_receiver_params_t receiver_params = {.addr_port = NULL};
 ErlNifTid audio_sink_tid;
+audio_sink_params_t audio_sink_params = {.pcm_name = NULL};
+
+// Shared data (same as in gaia.c)
+jb_table_t *jb_table;
 bool kill_network_sender = false;
 bool kill_network_receiver = false;
 bool kill_audio_sink = false;
-
-jb_table_t *jb_table;
-
-pthread_rwlock_t *params_rwlock;
-network_receiver_params_t receiver_params = {.addr_port = NULL};
-audio_sink_params_t audio_sink_params = {.pcm_name = NULL};
-uint64_t params_last_updated;
+uint8_t *playback_packet;
+thread_mutex_t *playback_packet_mutex;
 
 void take_params_rdlock(void) {
     assert(pthread_rwlock_rdlock(params_rwlock) == 0);
@@ -55,9 +58,6 @@ void take_params_wrlock(void) {
 void release_params_lock(void) {
     assert(pthread_rwlock_unlock(params_rwlock) == 0);
 }
-
-#define MAX_ADDR_LEN 64
-#define MAX_PCM_NAME_LEN 64
 
 bool parse_params(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
     const ERL_NIF_TERM *params_tuple;
@@ -184,7 +184,14 @@ static ERL_NIF_TERM _start(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) 
     params_rwlock = malloc(sizeof(pthread_rwlock_t));
     assert(pthread_rwlock_init(params_rwlock, NULL) == 0);
 
+    // Create jitter buffer table
     jb_table = jb_table_new();
+
+    // Create playback packet data and mutex
+    playback_packet = malloc(PERIOD_SIZE_IN_BYTES);
+    playback_packet_mutex = malloc(sizeof(thread_mutex_t));
+    assert(thread_mutex_init(playback_packet_mutex,
+                             "playback_packet_mutex") == 0);
 
     // Start network receiver thread
     enif_thread_create("network_receiver", &network_receiver_tid,
@@ -225,7 +232,15 @@ static ERL_NIF_TERM _stop(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
     assert(pthread_rwlock_destroy(params_rwlock) == 0);
     free(params_rwlock);
 
+    // Remove jitter buffer table
     jb_table_free(jb_table, false);
+
+    // Remove playback packet data and mutex
+    assert(thread_mutex_lock(playback_packet_mutex) == 0);
+    free(playback_packet);
+    assert(thread_mutex_unlock(playback_packet_mutex) == 0);
+    assert(thread_mutex_destroy(playback_packet_mutex) == 0);
+    free(playback_packet_mutex);
 
     DEBUGP("All is good. We can die in peace.");
     started = false;
@@ -243,6 +258,21 @@ static ERL_NIF_TERM _set_params(ErlNifEnv* env, int argc, const ERL_NIF_TERM arg
     }
     release_params_lock();
     return ATOM(ok);
+}
+
+/*
+ * set_params
+ */
+
+static ERL_NIF_TERM _read_packet(ErlNifEnv* env, int argc,
+                                 const ERL_NIF_TERM argv[]) {
+    assert(thread_mutex_lock(playback_packet_mutex) == 0);
+    ERL_NIF_TERM bin;
+    uint8_t *data =
+        (uint8_t *)enif_make_new_binary(env, PERIOD_SIZE_IN_BYTES, &bin);
+    memcpy(data, playback_packet, PERIOD_SIZE_IN_BYTES);
+    assert(thread_mutex_unlock(playback_packet_mutex) == 0);
+    return bin;
 }
 
 /*
@@ -279,6 +309,7 @@ static ErlNifFunc nif_funcs[] =
      {"start", 1, _start, 0},
      {"stop", 0, _stop, ERL_NIF_DIRTY_JOB_IO_BOUND},
      {"set_params", 1, _set_params, 0},
+     {"read_packet", 0, _read_packet, ERL_NIF_DIRTY_JOB_IO_BOUND}
     };
 
 ERL_NIF_INIT(gaia_nif, nif_funcs, load, NULL, NULL, unload);

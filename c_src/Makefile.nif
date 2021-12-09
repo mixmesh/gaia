@@ -1,17 +1,22 @@
 # --Makefile--
 ERL=$(shell readlink -f `which erl`)
 ERL_TOP=$(ERL:%/bin/erl=%)
-CFLAGS=-std=c18 -Wall -Werror -D_POSIX_C_SOURCE=200809L $(shell pkg-config --cflags alsa) -I$(ERL_TOP)/usr/include -D_REENTRANT -fPIC -DNIF # -DDEBUG
-LDLIBS=$(shell pkg-config --libs alsa) $(ERL_TOP)/usr/lib/libei.a -lm -lpthread -lrt -lopus
+CFLAGS=-std=c18 -Wall -Werror -D_POSIX_C_SOURCE=200809L $(shell pkg-config --cflags alsa) -I$(ERL_TOP)/usr/include -D_REENTRANT -fPIC -DNIF -DDEBUG
+GAIA_LDLIBS=$(shell pkg-config --libs alsa) $(ERL_TOP)/usr/lib/libei.a -lm -lpthread -lrt -lopus
+OPUS_LDLIBS=$(ERL_TOP)/usr/lib/libei.a -lopus
+
 LDFLAGS=-shared
 
-all: ../priv/gaia_nif.so
+all: ../priv/gaia_nif.so ../priv/opus_nif.so
 
 ../priv/gaia_nif.so: audio.o audio_sink.o gaia_nif.o jb.o jb_table.o network_receiver.o threadlib.o timing.o
-	$(CC) $^ $(LDFLAGS) $(LDLIBS) -o ../priv/gaia_nif.so
+	$(CC) $^ $(LDFLAGS) $(GAIA_LDLIBS) -o ../priv/gaia_nif.so
+
+../priv/opus_nif.so: opus_nif.o
+	$(CC) $^ $(LDFLAGS) $(OPUS_LDLIBS) -o ../priv/opus_nif.so
 
 %.o : %.c
 	$(CC) $(CFLAGS) -c $<
 
 clean:
-	rm -f *.o ../priv/gaia_nif.so
+	rm -f *.o ../priv/gaia_nif.so ../priv/opus_nif.so
