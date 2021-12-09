@@ -9,22 +9,15 @@
 -export([start/0, start/1]).
 -compile(export_all).
 
--define(DEFAULT_FORMAT, s16_le).
--define(DEFAULT_SAMPLE_RATE, 48000).
--define(DEFAULT_CHANNELS, 2).
--define(PERIOD_SIZE_IN_FRAMES, 4800).  %% 100 ms
--define(BUFFER_PERIODS, 2).
--define(DEFAULT_DEVICE, "plughw:1,0").
-
 -define(MODEL, "vosk-model-small-en-us-0.15").
 
 start() ->
-    start([]).
+    start(#{}).
 start(Params) ->
     VoskPid = start_vosk(Params),
     receive 
-	{vosk_start, VoskPid, Params1} ->
-	    command_query(VoskPid, Params1)
+	{vosk_start, VoskPid, VoskParams} ->
+	    command_query(VoskPid, VoskParams)
     end.
 
 
@@ -36,31 +29,31 @@ command_query(VoskPid, Params) ->
 	    command_query_(VoskPid, Params)
     end.
 
-command_query_(VoskPid, Params1) ->
+command_query_(VoskPid, Params) ->
     receive
 	{vosk, VoskPid, VoskData} ->
 	    io:format("VoskData: ~p\n", [VoskData]),
 	    case maps:get("text", VoskData, "") of
 		"" ->
-		    command_query(VoskPid, Params1);
+		    command_query(VoskPid, Params);
 		Text ->
 		    case action(string:tokens(Text, " \t\n\r")) of
 			{'?', [], _} ->
-			    command_query(VoskPid, Params1);
+			    command_query(VoskPid, Params);
 			{'?', [Word|_Cs], _} ->
 			    Response = "I do not understand " ++ join([Word]),
-			    flite:say(Response, Params1),
-			    command_query(VoskPid, Params1);
+			    flite:say(Response, Params),
+			    command_query(VoskPid, Params);
 			{'say', Cs, _} ->
 			    Response = join(Cs),
-			    flite:say(Response, Params1),
-			    command_query(VoskPid, Params1);
+			    flite:say(Response, Params),
+			    command_query(VoskPid, Params);
 			Cmd = {Command, Args, _More} ->
 			    io:format("~p\n", [Cmd]),
 			    Query = "Do you really want to " ++ 
 				join([Command | Args]) ++ "?",
-			    flite:say(Query, Params1),
-			    command_ack(VoskPid, Cmd, Params1)
+			    flite:say(Query, Params),
+			    command_ack(VoskPid, Cmd, Params)
 		    end
 	    end
     end.
@@ -75,30 +68,30 @@ command_ack(VoskPid, Cmd, Params) ->
     end.
 
 
-command_ack_(VoskPid, Cmd={Command,Args,_}, Params1) ->
+command_ack_(VoskPid, Cmd={Command,Args,_}, Params) ->
     receive
 	{vosk, VoskPid, Response} ->
 	    io:format("Response: ~p\n", [Response]),
 	    case string:tokens(maps:get("text", Response, ""), "\s\t") of
 		"" -> %% wait
-		    command_ack(VoskPid, Cmd, Params1);
+		    command_ack(VoskPid, Cmd, Params);
 		["yes"|_] ->
 		    Ack = join(["execute",Command | Args]),
-		    flite:say(Ack, Params1),
+		    flite:say(Ack, Params),
 		    if Command =:= exit ->
 			    VoskPid ! stop,
 			    ok;
 		       true ->
-			    command_query(VoskPid, Params1)
+			    command_query(VoskPid, Params)
 		    end;
 		["no"|_] ->
 		    Ack = join(["aborting",Command | Args]),
-		    flite:say(Ack, Params1),
-		    command_query(VoskPid, Params1);
+		    flite:say(Ack, Params),
+		    command_query(VoskPid, Params);
 		_ ->
 		    Ack = "please respond with yes or no",
-		    flite:say(Ack, Params1),
-		    command_ack(VoskPid, Cmd, Params1)
+		    flite:say(Ack, Params),
+		    command_ack(VoskPid, Cmd, Params)
 	    end
     end.
 
@@ -119,6 +112,7 @@ action(Cs) ->
     action_(Cs).
 action_(Cs0) ->
     case Cs0 of
+	["huh"|Cs]       -> action(Cs);
 	["open"|Cs]       -> obj(Cs,open);
 	["close"|Cs]      -> obj(Cs,close);
 	["turn","on"|Cs]  -> obj(Cs,'turn-on');
@@ -130,7 +124,11 @@ action_(Cs0) ->
 	["quit"|Cs]       -> {exit, [], Cs};
 	["bye"|Cs]        -> {exit, [], Cs};
 	["exit"|Cs]       -> {exit, [], Cs};
+	["stop"|Cs]       -> {exit, [], Cs};
 	["say"|Cs]        -> {say, Cs, []};
+	["hello"]         -> {say, ["hi"], []};
+	["hi"]            -> {say, ["hello"], []};
+	["how","are","you"] -> {say,["Fine", "Thank", "You"],[]};
 	["call"|Cs]       -> {call, Cs, []};
 	_ -> {'?', Cs0, []}
     end.
@@ -178,110 +176,57 @@ obj_(Cs0, Command, Form) ->
 jobj(Command,Form,Obj,Cs) ->
     {Command,Form++Obj,Cs}.
 
-start_vosk(Params0) ->
+start_vosk(Options) ->
     Parent = self(),
     spawn(
       fun() ->
-	      Rate0 = 16000,
-	      Params1 = [{device,"default"},
-			 {rate,Rate0},
-			 {format,s16_le},
-			 {channels,1}],
-	      Params = Params0 ++ Params1,
-	      {ok, {AlsaHandle,PeriodFrames,Header}} = alsa_open(Params),
-	      Channels = proplists:get_value(channels, Header),
-	      Format   = proplists:get_value(format, Header),
-	      SampleRate = proplists:get_value(rate, Header),
-
+	      {ok, AlsaHandle, Params} = alsa_capture:open(Options),
+	      #{ device := Device,
+		 channels := Channels,
+ 		 format := Format,
+		 rate := Rate, 
+		 buffer_size := BufferSize
+	       } = Params,
 	      Model = vosk:model_new(filename:join(code:priv_dir(vosk),?MODEL)),
-	      Vosk = vosk:recognizer_new(Model, SampleRate),
-
+	      Vosk = vosk:recognizer_new(Model, Rate),
 	      Transform =
 		  if Channels =:= 2 ->
-			  fun (X) -> stereo_to_mono(Format, X) end;
+			  fun (X) -> alsa_util:stereo_to_mono(Format, X) end;
 		     true ->
 			  fun (X) -> X end
 		  end,
-	      Parent ! {vosk_start, self(), Params},
-	      alsa_loop(Parent, AlsaHandle, PeriodFrames, Transform,
+	      Parent ! {vosk_start, self(), [{device, Device }]},
+	      alsa_loop(Parent, AlsaHandle, BufferSize, Transform,
 			Vosk, Model)
       end).
 
-alsa_open(Params) ->
-    PeriodSizeInFrames = 
-	proplists:get_value(period_size, Params, ?PERIOD_SIZE_IN_FRAMES),
-    NumBufferPeriods =
-	proplists:get_value(buffer_periods, Params, ?BUFFER_PERIODS),
-    BufferSizeInFrames = PeriodSizeInFrames * NumBufferPeriods,
-    Format = proplists:get_value(format, Params, ?DEFAULT_FORMAT),
-    Channels = proplists:get_value(channels, Params, ?DEFAULT_CHANNELS),
-    SampleRate = proplists:get_value(rate, Params, ?DEFAULT_SAMPLE_RATE),
-    Device = proplists:get_value(device, Params, ?DEFAULT_DEVICE),
-    WantedHwParams =
-	[{format,Format},
-	 {channels, Channels},
-	 {rate,SampleRate},
-	 {period_size,PeriodSizeInFrames},
-	 {buffer_size,BufferSizeInFrames}],
-    io:format("gaia_command: alsa_open device=~s, wanted_hw_params = ~p\n",
-	      [Device, WantedHwParams]),
-    WantedSwParams = [],
-    %% WantedSwParams = [{avail_min, 1}],
-    %% [{start_threshold,PeriodSizeInFrames}],
-    case alsa:open(Device, capture, WantedHwParams, WantedSwParams) of
-	{ok, Handle, ActualHwParams, ActualSwParams} ->
-	    io:format("gaia_command: alsa_open actual_hw_params = ~p\n",
-		      [ActualHwParams]),
-	    io:format("gaia_command: alsa_open actual_sw_params = ~p\n",
-		      [ActualSwParams]),
-	    Format1 = proplists:get_value(format, ActualHwParams),
-	    Channels1 = proplists:get_value(channels, ActualHwParams),
-	    SampleRate1 = proplists:get_value(rate, ActualHwParams),
-	    PeriodSizeInFrames1 = proplists:get_value(period_size, 
-						      ActualHwParams),
-	    Header = [{format,Format1},
-		      {channels,Channels1},
-		      {rate,SampleRate1}],
-	    {ok,{Handle,PeriodSizeInFrames1, Header}};
-	Error ->
-	    Error
-    end.
 
-
-alsa_loop(Parent, AlsaHandle, PeriodFrames,  Transform, Vosk, Model) ->
-    case alsa:read(AlsaHandle, PeriodFrames) of
-	{ok, Data} ->
+alsa_loop(Parent, AlsaHandle, NumFrames,  Transform, Vosk, Model) ->
+    case alsa:read_(AlsaHandle, NumFrames) of
+	{ok, {_ReadFrames, Data}} ->
 	    Data1 =  Transform(Data),
 	    case vosk:recognizer_accept_waveform(Vosk, Data1) of
 		0 ->
-		    alsa_loop(Parent, AlsaHandle, PeriodFrames, Transform,
+		    alsa_util:async_wait_ready(AlsaHandle),
+		    alsa_loop(Parent,AlsaHandle,NumFrames,Transform,
 			      Vosk, Model);
 		1 ->
 		    Result = vosk:recognizer_result(Vosk),
 		    Parent ! {vosk,self(),Result},
 		    vosk:recognizer_reset(Vosk),
-		    alsa_loop(Parent, AlsaHandle, PeriodFrames,  Transform,
+		    alsa_loop(Parent,AlsaHandle,NumFrames,Transform,
 			      Vosk, Model);
 		-1 ->
 		    vosk:recognizer_reset(Vosk),
-		    alsa_loop(Parent, AlsaHandle, PeriodFrames,  Transform,
-			      Vosk, Model)
+		    alsa_loop(Parent,AlsaHandle,NumFrames,Transform,Vosk,Model)
 	    end;
+	{error, eagain} -> %% reading too fast
+	    alsa_util:async_wait_ready(AlsaHandle),
+	    alsa_loop(Parent,AlsaHandle,NumFrames,Transform,Vosk,Model);
 	stop ->
 	    alsa:close(AlsaHandle),
 	    ok;
 	Got ->
 	    io:format("alsa_loop: got ~p\n", [Got]),
-	    alsa_loop(Parent, AlsaHandle, PeriodFrames,  Transform,
-		      Vosk, Model)
+	    alsa_loop(Parent,AlsaHandle,NumFrames,Transform,Vosk,Model)
     end.
-
-%% Add more stuff? or use mixer device?
-mono_to_stereo(s16_le, Bin,Pan) ->
-    << <<(trunc(X*(1.0-Pan))):16/signed-little, 
-	 (trunc(X*Pan)):16/signed-little>> ||
-	<<X:16/signed-little>> <= Bin >>.
-
-stereo_to_mono(s16_le, Bin) ->
-    << <<(max(X1,X2)):16/little-signed>> || 
-	<<X1:16/little-signed,X2:16/little-signed>> <= Bin >>.
