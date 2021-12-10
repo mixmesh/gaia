@@ -153,7 +153,7 @@ gaia-id");
 #endif
                 goto bail_out;
             } else if (n != HEADER_SIZE) {
-                DEBUGP("Ignored truncated UDP packet!");
+                DEBUGP("recvfrom: Ignored truncated UDP packet!");
                 break;
             }
             uint32_t new_gaia_id = ntohl(*(uint32_t *)&header_buf[0]);
@@ -196,7 +196,7 @@ gaia-id");
 #endif
                 goto bail_out;
             } else if (n != udp_buf_size) {
-                DEBUGP("Ignored truncated UDP packet!");
+                DEBUGP("recvfrom: Ignored truncated UDP packet!");
                 break;
             }
 
@@ -205,12 +205,12 @@ gaia-id");
             memcpy(&timestamp_nll, &jb_entry->udp_buf[4], sizeof(uint64_t));
             uint64_t timestamp = ntohll(timestamp_nll);
             uint64_t current_timestamp = utimestamp();
-            // NOTE: Disable to allow development machines without NTP client
             //assert(current_timestamp > timestamp);
+            // NOTE: Disable if NTP isn't installed on test clients
             latency = latency * 0.9 + (current_timestamp - timestamp) * 0.1;
             if (current_timestamp - last_latency_printout >
                 FOUR_SECONDS_IN_US) {
-                DEBUGF("Latency: %fms", latency / 1000);
+                //DEBUGF("Latency: %fms", latency / 1000);
                 last_latency_printout = current_timestamp;
             }
 

@@ -143,10 +143,11 @@ void *file_sender(void *arg) {
         // Add cached audio packet to UDP buffer
         uint16_t packet_len;
         if (params->opus_enabled) {
-            if ((packet_len = opus_encode(opus_encoder,
-                                          (opus_int16 *)&file_cache[file_cache_index],
-                                          PERIOD_SIZE_IN_FRAMES, &udp_buf[HEADER_SIZE],
-                                          OPUS_MAX_PACKET_LEN_IN_BYTES)) < 0) {
+            if ((packet_len = opus_encode(
+                                  opus_encoder,
+                                  (opus_int16 *)&file_cache[file_cache_index],
+                                  PERIOD_SIZE_IN_FRAMES, &udp_buf[HEADER_SIZE],
+                                  OPUS_MAX_PACKET_LEN_IN_BYTES)) < 0) {
                 fprintf(stderr, "Failed to Opus encode: %s\n",
                         opus_strerror(packet_len));
                 break;

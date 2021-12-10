@@ -11,10 +11,10 @@
 
 #define ATOM(name) atm_##name
 #define DECL_ATOM(name) ERL_NIF_TERM atm_##name = 0
-#define LOAD_ATOM(name)                         \
-    do {                                                                \
+#define LOAD_ATOM(name) \
+    do { \
         if (!enif_make_existing_atom(env, #name, &atm_##name, ERL_NIF_LATIN1)) \
-            return -1;                                                  \
+            return -1; \
     } while (0)
 
 DECL_ATOM(ok);
@@ -85,7 +85,8 @@ bool parse_params(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
                             return false;
                         }
                         char addr_string[MAX_ADDR_LEN];
-                        if (enif_get_string(env, addr_port_tuple[0], addr_string,
+                        if (enif_get_string(env, addr_port_tuple[0],
+                                            addr_string,
                                             MAX_ADDR_LEN, ERL_NIF_LATIN1) > 0) {
                             network_receiver_addr = inet_addr(addr_string);
                             if (!enif_get_uint(env, addr_port_tuple[1],
@@ -171,7 +172,8 @@ bool parse_params(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
  * start
  */
 
-static ERL_NIF_TERM _start(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
+static ERL_NIF_TERM _start(ErlNifEnv* env, int argc,
+                           const ERL_NIF_TERM argv[]) {
     if (started) {
         return enif_make_tuple2(env, ATOM(error), ATOM(already_started));
     }
@@ -209,7 +211,8 @@ static ERL_NIF_TERM _start(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) 
  * stop
  */
 
-static ERL_NIF_TERM _stop(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
+static ERL_NIF_TERM _stop(ErlNifEnv* env, int argc,
+                          const ERL_NIF_TERM argv[]) {
     if (!started) {
         return enif_make_tuple2(env, ATOM(error), ATOM(not_started));
     }
@@ -251,7 +254,8 @@ static ERL_NIF_TERM _stop(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
  * set_params
  */
 
-static ERL_NIF_TERM _set_params(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
+static ERL_NIF_TERM _set_params(ErlNifEnv* env, int argc,
+                                const ERL_NIF_TERM argv[]) {
     take_params_wrlock();
     if (!parse_params(env, argc, argv)) {
         return enif_make_tuple2(env, ATOM(error), ATOM(bad_params));

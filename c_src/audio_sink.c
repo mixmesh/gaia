@@ -72,7 +72,8 @@ entry %d but got %d (%d will be reused as %d!)",
 
             if (!skip_packet) {
                 if (params->opus_enabled) {
-                    uint16_t packet_len = ntohs(*(uint16_t *)&jb->playback->udp_buf[16]);
+                    uint16_t packet_len =
+                        ntohs(*(uint16_t *)&jb->playback->udp_buf[16]);
                     int frames;
                     if ((frames =
                          opus_decode(jb->opus_decoder,
@@ -81,7 +82,8 @@ entry %d but got %d (%d will be reused as %d!)",
                                      (opus_int16 *)jb->playback->period_buf,
                                      OPUS_MAX_PACKET_LEN_IN_BYTES,
                                      0)) < 0) {
-                        DEBUGF("Failed to Opus decode: %s", opus_strerror(frames));
+                        DEBUGF("Failed to Opus decode: %s",
+                               opus_strerror(frames));
                     } else {
                         assert(frames == PERIOD_SIZE_IN_FRAMES);
                         packet[npackets++] = jb->playback->period_buf;
@@ -131,8 +133,7 @@ entry %d but got %d (%d will be reused as %d!)",
                                      RATE_IN_HZ, SAMPLE_SIZE_IN_BYTES,
                                      PERIOD_SIZE_IN_FRAMES, BUFFER_PERIODS,
                                      &audio_info)) < 0) {
-                    DEBUGF("audio_new: Could not initialize audio: %s",
-                           snd_strerror(err));
+                    DEBUGF("audio_new: %s", snd_strerror(err));
                     int retval = AUDIO_ERROR;
                     thread_exit(&retval);
                 }
@@ -153,10 +154,6 @@ entry %d but got %d (%d will be reused as %d!)",
                                     PERIOD_SIZE_IN_FRAMES, CHANNELS) == 0);
             }
 
-            if (playback_audio) {
-                audio_write(audio_info, playback_packet, PERIOD_SIZE_IN_FRAMES);
-            }
-
             // Sleep (very carefully)
             struct timespec next_time;
             timespecadd(&time, &period_size_as_tsp, &next_time);
@@ -164,6 +161,14 @@ entry %d but got %d (%d will be reused as %d!)",
             assert(clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME,
                                    &next_time, &rem) == 0);
             memcpy(&time, &next_time, sizeof(struct timespec));
+
+            if (playback_audio) {
+                if ((err = audio_non_blocking_write(
+                               audio_info, playback_packet,
+                               PERIOD_SIZE_IN_FRAMES)) < 0) {
+                    DEBUGF("audio_non_blocking_write: %s", snd_strerror(err));
+                }
+            }
 
             assert(thread_mutex_unlock(playback_packet_mutex) == 0);
             holding_playback_packet_mutex = false;

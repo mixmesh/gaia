@@ -66,7 +66,7 @@ void *network_sender(void *arg) {
         opus_encoder = opus_encoder_create(RATE_IN_HZ, CHANNELS,
                                            OPUS_APPLICATION_AUDIO, &err);
         if (err < 0) {
-            DEBUGF("ERROR: Failed to create an encoder: %s",
+            DEBUGF("opus_encoder_create: Creation failed: %s",
                    opus_strerror(err));
         }
         assert(err == 0);
@@ -81,7 +81,7 @@ void *network_sender(void *arg) {
                          FORMAT, CHANNELS, RATE_IN_HZ, SAMPLE_SIZE_IN_BYTES,
                          PERIOD_SIZE_IN_FRAMES, BUFFER_PERIODS,
                          &audio_info)) < 0) {
-        DEBUGF("audio_new: Could not initialize audio: %s", snd_strerror(err));
+        DEBUGF("audio_new: %s", snd_strerror(err));
         int retval = AUDIO_ERROR;
         thread_exit(&retval);
     }
@@ -124,26 +124,25 @@ void *network_sender(void *arg) {
         // Add audio packet to UDP buffer
         int packet_len;
         if (params->opus_enabled) {
-            snd_pcm_uframes_t frames;
-            if ((frames = audio_read(audio_info, period_buf,
-                                     PERIOD_SIZE_IN_FRAMES)) < 0) {
+            if ((err = audio_read(audio_info, period_buf,
+                                  PERIOD_SIZE_IN_FRAMES)) < 0) {
+                DEBUGF("audio_read: %s", snd_strerror(err));
                 continue;
             }
-            assert(frames == PERIOD_SIZE_IN_FRAMES);
             if ((packet_len = opus_encode(opus_encoder,
                                           (opus_int16 *)period_buf,
-                                          frames, &udp_buf[HEADER_SIZE],
+                                          PERIOD_SIZE_IN_FRAMES,
+                                          &udp_buf[HEADER_SIZE],
                                           OPUS_MAX_PACKET_LEN_IN_BYTES)) < 0) {
-                DEBUGF("Failed to Opus encode: %s", opus_strerror(packet_len));
+                DEBUGF("opus_encode: %s", opus_strerror(packet_len));
                 break;
             }
         } else {
-            snd_pcm_uframes_t frames;
-            if ((frames = audio_read(audio_info, &udp_buf[HEADER_SIZE],
-                                     PERIOD_SIZE_IN_FRAMES)) < 0) {
+            if ((err = audio_read(audio_info, &udp_buf[HEADER_SIZE],
+                                  PERIOD_SIZE_IN_FRAMES)) < 0) {
+                DEBUGF("audio_read: %s", snd_strerror(err));
                 continue;
             }
-            assert(frames == PERIOD_SIZE_IN_FRAMES);
             packet_len = PERIOD_SIZE_IN_BYTES;
         }
 
@@ -161,7 +160,7 @@ void *network_sender(void *arg) {
                 perror("sendto: Failed to write to socket");
 #endif
             } else if (n != udp_buf_size) {
-                DEBUGP("Too few bytes written to socket!");
+                DEBUGP("sendto: Too few bytes written to socket!");
             }
         }
 
