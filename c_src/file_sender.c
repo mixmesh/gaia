@@ -70,8 +70,7 @@ void *file_sender(void *arg) {
         opus_encoder = opus_encoder_create(RATE_IN_HZ, CHANNELS,
                                            OPUS_APPLICATION_AUDIO, &err);
         if (err < 0) {
-            fprintf(stderr, "ERROR: Failed to create an encoder: %s\n",
-                    opus_strerror(err));
+            fprintf(stderr, "opus_encoder_create: %s\n", opus_strerror(err));
         }
         assert(err == 0);
     }
@@ -148,8 +147,7 @@ void *file_sender(void *arg) {
                                   (opus_int16 *)&file_cache[file_cache_index],
                                   PERIOD_SIZE_IN_FRAMES, &udp_buf[HEADER_SIZE],
                                   OPUS_MAX_PACKET_LEN_IN_BYTES)) < 0) {
-                fprintf(stderr, "Failed to Opus encode: %s\n",
-                        opus_strerror(packet_len));
+                fprintf(stderr, "opus_encode: %s\n", opus_strerror(packet_len));
                 break;
             }
         } else {
@@ -178,7 +176,7 @@ void *file_sender(void *arg) {
             if (n < 0) {
                 perror("sendto: Failed to write to socket");
             } else if (n != udp_buf_size) {
-                printf("Too few bytes written to socket!\n");
+                printf("sendto: Too few bytes written to socket!\n");
             }
         }
 
