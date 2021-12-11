@@ -174,43 +174,45 @@ int audio_read(audio_info_t *audio_info, uint8_t *data,
 
 int audio_non_blocking_write(audio_info_t *audio_info, uint8_t *data,
                              snd_pcm_uframes_t nframes) {
-    int count;
-    if ((count = snd_pcm_poll_descriptors_count(audio_info->pcm)) < 0) {
-        DEBUGF("snd_pcm_poll_descriptors_count: %d", count);
-        return count;
-    }
-    struct pollfd fds[count];
     int err;
-    if ((err = snd_pcm_poll_descriptors(audio_info->pcm, fds, count)) < 0) {
-        DEBUGF("snd_pcm_poll_descriptors: %d", err);
-        return err;
-    }
-    unsigned short revents;
     ssize_t frame_size_in_bytes = snd_pcm_frames_to_bytes(audio_info->pcm, 1);
     snd_pcm_uframes_t written_frames = 0;
     while (written_frames < nframes) {
-        do {
-            poll(fds, count, -1);
-            snd_pcm_poll_descriptors_revents(audio_info->pcm, fds, count, &revents);
-            if (revents & POLLERR) {
-                return -EIO;
-            }
-        } while (!(revents & POLLOUT));
         snd_pcm_uframes_t frames =
             snd_pcm_writei(audio_info->pcm,
                            &data[written_frames * frame_size_in_bytes],
                            nframes - written_frames);
-
-        if (frames < 0) {
+        if (-EAGAIN) {
+            int count;
+            if ((count = snd_pcm_poll_descriptors_count(audio_info->pcm)) < 0) {
+                DEBUGF("snd_pcm_poll_descriptors_count: %d", count);
+                return count;
+            }
+            struct pollfd fds[count];
+            if ((err = snd_pcm_poll_descriptors(audio_info->pcm, fds,
+                                                count)) < 0) {
+                DEBUGF("snd_pcm_poll_descriptors: %d", err);
+                return err;
+            }
+            unsigned short revents;
+            do {
+                poll(fds, count, -1);
+                snd_pcm_poll_descriptors_revents(audio_info->pcm, fds, count,
+                                                 &revents);
+                if (revents & POLLERR) {
+                    return -EIO;
+                }
+            } while (!(revents & POLLOUT));
+        } else if (frames < 0) {
             DEBUGF("snd_pcm_readi: Failed to write to audio device: %s",
                    snd_strerror(frames));
-            int err;
             if ((err = snd_pcm_recover(audio_info->pcm, frames, 0)) < 0) {
                 DEBUGF("snd_pcm_readi: Failed to recover audio device: %s",
                        snd_strerror(frames));
                 return err;
             }
         }
+
         written_frames += frames;
     }
     return 0;
