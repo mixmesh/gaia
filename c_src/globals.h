@@ -19,16 +19,16 @@
 
 #define PERIOD_SIZE_IN_MS 20
 #define PERIOD_SIZE_IN_NS (20 * 1000000)
-#define PERIOD_SIZE_IN_FRAMES \
-    (uint16_t)((double)PERIOD_SIZE_IN_MS / 1000 * RATE_IN_HZ)
+#define PERIOD_SIZE_IN_FRAMES                           \
+    (uint16_t)(PERIOD_SIZE_IN_MS / 1000.0 * RATE_IN_HZ)
 #define PERIOD_SIZE_IN_BYTES (PERIOD_SIZE_IN_FRAMES * FRAME_SIZE_IN_BYTES)
 
 #define BUFFER_PERIODS 8
-#define start_threshold(period_size_in_frames, buffer_periods) \
+#define start_threshold(period_size_in_frames, buffer_periods)  \
     (period_size_in_frames * (buffer_periods - 1))
 
 #define JITTER_BUFFER_SIZE_IN_MS 400
-#define PERIODS_IN_JITTER_BUFFER \
+#define PERIODS_IN_JITTER_BUFFER                                \
     (uint32_t)(JITTER_BUFFER_SIZE_IN_MS / PERIOD_SIZE_IN_MS)
 #define JITTER_BUFFER_SIZE_IN_BYTES                             \
     (uint32_t)(PERIODS_IN_JITTER_BUFFER * PERIOD_SIZE_IN_BYTES)
