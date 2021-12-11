@@ -71,7 +71,7 @@ consumer() ->
 consumer(H) ->
     Packet = crypto:strong_rand_bytes(?PERIOD_SIZE_IN_BYTES),
     case alsa:write(H, Packet) of
-        {ok, _} ->
+        {ok, N} when is_integer(N) ->
             io:format("-"),
             consumer(H);
         {ok, underrun} ->
