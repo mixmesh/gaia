@@ -88,6 +88,8 @@ audio_consumer_init(Params) ->
 audio_consumer(AlsaHandle) ->
     Packet = gaia_nif:read_packet(),
     case alsa:write(AlsaHandle, Packet) of
+        {ok, N} when is_integer(N) ->
+            audio_consumer(AlsaHandle);
         {ok, underrun} ->
             ?LOG_WARNING(#{module => ?MODULE, reason => underrun}),
             audio_consumer(AlsaHandle);
