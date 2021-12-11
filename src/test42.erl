@@ -1,8 +1,10 @@
 -module(test42).
 -compile(export_all).
 
--define(CAPTURE_PCM_NAME, "plughw:0,0").
--define(PLAYBACK_PCM_NAME, "plughw:0,0").
+-define(CAPTURE_PCM_NAME, "bluealsa:DEV=20:74:CF:C5:28:79,PROFILE=sco").
+-define(PLAYBACK_PCM_NAME, "bluealsa:DEV=20:74:CF:C5:28:79,PROFILE=a2dp").
+%%-define(CAPTURE_PCM_NAME, "plughw:1,0").
+%%-define(PLAYBACK_PCM_NAME, "plughw:1,0").
 -define(FORMAT, s16_le).
 -define(CHANNELS, 1).
 -define(SAMPLE_SIZE_IN_BYTES, 2).
