@@ -116,21 +116,29 @@ audio_producer_init(Params) ->
     Format = proplists:get_value(format, Params, ?FORMAT),
     Channels = proplists:get_value(channels, Params, ?CHANNELS),
     Rate = proplists:get_value(rate, Params, ?RATE_IN_HZ),
-    Device = proplists:get_value(device, Params, ?DEFAULT_PCM_NAME),
+    PcmName = proplists:get_value(device, Params, ?DEFAULT_PCM_NAME),
     WantedHwParams =
         [{format, Format},
 	 {channels, Channels},
 	 {rate, Rate},
 	 {period_size, PeriodSizeInFrames},
 	 {buffer_size, BufferSizeInFrames}],
-    ?LOG_DEBUG("WantedHwParams = ~w", [WantedHwParams]),
-    case alsa:open(Device, capture, WantedHwParams, []) of
+    ?LOG_DEBUG(#{module => ?MODULE, wanted_hw_params => WantedHwParams}),
+    AlsaHandle = force_open_alsa(PcmName, WantedHwParams),
+    audio_producer(AlsaHandle, PeriodSizeInFrames, []).
+
+force_open_alsa(PcmName, WantedHwParams) ->
+    case alsa:open(PcmName, capture, WantedHwParams, []) of
         {ok, AlsaHandle, ActualHwParams, ActualSwParams} ->
-            ?LOG_INFO(#{actual_hw_params => ActualHwParams,
+            ?LOG_INFO(#{module => ?MODULE,
+                        actual_hw_params => ActualHwParams,
                         actual_sw_params => ActualSwParams}),
-            audio_producer(AlsaHandle, PeriodSizeInFrames, []);
+            AlsaHandle;
         {error, Reason} ->
-            exit({alsa, open, alsa:strerror(Reason)})
+            ?LOG_ERROR(#{module => ?MODULE,
+                         function => {alsa, open, 3},
+                         reason => alsa:strerror(Reason)}),
+            force_open_alsa(PcmName, WantedHwParams)
     end.
 
 audio_producer(AlsaHandle, PeriodSizeInFrames, []) ->

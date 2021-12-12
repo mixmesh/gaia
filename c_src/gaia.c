@@ -202,6 +202,7 @@ int main (int argc, char *argv[]) {
         audio_sink_params = malloc(sizeof(audio_sink_params_t));
         audio_sink_params->pcm_name = playback_pcm_name;
         audio_sink_params->opus_enabled = opus_enabled;
+        audio_sink_params->playback_audio = true;
         if ((err = start_thread(audio_sink, (void *)audio_sink_params,
                                 &audio_sink_thread)) != 0) {
             exit(err);

@@ -64,7 +64,7 @@ audio_consumer_init(Params) ->
     Format = proplists:get_value(format, Params, ?FORMAT),
     Channels = proplists:get_value(channels, Params, ?CHANNELS),
     Rate = proplists:get_value(rate, Params, ?RATE_IN_HZ),
-    Device = proplists:get_value(device, Params, ?DEFAULT_PCM_NAME),
+    PcmName = proplists:get_value(device, Params, ?DEFAULT_PCM_NAME),
     WantedHwParams =
         [{format, Format},
 	 {channels, Channels},
@@ -74,15 +74,24 @@ audio_consumer_init(Params) ->
     WantedSwParams =
         [{start_threshold,
           ?start_threshold(PeriodSizeInFrames, BufferPeriods)}],
-    ?LOG_DEBUG("WantedHwParams = ~w\nWantedSwParams = ~w",
-               [WantedHwParams, WantedSwParams]),
-    case alsa:open(Device, playback, WantedHwParams, WantedSwParams) of
+    ?LOG_DEBUG(#{module => ?MODULE,
+                 wanted_hw_params => WantedHwParams,
+                 wanted_sw_params => WantedSwParams}),
+    AlsaHandle = force_open_alsa(PcmName, WantedHwParams, WantedSwParams),
+    audio_consumer(AlsaHandle).
+
+force_open_alsa(PcmName, WantedHwParams, WantedSwParams) ->
+    case alsa:open(PcmName, playback, WantedHwParams, WantedSwParams) of
         {ok, AlsaHandle, ActualHwParams, ActualSwParams} ->
-            ?LOG_INFO(#{actual_hw_params => ActualHwParams,
-                        actual_sw_params => ActualSwParams}),
-            audio_consumer(AlsaHandle);
+            ?LOG_DEBUG(#{module => ?MODULE,
+                         actual_hw_params => ActualHwParams,
+                         actual_sw_params => ActualSwParams}),
+            AlsaHandle;
         {error, Reason} ->
-            exit({alsa, open, alsa:strerror(Reason)})
+            ?LOG_ERROR(#{module => ?MODULE,
+                         function => {alsa, open, 3},
+                         reason => alsa:strerror(Reason)}),
+            force_open_alsa(PcmName, WantedHwParams, WantedSwParams)
     end.
 
 audio_consumer(AlsaHandle) ->

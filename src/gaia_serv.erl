@@ -30,7 +30,8 @@ init(Parent, GaiaId, {IpAddress, Port}, PcmName) ->
     ok = gaia_nif:start({#{addr_port => {inet_parse:ntoa(IpAddress), Port},
                            opus_enabled => ?OPUS_ENABLED},
                          #{pcm_name => PcmName,
-                           opus_enabled => ?OPUS_ENABLED}}),
+                           opus_enabled => ?OPUS_ENABLED,
+                           playback_audio => ?PLAYBACK_AUDIO}}),
     ?LOG_INFO("Gaia NIF has been initialized"),
     ?LOG_DEBUG(#{module => ?MODULE, gaia_address => IpAddress}),
     ok = nodis:set_node_info(

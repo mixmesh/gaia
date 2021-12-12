@@ -12,9 +12,6 @@ extern bool kill_audio_sink;
 extern uint8_t *playback_packet;
 extern thread_mutex_t *playback_packet_mutex;
 
-// NOTE: A compile time option
-bool playback_audio = true;
-
 void reset_playback_delay(jb_t *jb) {
     jb->playback = jb_get_entry(jb, JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS);
     assert(jb->playback != NULL);
@@ -127,7 +124,7 @@ entry %d but got %d (%d will be reused as %d!)",
 
         if (npackets > 0) {
             // Open audio device (if needed)
-            if (playback_audio && audio_info == NULL) {
+            if (params->playback_audio && audio_info == NULL) {
                 if ((err = audio_new(params->pcm_name, SND_PCM_STREAM_PLAYBACK,
                                      SND_PCM_NONBLOCK, FORMAT, CHANNELS,
                                      RATE_IN_HZ, SAMPLE_SIZE_IN_BYTES,
@@ -162,7 +159,7 @@ entry %d but got %d (%d will be reused as %d!)",
                                    &next_time, &rem) == 0);
             memcpy(&time, &next_time, sizeof(struct timespec));
 
-            if (playback_audio) {
+            if (params->playback_audio) {
                 if ((err = audio_non_blocking_write(
                                audio_info, playback_packet,
                                PERIOD_SIZE_IN_FRAMES)) < 0) {
@@ -175,7 +172,7 @@ entry %d but got %d (%d will be reused as %d!)",
         } else {
             DEBUGP("No data available in jitter buffers");
             // Close audio device and wait a bit
-            if (playback_audio && audio_info != NULL) {
+            if (params->playback_audio && audio_info != NULL) {
                 audio_free(audio_info);
                 audio_info = NULL;
             }
@@ -185,7 +182,7 @@ entry %d but got %d (%d will be reused as %d!)",
     }
 
     DEBUGP("audio_sink is shutting down!!!");
-    if (playback_audio && audio_info != NULL) {
+    if (params->playback_audio && audio_info != NULL) {
         audio_free(audio_info);
     }
     int retval = AUDIO_SINK_DIED;

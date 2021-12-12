@@ -10,7 +10,8 @@
           opus_enabled := boolean()}.
 -type audio_sink_params() ::
         #{pcm_name := string(),
-          opus_enabled := boolean()}.
+          opus_enabled := boolean(),
+          playback_audio := boolean()}.
 -type params() :: {network_receiver_params(), audio_sink_params()}.
 
 %%
@@ -27,7 +28,7 @@ init() ->
 
 preloaded_atoms() ->
     [already_started, not_started, bad_params, addr_port, opus_enabled,
-     pcm_name].
+     playback_audio, pcm_name].
 
 %%
 %% Exported: start

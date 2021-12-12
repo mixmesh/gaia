@@ -27,4 +27,6 @@
 -define(OPUS_COMPLEXITY, 5).
 -define(OPUS_MAX_PACKET_LEN_IN_BYTES, 1276).
 
+-define(PLAYBACK_AUDIO, true).
+
 -endif.

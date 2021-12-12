@@ -26,6 +26,7 @@ DECL_ATOM(not_started);
 DECL_ATOM(bad_params);
 DECL_ATOM(addr_port);
 DECL_ATOM(opus_enabled);
+DECL_ATOM(playback_audio);
 DECL_ATOM(pcm_name);
 
 #define MAX_ADDR_LEN 64
@@ -70,10 +71,10 @@ bool parse_params(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
 
         ErlNifMapIterator iter;
 
-        // Type: alsa_nif:network_receiver_params()
+        // Type: gaia_nif:network_receiver_params()
         in_addr_t network_receiver_addr;
         unsigned int network_receiver_port;
-        bool network_receiver_opus_enabled;
+        bool network_receiver_opus_enabled = false;
         if (enif_map_iterator_create(env, params_tuple[0], &iter,
                                      ERL_NIF_MAP_ITERATOR_FIRST)) {
             ERL_NIF_TERM key, value;
@@ -116,9 +117,10 @@ bool parse_params(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
             return false;
         }
 
-        // Type: alsa_nif:audio_sink_params()
+        // Type: gaia_nif:audio_sink_params()
         char audio_sink_pcm_name[MAX_PCM_NAME_LEN];
-        bool audio_sink_opus_enabled;
+        bool audio_sink_opus_enabled = false;
+        bool audio_sink_playback_audio = true;
         if (enif_map_iterator_create(env, params_tuple[1], &iter,
                                      ERL_NIF_MAP_ITERATOR_FIRST)) {
             ERL_NIF_TERM key, value;
@@ -133,6 +135,14 @@ bool parse_params(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
                         audio_sink_opus_enabled = true;
                     } else if (value == ATOM(false)) {
                         audio_sink_opus_enabled = false;
+                    } else {
+                        return false;
+                    }
+                } else if (key == ATOM(playback_audio)) {
+                    if (value == ATOM(true)) {
+                        audio_sink_playback_audio = true;
+                    } else if (value == ATOM(false)) {
+                        audio_sink_playback_audio = false;
                     } else {
                         return false;
                     }
@@ -159,6 +169,7 @@ bool parse_params(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
         }
         audio_sink_params.pcm_name = strdup(audio_sink_pcm_name);
         audio_sink_params.opus_enabled = audio_sink_opus_enabled;
+        audio_sink_params.playback_audio = audio_sink_playback_audio;
 
         params_last_updated = utimestamp();
 
@@ -293,6 +304,7 @@ static int load(ErlNifEnv *env, void **priv_data, ERL_NIF_TERM load_info) {
     LOAD_ATOM(bad_params);
     LOAD_ATOM(addr_port);
     LOAD_ATOM(opus_enabled);
+    LOAD_ATOM(playback_audio);
     LOAD_ATOM(pcm_name);
     return 0;
 }
