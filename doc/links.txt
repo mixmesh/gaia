@@ -27,8 +27,8 @@ https://stackoverflow.com/questions/62291143/record-audio-from-bluetooth-headset
 https://www.sigmdel.ca/michel/ha/rpi/bluetooth_n_buster_01_en.html
 https://introt.github.io/docs/raspberrypi/bluealsa.html
 https://www.sigmdel.ca/michel/ha/rpi/bluetooth_in_rpios_01_en.html
-
-ssh black.mixmesh
+https://bbs.archlinux.org/viewtopic.php?id=258363
+https://securitronlinux.com/debian-testing/how-to-control-your-pulseaudio-sound-volume-using-the-command-line/
 
 Speech recognition
 ------------------
