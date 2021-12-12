@@ -6,6 +6,8 @@
 -include_lib("kernel/include/logger.hrl").
 -include("globals.hrl").
 
+-define(ALSA_PUSHBACK_TIMEOUT_IN_MS, 1000).
+
 %%
 %% Exported: start_link
 %%
@@ -91,6 +93,7 @@ force_open_alsa(PcmName, WantedHwParams, WantedSwParams) ->
             ?LOG_ERROR(#{module => ?MODULE,
                          function => {alsa, open, 3},
                          reason => alsa:strerror(Reason)}),
+            timer:sleep(?ALSA_PUSHBACK_TIMEOUT_IN_MS),
             force_open_alsa(PcmName, WantedHwParams, WantedSwParams)
     end.
 
@@ -106,6 +109,9 @@ audio_consumer(AlsaHandle) ->
             ?LOG_WARNING(#{module => ?MODULE, reason => suspend_event}),
             audio_consumer(AlsaHandle);
         {error, Reason} ->
-            alsa:close(AlsaHandle),
-            exit({alsa, read, alsa:strerror(Reason)})
+            ?LOG_ERROR(#{module => ?MODULE,
+                         function => {alsa, read, 2},
+                         reason => alsa:strerror(Reason)}),
+            timer:sleep(?ALSA_PUSHBACK_TIMEOUT_IN_MS),
+            audio_consumer(AlsaHandle)
     end.

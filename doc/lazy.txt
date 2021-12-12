@@ -35,3 +35,11 @@ Alsa/Bluetooth
 $ aplay -D bluealsa /usr/share/sounds/alsa/Front_Center.wav
 $ sudo ./gaia -D bluealsa:PROFILE=sco -E bluealsa -s 192.168.99.175:2305 -d 192.168.99.182 1000
 $ sudo ./gaia -D plughw:1,0 -E plughw:1,0 -s 192.168.99.175:2305 -d 192.168.99.182 1000
+
+Pulseaudio/Bluetooth
+--------------------
+$ pacmd set-card-profile 0 headset_head_unit
+
+You can pass "auto_switch=2" to module-bluetooth-policy in /etc/pulse/default.pa to make the profile switching more aggressive.
+
+load-module module-bluetooth-policy auto_switch=2
