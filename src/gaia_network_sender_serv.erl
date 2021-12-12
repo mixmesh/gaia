@@ -151,7 +151,9 @@ send_packet(GaiaId, _OpusEncoder, Socket, Seqnum, DestAddresses, Packet) ->
                   ok ->
                       ok;
                   {error, Reason} ->
-                      exit(io:format(standard_error,"~s\n",
-                                     [file:format_error(Reason)]))
+                      ?LOG_ERROR(#{module => ?MODULE,
+                                   function => {gen_udp, send, 4},
+                                   reason => file:format_error(Reason)}),
+                      ok
               end
       end, DestAddresses).
