@@ -23,7 +23,7 @@ jb_t *jb_new(uint32_t gaia_id, bool opus_enabled) {
         int err;
         jb->opus_decoder = opus_decoder_create(RATE_IN_HZ, CHANNELS, &err);
         if (err < 0) {
-            DEBUGF("opus_decoder_create: %s", opus_strerror(err));
+            ERRORF("opus_decoder_create: %s", opus_strerror(err));
         }
         assert(err == 0);
     } else {

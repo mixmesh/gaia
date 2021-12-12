@@ -19,9 +19,7 @@ void *network_sender(void *arg) {
     // Create socket
     int sockfd = -1;
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-#ifdef DEBUG
         perror("socket: Socket creation failed");
-#endif
         int retval = SOCKET_ERROR;
         thread_exit(&retval);
     }
@@ -37,16 +35,12 @@ void *network_sender(void *arg) {
     // Make socket non-blocking
     int flags = fcntl(sockfd, F_GETFL, 0);
     if (flags < 0) {
-#ifdef DEBUG
         perror("fcntl: Socket could not be made non-blocking");
-#endif
         int retval = SOCKET_ERROR;
         thread_exit(&retval);
     }
     if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) < 0) {
-#ifdef DEBUG
         perror("fcntl: Socket could not be made non-blocking");
-#endif
         int retval = SOCKET_ERROR;
         thread_exit(&retval);
     }
@@ -66,7 +60,7 @@ void *network_sender(void *arg) {
         opus_encoder = opus_encoder_create(RATE_IN_HZ, CHANNELS,
                                            OPUS_APPLICATION_AUDIO, &err);
         if (err < 0) {
-            DEBUGF("opus_encoder_create: Creation failed: %s",
+            ERRORF("opus_encoder_create: Creation failed: %s",
                    opus_strerror(err));
         }
         assert(err == 0);
@@ -81,15 +75,15 @@ void *network_sender(void *arg) {
                          FORMAT, CHANNELS, RATE_IN_HZ, SAMPLE_SIZE_IN_BYTES,
                          PERIOD_SIZE_IN_FRAMES, BUFFER_PERIODS,
                          &audio_info)) < 0) {
-        DEBUGF("audio_new: %s", snd_strerror(err));
+        ERRORF("audio_new: %s", snd_strerror(err));
         int retval = AUDIO_ERROR;
         thread_exit(&retval);
     }
-    audio_print_parameters(audio_info, "sender");
+    //audio_print_parameters(audio_info, "sender");
     assert(PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
 
-    DEBUGF("Period size is %d bytes (%dms)", PERIOD_SIZE_IN_BYTES,
-           PERIOD_SIZE_IN_MS);
+    INFOF("Period size is %d bytes (%dms)", PERIOD_SIZE_IN_BYTES,
+          PERIOD_SIZE_IN_MS);
 
     // Allocate memory for UDP buffer
     ssize_t udp_max_buf_size;
@@ -111,7 +105,7 @@ void *network_sender(void *arg) {
     uint32_t seqnum = 1;
 
     // Read from audio device and write to socket
-    DEBUGP("Sending audio...");
+    INFOF("Sending audio...");
     while (!kill_network_sender) {
         // Add timestamp to UDP buffer header
         uint64_t timestamp_nll = htonll(utimestamp());
@@ -126,7 +120,7 @@ void *network_sender(void *arg) {
         if (params->opus_enabled) {
             if ((err = audio_read(audio_info, period_buf,
                                   PERIOD_SIZE_IN_FRAMES)) < 0) {
-                DEBUGF("audio_read: %s", snd_strerror(err));
+                ERRORF("audio_read: %s", snd_strerror(err));
                 continue;
             }
             if ((packet_len = opus_encode(opus_encoder,
@@ -134,13 +128,13 @@ void *network_sender(void *arg) {
                                           PERIOD_SIZE_IN_FRAMES,
                                           &udp_buf[HEADER_SIZE],
                                           OPUS_MAX_PACKET_LEN_IN_BYTES)) < 0) {
-                DEBUGF("opus_encode: %s", opus_strerror(packet_len));
+                ERRORF("opus_encode: %s", opus_strerror(packet_len));
                 break;
             }
         } else {
             if ((err = audio_read(audio_info, &udp_buf[HEADER_SIZE],
                                   PERIOD_SIZE_IN_FRAMES)) < 0) {
-                DEBUGF("audio_read: %s", snd_strerror(err));
+                ERRORF("audio_read: %s", snd_strerror(err));
                 continue;
             }
             packet_len = PERIOD_SIZE_IN_BYTES;
@@ -156,18 +150,16 @@ void *network_sender(void *arg) {
             ssize_t n = sendto(sockfd, udp_buf, udp_buf_size, 0,
                                (struct sockaddr *)&addrs[i], sizeof(addrs[i]));
             if (n < 0) {
-#ifdef DEBUG
                 perror("sendto: Failed to write to socket");
-#endif
             } else if (n != udp_buf_size) {
-                DEBUGP("sendto: Too few bytes written to socket!");
+                ERRORF("sendto: Too few bytes written to socket!");
             }
         }
 
         seqnum++;
     }
 
-    DEBUGP("network_sender is shutting down!!!");
+    INFOF("network_sender is shutting down!!!");
     audio_free(audio_info);
     free(udp_buf);
     close(sockfd);

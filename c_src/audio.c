@@ -63,7 +63,7 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
         return err;
     }
     if (desired_period_size_in_frames != period_size_in_frames) {
-        DEBUGF("NOTE: Desired period size was %ld bytes but it was set to %ld",
+        ERRORF("NOTE: Desired period size was %ld bytes but it was set to %ld",
                desired_period_size_in_frames, period_size_in_frames);
     }
 
@@ -77,7 +77,7 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
         return err;
     }
     if (desired_buffer_size_in_frames != buffer_size_in_frames) {
-        DEBUGF("NOTE: Desired buffer size was %ld bytes but it was set to %ld",
+        ERRORF("NOTE: Desired buffer size was %ld bytes but it was set to %ld",
                desired_buffer_size_in_frames, buffer_size_in_frames);
     }
 
@@ -160,11 +160,11 @@ int audio_read(audio_info_t *audio_info, uint8_t *data,
                snd_pcm_uframes_t nframes) {
     snd_pcm_uframes_t frames = snd_pcm_readi(audio_info->pcm, data, nframes);
     if (frames < 0) {
-        DEBUGF("snd_pcm_readi: Failed to read from audio device: %s",
+        ERRORF("snd_pcm_readi: Failed to read from audio device: %s",
                snd_strerror(frames));
         int err;
         if ((err = snd_pcm_recover(audio_info->pcm, frames, 0)) < 0) {
-            DEBUGF("snd_pcm_readi: Failed to recover audio device: %s",
+            ERRORF("snd_pcm_readi: Failed to recover audio device: %s",
                    snd_strerror(frames));
             return err;
         }
@@ -185,13 +185,13 @@ int audio_non_blocking_write(audio_info_t *audio_info, uint8_t *data,
         if (-EAGAIN) {
             int count;
             if ((count = snd_pcm_poll_descriptors_count(audio_info->pcm)) < 0) {
-                DEBUGF("snd_pcm_poll_descriptors_count: %d", count);
+                ERRORF("snd_pcm_poll_descriptors_count: %d", count);
                 return count;
             }
             struct pollfd fds[count];
             if ((err = snd_pcm_poll_descriptors(audio_info->pcm, fds,
                                                 count)) < 0) {
-                DEBUGF("snd_pcm_poll_descriptors: %d", err);
+                ERRORF("snd_pcm_poll_descriptors: %d", err);
                 return err;
             }
             unsigned short revents;
@@ -204,10 +204,10 @@ int audio_non_blocking_write(audio_info_t *audio_info, uint8_t *data,
                 }
             } while (!(revents & POLLOUT));
         } else if (frames < 0) {
-            DEBUGF("snd_pcm_readi: Failed to write to audio device: %s",
+            ERRORF("snd_pcm_readi: Failed to write to audio device: %s",
                    snd_strerror(frames));
             if ((err = snd_pcm_recover(audio_info->pcm, frames, 0)) < 0) {
-                DEBUGF("snd_pcm_readi: Failed to recover audio device: %s",
+                ERRORF("snd_pcm_readi: Failed to recover audio device: %s",
                        snd_strerror(frames));
                 return err;
             }

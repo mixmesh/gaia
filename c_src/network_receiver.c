@@ -31,9 +31,7 @@ void *network_receiver(void *arg) {
 
     // Create and bind socket
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-#ifdef DEBUG
         perror("socket: Socket creation failed");
-#endif
         int retval = SOCKET_ERROR;
         thread_exit(&retval);
     }
@@ -45,9 +43,7 @@ void *network_receiver(void *arg) {
     addr.sin_port = htons(params->addr_port->port);
 
     if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-#ifdef DEBUG
         perror("bind: Binding of socket failed");
-#endif
         int retval = SOCKET_ERROR;
         thread_exit(&retval);
     }
@@ -65,24 +61,22 @@ void *network_receiver(void *arg) {
 
     uint8_t drain_buf[DRAIN_BUF_SIZE];
 
-    DEBUGF("Jitter buffer contains %dms of audio data (%d periods, %d bytes)",
-           JITTER_BUFFER_SIZE_IN_MS,
-           PERIODS_IN_JITTER_BUFFER,
-           JITTER_BUFFER_SIZE_IN_BYTES);
+    INFOF("Jitter buffer contains %dms of audio data (%d periods, %d bytes)",
+          JITTER_BUFFER_SIZE_IN_MS,
+          PERIODS_IN_JITTER_BUFFER,
+          JITTER_BUFFER_SIZE_IN_BYTES);
 
     // Read from socket and write to jitter buffer
     while (!kill_network_receiver) {
         // Waiting for incoming audio
-        DEBUGP("Waiting for incoming audio...");
+        INFOF("Waiting for incoming audio...");
         fd_set readfds;
         FD_ZERO(&readfds);
         FD_SET(sockfd, &readfds);
         struct timeval timeout = two_second_timeout;
         int nfds = select(sockfd + 1, &readfds, 0, 0, &timeout);
         if (nfds < 0) {
-#ifdef DEBUG
             perror("select: Failed to wait for incoming audio");
-#endif
             break;
         } else if (nfds == 0) {
             continue;
@@ -95,9 +89,7 @@ void *network_receiver(void *arg) {
             struct timeval timeout = zero_timeout;
             int nfds = select(sockfd + 1, &readfds, 0, 0, &timeout);
             if (nfds < 0) {
-#ifdef DEBUG
                 perror("select: Failed to drain socket receive buffer\n");
-#endif
                 goto bail_out;
             } else if (nfds == 0) {
                 // Socket receiver buffer has been drained!
@@ -105,17 +97,15 @@ void *network_receiver(void *arg) {
             }
             if (recvfrom(sockfd, drain_buf, DRAIN_BUF_SIZE, 0, NULL,
                          NULL) < 0) {
-#ifdef DEBUG
                 perror("recvfrom: Failed to drain socket receive buffer\n");
-#endif
                 goto bail_out;
             }
             FD_ZERO(&readfds);
             FD_SET(sockfd, &readfds);
         }
-        DEBUGP("Socket receive buffer has been drained");
+        INFOF("Socket receive buffer has been drained");
 
-        DEBUGP("Erase all stale jitter buffers");
+        INFOF("Erase all stale jitter buffers");
         jb_table_free(jb_table, true);
 
         uint64_t gaia_id = 0;
@@ -124,7 +114,7 @@ void *network_receiver(void *arg) {
         uint64_t last_latency_printout = 0;
 
         // Read from socket and write to jitter buffer
-        DEBUGP("Receiving audio...");
+        INFOF("Receiving audio...");
         while (!kill_network_receiver) {
             // Wait for incoming socket data (or timeout)
             FD_ZERO(&readfds);
@@ -132,13 +122,11 @@ void *network_receiver(void *arg) {
             struct timeval timeout = one_second_timeout;
             int nfds = select(sockfd + 1, &readfds, 0, 0, &timeout);
             if (nfds < 0) {
-#ifdef DEBUG
                 perror("select: Failed to wait for incoming socket data");
-#endif
                 goto bail_out;
             } else if (nfds == 0) {
                 // Timeout
-                DEBUGP("No longer receiving audio!\n");
+                INFOF("No longer receiving audio!\n");
                 break;
             }
 
@@ -147,13 +135,11 @@ void *network_receiver(void *arg) {
             int n;
             if ((n = recvfrom(sockfd, header_buf, HEADER_SIZE, MSG_PEEK, NULL,
                               NULL)) < 0) {
-#ifdef DEBUG
                 perror("recvfrom: Failed to peek into socket and extract \
 gaia-id");
-#endif
                 goto bail_out;
             } else if (n != HEADER_SIZE) {
-                DEBUGP("recvfrom: Ignored truncated UDP packet!");
+                ERRORF("recvfrom: Ignored truncated UDP packet!");
                 break;
             }
             uint32_t new_gaia_id = ntohl(*(uint32_t *)&header_buf[0]);
@@ -191,12 +177,10 @@ gaia-id");
             ssize_t udp_buf_size = HEADER_SIZE + packet_len;
             if ((n = recvfrom(sockfd, jb_entry->udp_buf, udp_buf_size, 0, NULL,
                               NULL)) < 0) {
-#ifdef DEBUG
                 perror("recvfrom: Failed to read from socket");
-#endif
                 goto bail_out;
             } else if (n != udp_buf_size) {
-                DEBUGP("recvfrom: Ignored truncated UDP packet!");
+                ERRORF("recvfrom: Ignored truncated UDP packet!");
                 break;
             }
 
@@ -210,7 +194,7 @@ gaia-id");
             latency = latency * 0.9 + (current_timestamp - timestamp) * 0.1;
             if (current_timestamp - last_latency_printout >
                 FOUR_SECONDS_IN_US) {
-                //DEBUGF("Latency: %fms", latency / 1000);
+                DEBUGF("Latency: %fms", latency / 1000);
                 last_latency_printout = current_timestamp;
             }
 
@@ -221,10 +205,10 @@ gaia-id");
 
             if (jb->nentries > 0) {
                 if (jb->tail->seqnum == seqnum) {
-                    DEBUGF("Duplicated UDP packet (%d)", seqnum);
+                    INFOF("Duplicated UDP packet (%d)", seqnum);
                 } else if (jb->tail->seqnum + 1 != seqnum) {
-                    DEBUGF("Missing UDP packet %d. Got %d instead.",
-                           jb->tail->seqnum + 1, seqnum);
+                    INFOF("Missing UDP packet %d. Got %d instead.",
+                          jb->tail->seqnum + 1, seqnum);
                 }
             }
             jb_entry->seqnum = seqnum;
@@ -256,7 +240,7 @@ gaia-id");
     }
 
  bail_out:
-    DEBUGP("network_receiver is shutting down!!!");
+    INFOF("network_receiver is shutting down!!!");
     close(sockfd);
     int retval = NETWORK_RECEIVER_DIED;
     thread_exit(&retval);

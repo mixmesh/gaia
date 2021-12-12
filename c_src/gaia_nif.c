@@ -230,16 +230,16 @@ static ERL_NIF_TERM _stop(ErlNifEnv* env, int argc,
 
     // Wait for audio sink thread to die
     kill_audio_sink = true;
-    DEBUGP("Waiting for audio sink to kill itself");
+    INFOF("Waiting for audio sink to kill itself");
     enif_thread_join(audio_sink_tid, NULL);
-    DEBUGP("Audio sink has killed itself");
+    INFOF("Audio sink has killed itself");
     kill_audio_sink = false;
 
     // Wait for network receiver thread to die
     kill_network_receiver = true;
-    DEBUGP("Waiting for network receiver to kill itself");
+    INFOF("Waiting for network receiver to kill itself");
     enif_thread_join(network_receiver_tid, NULL);
-    DEBUGP("Network receiver has killed itself");
+    INFOF("Network receiver has killed itself");
     kill_network_receiver = false;
 
     // Remove locks
@@ -256,7 +256,7 @@ static ERL_NIF_TERM _stop(ErlNifEnv* env, int argc,
     assert(thread_mutex_destroy(playback_packet_mutex) == 0);
     free(playback_packet_mutex);
 
-    DEBUGP("All is good. We can die in peace.");
+    INFOF("All is good. We can die in peace.");
     started = false;
     return ATOM(ok);
 }

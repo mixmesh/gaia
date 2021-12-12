@@ -6,12 +6,18 @@
 #include <inttypes.h>
 
 #ifdef DEBUG
-#define DEBUGF(f, a...) fprintf(stderr, f "\r\n", a)
-#define DEBUGP(s) fprintf(stderr, s "\r\n")
+#define DEBUGF(f, ...) fprintf(stderr, f "\r\n", ##__VA_ARGS__)
 #else
-#define DEBUGF(f, a...)
-#define DEBUGP(s)
+#define DEBUGF(f, ...)
 #endif
+
+#ifdef INFO
+#define INFOF(f, ...) fprintf(stderr, f "\r\n", ##__VA_ARGS__)
+#else
+#define INFOF(f, ...)
+#endif
+
+#define ERRORF(f, ...) fprintf(stderr, f "\r\n", ##__VA_ARGS__)
 
 #if __BIG_ENDIAN__
 #define htonll(x) (x)
