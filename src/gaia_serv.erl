@@ -145,5 +145,6 @@ update_neighbours(Neighbours, Address, Info) ->
             ?LOG_WARNING(#{module => ?MODULE, bad_gaia_info => GaiaInfo}),
             not_updated;
         false ->
+            ?LOG_ERROR(#{module => ?MODULE, invalid_gaia_info => Info}),
             not_updated
     end.
