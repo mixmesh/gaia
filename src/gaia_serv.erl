@@ -89,9 +89,13 @@ message_handler(#{parent := Parent,
             ?LOG_DEBUG(#{module => ?MODULE, nodis => {wait, Address}}),
             noreply;
         {nodis, NodisSubscription, {change, Address, Info}} ->
-            ?LOG_DEBUG(#{module => ?MODULE, nodis => {change, Address, Info}}),
+            ?LOG_DEBUG(#{module => ?MODULE,
+                         nodis => {change, Neighbours, Address, Info}}),
             case update_neighbours(Neighbours, Address, Info) of
                 not_updated ->
+                    ?LOG_DEBUG(
+                       #{module => ?MODULE,
+                         nodis => {not_updated, Neighbours, Address, Info}}),
                     noreply;
                 UpdatedNeighbours ->
                     DestAddresses =
@@ -101,6 +105,9 @@ message_handler(#{parent := Parent,
                               Acc) ->
                                   [{GaiaIpAddress, GaiaPort}|Acc]
                           end, [], UpdatedNeighbours),
+                    ?LOG_DEBUG(#{module => ?MODULE,
+                                 sets_dest_addresses => {UpdatedNeighbours,
+                                                         DestAddresses}}),
                     ok = gaia_network_sender_serv:set_dest_addresses(
                            NetworkSenderPid, DestAddresses),
                     {noreply, State#{neighbours => UpdatedNeighbours}}
