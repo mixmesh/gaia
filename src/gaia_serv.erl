@@ -90,7 +90,8 @@ message_handler(#{parent := Parent,
             noreply;
         {nodis, NodisSubscription, {change, Address, Info}} ->
             ?LOG_DEBUG(#{module => ?MODULE,
-                         nodis => {change, Neighbours, Address, Info}}),
+                         nodis => change,
+                         node_info => {Address, Info}}),
             case update_neighbours(Neighbours, Address, Info) of
                 not_updated ->
                     ?LOG_DEBUG(
