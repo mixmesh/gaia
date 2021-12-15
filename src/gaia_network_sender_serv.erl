@@ -127,7 +127,9 @@ set_flags(Options) ->
 set_flags([], Flags) ->
     Flags;
 set_flags([{opus_enabled, true}|Rest], Flags) ->
-    set_flags(Rest, ?bit_set(Flags, ?OPUS_ENABLED_FLAG)).
+    set_flags(Rest, ?bit_set(Flags, ?OPUS_ENABLED_FLAG));
+set_flags([_|Rest], Flags) ->
+    set_flags(Rest, Flags).
 
 create_callback(GaiaId, OpusEncoder, Socket, Seqnum, Flags, DestAddresses) ->
     fun(Packet) when is_binary(Packet) ->

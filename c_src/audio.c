@@ -1,3 +1,5 @@
+#include <assert.h>
+#include <stdbool.h>
 #include "audio.h"
 #include "globals.h"
 #include "gaia_utils.h"
@@ -65,6 +67,7 @@ int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,
     if (desired_period_size_in_frames != period_size_in_frames) {
         ERRORF("NOTE: Desired period size was %ld bytes but it was set to %ld",
                desired_period_size_in_frames, period_size_in_frames);
+        assert(false);
     }
 
     snd_pcm_uframes_t desired_buffer_size_in_frames =

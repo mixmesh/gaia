@@ -135,6 +135,11 @@ force_open_alsa(PcmName, WantedHwParams) ->
             ?LOG_INFO(#{module => ?MODULE,
                         actual_hw_params => ActualHwParams,
                         actual_sw_params => ActualSwParams}),
+            %% Ensure that period size is exact or else things will break
+            {value, {_, WantedPeriodSizeInFrames}} =
+                lists:keysearch(period_size, 1, WantedHwParams),
+            {value, {_, WantedPeriodSizeInFrames}} =
+                lists:keysearch(period_size, 1, ActualHwParams),
             AlsaHandle;
         {error, Reason} ->
             ?LOG_ERROR(#{module => ?MODULE,

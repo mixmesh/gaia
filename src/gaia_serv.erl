@@ -26,8 +26,9 @@ stop(Pid) ->
 %%
 
 init(Parent, -1, Port, PcmName) ->
-    #{nodeid := Nodeid} = nods:get_node_info([nodeid]),
-    GaiaId = binary:decode_unsigned(binary:part(Nodeid, -4)),
+    [{nodeid, Nodeid}] = nodis:get_node_info([nodeid]),
+    GaiaId =
+        binary:decode_unsigned(binary:part(Nodeid, {byte_size(Nodeid), -4})),
     init(Parent, GaiaId, Port, PcmName);
 init(Parent, GaiaId, Port, PcmName) ->
     ?LOG_INFO("Gaia NIF is initializing..."),
