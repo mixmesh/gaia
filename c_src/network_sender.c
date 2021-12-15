@@ -80,7 +80,7 @@ void *network_sender(void *arg) {
         int retval = AUDIO_ERROR;
         thread_exit(&retval);
     }
-    //audio_print_parameters(audio_info, "sender");
+    audio_print_parameters(audio_info, "sender");
     assert(PERIOD_SIZE_IN_FRAMES == audio_info->period_size_in_frames);
 
     INFOF("Period size is %d bytes (%dms)", PERIOD_SIZE_IN_BYTES,
