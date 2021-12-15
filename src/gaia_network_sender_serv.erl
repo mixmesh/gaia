@@ -86,8 +86,9 @@ message_handler(#{parent := Parent,
             {stop, From, ok};
         {cast, {set_dest_addresses, NewDestAddresses}} ->
             ?LOG_DEBUG(#{module => ?MODULE,
-                         call => {set_dest_addresses, DestAddresses,
-                                  NewDestAddresses}}),
+                         call => {set_dest_addresses,
+                                  {old, DestAddresses},
+                                  {new, NewDestAddresses}}}),
             case {DestAddresses, lists:sort(NewDestAddresses)} of
                 {_, DestAddresses} ->
                     noreply;
@@ -95,16 +96,14 @@ message_handler(#{parent := Parent,
                     _ = gaia_audio_source_serv:unsubscribe(AudioSourcePid),
                     {noreply, State#{dest_addresses => [],
                                      subscription => false}};
-                {[], SortedNewDestAddresses} when UseCallback ->
+                {_, SortedNewDestAddresses} when UseCallback ->
                     Callback = create_callback(
                                  GaiaId, OpusEncoder, Socket, Seqnum, Flags,
                                  SortedNewDestAddresses),
                     ok = gaia_audio_source_serv:subscribe(AudioSourcePid, Callback),
                     {noreply, State#{dest_addresses => SortedNewDestAddresses}};
-                {[], SortedNewDestAddresses}  ->
+                {_, SortedNewDestAddresses}  ->
                     ok = gaia_audio_source_serv:subscribe(AudioSourcePid),
-                    {noreply, State#{dest_addresses => SortedNewDestAddresses}};
-                {_, SortedNewDestAddresses} ->
                     {noreply, State#{dest_addresses => SortedNewDestAddresses}}
             end;
         {subscription_packet, Packet} ->
@@ -139,9 +138,6 @@ create_callback(GaiaId, OpusEncoder, Socket, Seqnum, Flags, DestAddresses) ->
                             DestAddresses);
        (OldCallback) when is_function(OldCallback) ->
             OldSeqnum = OldCallback(seqnum),
-
-            io:format("REQUSE SEQNUM: ~p\n", [{OldSeqnum, Seqnum}]),
-
             create_callback(GaiaId, OpusEncoder, Socket, OldSeqnum, Flags,
                             DestAddresses);
        (seqnum) ->

@@ -67,10 +67,17 @@ message_handler(#{parent := Parent,
             ?LOG_DEBUG(#{module => ?MODULE, call => stop}),
             {stop, From, ok};
         {call, From, {subscribe, Pid, Callback}} ->
-            ?LOG_DEBUG(#{module => ?MODULE, call => subscribe}),
-            case lists:keymember(Pid, 1, Subscribers) of
-                true ->
-                    {reply, From, {error, already_subscribed}};
+            ?LOG_DEBUG(#{module => ?MODULE,
+                         call => subscribe,
+                         pid => Pid,
+                         subscribers => Subscribers}),
+            case lists:keytake(Pid, 1, Subscribers) of
+                {value, {Pid, MonitorRef, _OldCallback}, PurgedSubscribers} ->
+                    UpdatedSubscribers =
+                        [{Pid, MonitorRef, Callback}|PurgedSubscribers],
+                    AudioProducerPid ! {subscribers, UpdatedSubscribers},
+                    {reply, From, ok,
+                     State#{subscribers => UpdatedSubscribers}};
                 false ->
                     MonitorRef = monitor(process, Pid),
                     UpdatedSubscribers =
@@ -80,7 +87,10 @@ message_handler(#{parent := Parent,
                      State#{subscribers => UpdatedSubscribers}}
             end;
         {call, From, {unsubscribe, Pid}} ->
-            ?LOG_DEBUG(#{module => ?MODULE, call => unsubscribe}),
+            ?LOG_DEBUG(#{module => ?MODULE,
+                         call => unsubscribe,
+                         pid => Pid,
+                         subscribers => Subscribers}),
             case lists:keysearch(Pid, 1, Subscribers) of
                 {value, {_Pid, MonitorRef, _Callback}} ->
                     UpdatedSubscribers = lists:keydelete(Pid, 1, Subscribers),
@@ -158,7 +168,7 @@ audio_producer(AlsaHandle, PeriodSizeInFrames, CurrentSubscribers) ->
     Subscribers =
         receive
             {subscribers, UpdatedSubscribers} ->
-                A = lists:map(
+                lists:map(
                   fun({Pid, MonitorRef, Callback} = Subscriber) ->
                           case lists:keysearch(Pid, 1, CurrentSubscribers) of
                               {value, {Pid, MonitorRef, OldCallback}} ->
@@ -166,10 +176,7 @@ audio_producer(AlsaHandle, PeriodSizeInFrames, CurrentSubscribers) ->
                               false ->
                                   Subscriber
                           end
-                  end, UpdatedSubscribers),
-                io:format(standard_error, "NEW SUBSCRIBERS: ~p\n",
-                          [{UpdatedSubscribers, A, CurrentSubscribers}]),
-                A
+                  end, UpdatedSubscribers)
         after
             0 ->
                 CurrentSubscribers
