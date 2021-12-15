@@ -76,9 +76,8 @@ message_handler(#{parent := Parent,
             UpdatedNeighbours = maps:remove(Address, Neighbours),
             DestAddresses =
                 maps:fold(
-                  fun(_Address,
-                      #{ip_address := GaiaIpAddress, port := GaiaPort}, Acc) ->
-                          [{GaiaIpAddress, GaiaPort}|Acc]
+                  fun({IpAddress, _SyncPort}, #{port := GaiaPort}, Acc) ->
+                          [{IpAddress, GaiaPort}|Acc]
                   end, [], UpdatedNeighbours),
             ok = gaia_network_sender_serv:set_dest_addresses(
                    NetworkSenderPid, DestAddresses),
@@ -99,10 +98,9 @@ message_handler(#{parent := Parent,
                 UpdatedNeighbours ->
                     DestAddresses =
                         maps:fold(
-                          fun(_Address,
-                              #{ip_address := GaiaIpAddress, port := GaiaPort},
+                          fun({IpAddress, _SyncPort}, #{port := GaiaPort},
                               Acc) ->
-                                  [{GaiaIpAddress, GaiaPort}|Acc]
+                                  [{IpAddress, GaiaPort}|Acc]
                           end, [], UpdatedNeighbours),
                     ?LOG_DEBUG(#{module => ?MODULE,
                                  sets_dest_addresses => {UpdatedNeighbours,
@@ -123,23 +121,13 @@ message_handler(#{parent := Parent,
 
 update_neighbours(Neighbours, Address, Info) ->
     case lists:keysearch(gaia, 1, Info) of
-        {value, {gaia, #{id := GaiaId,
-                         ip_address := GaiaIpAddressString,
-                         port := GaiaPort} = GaiaInfo, _PreviousGaiaInfo}}
+        {value, {gaia, #{id := GaiaId, port := GaiaPort} = GaiaInfo,
+                 _PreviousGaiaInfo}}
           when is_integer(GaiaId) andalso
                GaiaId > 0 andalso GaiaId < 65536 andalso
                is_integer(GaiaPort) andalso
                GaiaPort >= 1024 andalso GaiaPort < 65536 ->
-            case inet:parse_address(GaiaIpAddressString) of
-                {ok, GaiaIpAddress} ->
-                    Neighbours#{Address =>
-                                    GaiaInfo#{ip_address =>
-                                                  GaiaIpAddress}};
-                {error, _Reason} ->
-                    ?LOG_WARNING(#{module => ?MODULE,
-                                   bad_gaia_info => GaiaInfo}),
-                    not_updated
-            end;
+            Neighbours#{Address => GaiaInfo};
         {value, {gaia, GaiaInfo, _PreviousGaiaInfo}} when is_map(GaiaInfo) ->
             ?LOG_WARNING(#{module => ?MODULE, bad_gaia_info => GaiaInfo}),
             not_updated;
