@@ -121,11 +121,12 @@ message_handler(#{parent := Parent,
     end.
 
 update_neighbours(Neighbours, Address, Info) ->
+    MaxGaiaId = math:pow(2,32) - 1,
     case lists:keysearch(gaia, 1, Info) of
         {value, {gaia, #{id := GaiaId, port := GaiaPort} = GaiaInfo,
                  _PreviousGaiaInfo}}
           when is_integer(GaiaId) andalso
-               GaiaId > 0 andalso GaiaId < 65536 andalso
+               GaiaId > 0 andalso GaiaId =< MaxGaiaId andalso
                is_integer(GaiaPort) andalso
                GaiaPort >= 1024 andalso GaiaPort < 65536 ->
             Neighbours#{Address => GaiaInfo};
