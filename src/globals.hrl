@@ -12,7 +12,7 @@
 -define(CHANNELS, 1).
 -define(SAMPLE_SIZE_IN_BYTES, 2).
 -define(FRAME_SIZE_IN_BYTES, (?CHANNELS * ?SAMPLE_SIZE_IN_BYTES)).
--define(RATE_IN_HZ, 16001).
+-define(RATE_IN_HZ, 16000).
 
 -define(PERIOD_SIZE_IN_MS, 20).
 -define(PERIOD_SIZE_IN_FRAMES,

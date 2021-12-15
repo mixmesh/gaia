@@ -139,6 +139,9 @@ create_callback(GaiaId, OpusEncoder, Socket, Seqnum, Flags, DestAddresses) ->
                             DestAddresses);
        (OldCallback) when is_function(OldCallback) ->
             OldSeqnum = OldCallback(seqnum),
+
+            io:format("REQUSE SEQNUM: ~p\n", [{OldSeqnum, Seqnum}]),
+
             create_callback(GaiaId, OpusEncoder, Socket, OldSeqnum, Flags,
                             DestAddresses);
        (seqnum) ->

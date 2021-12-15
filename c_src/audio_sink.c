@@ -158,6 +158,7 @@ entry %d but got %d (%d will be reused as %d!)",
             struct timespec rem;
             assert(clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME,
                                    &next_time, &rem) == 0);
+            assert(rem.tv_nsec == 0);
             memcpy(&time, &next_time, sizeof(struct timespec));
 
             if (params->playback_audio) {

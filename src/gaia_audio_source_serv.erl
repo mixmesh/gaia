@@ -158,7 +158,7 @@ audio_producer(AlsaHandle, PeriodSizeInFrames, CurrentSubscribers) ->
     Subscribers =
         receive
             {subscribers, UpdatedSubscribers} ->
-                lists:map(
+                A = lists:map(
                   fun({Pid, MonitorRef, Callback} = Subscriber) ->
                           case lists:keysearch(Pid, 1, CurrentSubscribers) of
                               {value, {Pid, MonitorRef, OldCallback}} ->
@@ -166,7 +166,10 @@ audio_producer(AlsaHandle, PeriodSizeInFrames, CurrentSubscribers) ->
                               false ->
                                   Subscriber
                           end
-                  end, UpdatedSubscribers)
+                  end, UpdatedSubscribers),
+                io:format(standard_error, "NEW SUBSCRIBERS: ~p\n",
+                          [{UpdatedSubscribers, A, CurrentSubscribers}]),
+                A
         after
             0 ->
                 CurrentSubscribers
