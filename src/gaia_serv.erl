@@ -10,8 +10,8 @@
 %% Exported: start_link
 %%
 
-start_link(GaiaId, BindAddress, PcmName) ->
-    ?spawn_server(fun(Parent) -> init(Parent, GaiaId, BindAddress, PcmName) end,
+start_link(GaiaId, Port, PcmName) ->
+    ?spawn_server(fun(Parent) -> init(Parent, GaiaId, Port, PcmName) end,
                   fun initial_message_handler/1).
 
 %%
@@ -25,19 +25,17 @@ stop(Pid) ->
 %% Server
 %%
 
-init(Parent, GaiaId, {IpAddress, Port}, PcmName) ->
+init(Parent, -1, Port, PcmName) ->
+    #{nodeid := Nodeid} = nods:get_node_info([nodeid]),
+    GaiaId = binary:decode_unsigned(binary:part(Nodeid, -4)),
+    init(Parent, GaiaId, Port, PcmName);
+init(Parent, GaiaId, Port, PcmName) ->
     ?LOG_INFO("Gaia NIF is initializing..."),
-    ok = gaia_nif:start({#{addr_port => {inet_parse:ntoa(IpAddress), Port},
-                           opus_enabled => ?OPUS_ENABLED},
+    ok = gaia_nif:start({#{port => Port},
                          #{pcm_name => PcmName,
-                           opus_enabled => ?OPUS_ENABLED,
                            playback_audio => ?PLAYBACK_AUDIO}}),
     ?LOG_INFO("Gaia NIF has been initialized"),
-    ?LOG_DEBUG(#{module => ?MODULE, gaia_address => IpAddress}),
-    ok = nodis:set_node_info(
-           #{gaia => #{id => GaiaId,
-                       ip_address => inet:ntoa(IpAddress),
-                       port => Port}}),
+    ok = nodis:set_node_info(#{gaia => #{id => GaiaId, port => Port}}),
     ?LOG_INFO("Gaia server has been started"),
     {ok, NodisSubscription} = nodis_serv:subscribe(),
     {ok, #{parent => Parent,

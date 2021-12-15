@@ -11,18 +11,27 @@ int string_to_long(char *string, long *value) {
     return 0;
 }
 
-int get_addr_port(char *arg, in_addr_t *addr, uint16_t *port) {
+int get_port(char *string, port_t *port) {
+    long value;
+    int err;
+    if ((err = string_to_long(string, &value)) < 0) {
+        return err;
+    }
+    *port = value;
+    return 0;
+}
+
+int get_addr_port(char *arg, in_addr_t *addr, port_t *port) {
     char *token;
     token = strtok(arg, ":");
     if ((*addr = inet_addr(token)) == -1) {
         return -1;
     }
     if ((token = strtok(NULL, ":")) != NULL) {
-        long value;
-        if (string_to_long(token, &value) < 0) {
-            return -1;
+        int err;
+        if ((err = get_port(token, port)) < 0) {
+            return err;
         }
-        *port = value;
     }
     if (strtok(NULL, ":") != NULL) {
         return -1;

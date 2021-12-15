@@ -5,8 +5,7 @@
 #include "gaia_utils.h"
 
 typedef struct {
-    addr_port_t *addr_port;
-    bool opus_enabled;
+    port_t port;
 } network_receiver_params_t;
 
 void *network_receiver(void *arg);

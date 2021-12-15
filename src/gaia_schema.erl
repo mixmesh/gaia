@@ -13,13 +13,18 @@ get() ->
            reloadable = false}},
        {'gaia-id',
         #json_type{
-           name = {integer, 1, 65535},
-           typical = 1,
+           name = {integer, -1, 65535},
+           typical = -1,
            reloadable = false}},
-       {'bind-address',
+       {port,
         #json_type{
-           name = ip_address_port,
-           typical = {{242, 45, 0, 34}, 10000},
+           name = {integer, 1024, 65535},
+           typical = 2305,
+           reloadable = false}},
+       {'use-opus-codec',
+        #json_type{
+           name = bool,
+           typical = true,
            reloadable = false}},
        {'capture-pcm-name',
         #json_type{

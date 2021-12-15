@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <opus/opus.h>
 #include "audio.h"
+#include "bits.h"
 #include "globals.h"
 #include "timing.h"
 #include "network_sender.h"
@@ -33,13 +34,13 @@ void *network_sender(void *arg) {
     */
 
     // Make socket non-blocking
-    int flags = fcntl(sockfd, F_GETFL, 0);
-    if (flags < 0) {
+    int status_flags = fcntl(sockfd, F_GETFL, 0);
+    if (status_flags < 0) {
         perror("fcntl: Socket could not be made non-blocking");
         int retval = SOCKET_ERROR;
         thread_exit(&retval);
     }
-    if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) < 0) {
+    if (fcntl(sockfd, F_SETFL, status_flags | O_NONBLOCK) < 0) {
         perror("fcntl: Socket could not be made non-blocking");
         int retval = SOCKET_ERROR;
         thread_exit(&retval);
@@ -100,6 +101,14 @@ void *network_sender(void *arg) {
 
     // Create a period buffer
     uint8_t period_buf[PERIOD_SIZE_IN_BYTES];
+
+    // Set buffer header flags
+    uint8_t flags = 0b00000000;
+    if (params->opus_enabled) {
+        udp_buf[18] = SET_FLAG(flags, OPUS_ENABLED_FLAG);
+    } else {
+        udp_buf[18] = flags;
+    }
 
     // Let sequence number start with 1 (zero is reserved)
     uint32_t seqnum = 1;

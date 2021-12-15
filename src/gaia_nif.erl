@@ -27,8 +27,7 @@ init() ->
 %%
 
 preloaded_atoms() ->
-    [already_started, not_started, bad_params, addr_port, opus_enabled,
-     playback_audio, pcm_name].
+    [already_started, not_started, bad_params, port, playback_audio, pcm_name].
 
 %%
 %% Exported: start

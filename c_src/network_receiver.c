@@ -40,7 +40,7 @@ void *network_receiver(void *arg) {
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    addr.sin_port = htons(params->addr_port->port);
+    addr.sin_port = htons(params->port);
 
     if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         perror("bind: Binding of socket failed");
@@ -52,12 +52,10 @@ void *network_receiver(void *arg) {
     struct timeval one_second_timeout = {.tv_usec = 0, .tv_sec = 1};
     struct timeval two_second_timeout = {.tv_usec = 0, .tv_sec = 2};
 
-    ssize_t udp_max_buf_size;
-    if (params->opus_enabled) {
-        udp_max_buf_size = HEADER_SIZE + OPUS_MAX_PACKET_LEN_IN_BYTES;
-    } else {
-        udp_max_buf_size = HEADER_SIZE + PERIOD_SIZE_IN_BYTES;
-    }
+    ssize_t udp_max_buf_size =
+        OPUS_MAX_PACKET_LEN_IN_BYTES > PERIOD_SIZE_IN_BYTES ?
+        HEADER_SIZE + OPUS_MAX_PACKET_LEN_IN_BYTES :
+        HEADER_SIZE + PERIOD_SIZE_IN_BYTES;
 
     uint8_t drain_buf[DRAIN_BUF_SIZE];
 
@@ -149,7 +147,7 @@ gaia-id");
             if (gaia_id != new_gaia_id) {
                 jb_table_take_rdlock(jb_table);
                 if ((jb = jb_table_find(jb_table, new_gaia_id)) == NULL) {
-                    jb = jb_new(new_gaia_id, params->opus_enabled);
+                    jb = jb_new(new_gaia_id, true);
                     jb_table_upgrade_to_wrlock(jb_table);
                     assert(jb_table_add(jb_table, jb) == JB_TABLE_SUCCESS);
                     jb_table_downgrade_to_rdlock(jb_table);

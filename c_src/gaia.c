@@ -22,10 +22,10 @@ thread_mutex_t *playback_packet_mutex;
 void usage(char *argv[]) {
     fprintf(stderr,
             "\
-Usage: %s [-D device] [-E device] [-L] [-s addr[:port]] [-d addr[:port] -d ...] [-x] gaia-id\n\
+Usage: %s [-D device] [-E device] [-L] [-s port] [-d addr[:port] -d ...] [-x] gaia-id\n\
 \n\
 Example: \n\
-  sudo %s -D hw:1,0 -d 172.16.0.95 -d 172.16.0.95:2356 -s 172.16.0.116:2305 1000\n\
+  sudo %s -D hw:1,0 -d 172.16.0.95 -d 172.16.0.95:2356 -s 2305 1000\n\
 \n\
 Options:\n\
   -D Use this device to capture audio (%s)\n\
@@ -34,10 +34,10 @@ Options:\n\
   -M Do not start network receiver thread\n\
   -N Do not start audio sink thread\n\
   -d Send audio streams to this destination address and port (%s:%d)\n\
-  -s Bind to this source address and port (%s:%d)\n\
+  -s Bind to this source port (%d)\n\
   -x Enable Opus audio codec\n",
             argv[0], argv[0], DEFAULT_PCM_NAME, DEFAULT_PCM_NAME,
-            DEFAULT_ADDR, DEFAULT_PORT, DEFAULT_ADDR, DEFAULT_PORT);
+            DEFAULT_ADDR, DEFAULT_PORT, DEFAULT_PORT);
     exit(ARG_ERROR);
 }
 
@@ -82,11 +82,7 @@ int main (int argc, char *argv[]) {
     dest_addr_ports[0].port = DEFAULT_PORT;
     int ndest_addr_ports = 0;
 
-    addr_port_t src_addr_port =
-        {
-         .addr = inet_addr(DEFAULT_ADDR),
-         .port = DEFAULT_PORT
-        };
+    port_t src_port = DEFAULT_PORT;
 
     bool disable_network_sender = false;
     bool disable_network_receiver = false;
@@ -123,8 +119,7 @@ int main (int argc, char *argv[]) {
                 (ndest_addr_ports + 1) % MAX_NETWORK_SENDER_ADDR_PORTS;
             break;
         case 's':
-            if (get_addr_port(optarg, &src_addr_port.addr,
-                              &src_addr_port.port) < 0) {
+            if (get_port(optarg, &src_port) < 0) {
                 usage(argv);
             }
             break;
@@ -185,8 +180,7 @@ int main (int argc, char *argv[]) {
     network_receiver_params_t *receiver_params;
     if (!disable_network_receiver) {
         receiver_params = malloc(sizeof(network_receiver_params_t));
-        receiver_params->addr_port = &src_addr_port;
-        receiver_params->opus_enabled = opus_enabled;
+        receiver_params->port = src_port;
         if ((err = start_thread(network_receiver, (void *)receiver_params,
                                 &receiver_thread)) != 0) {
             exit(err);
@@ -201,7 +195,6 @@ int main (int argc, char *argv[]) {
     if (!disable_audio_sink) {
         audio_sink_params = malloc(sizeof(audio_sink_params_t));
         audio_sink_params->pcm_name = playback_pcm_name;
-        audio_sink_params->opus_enabled = opus_enabled;
         audio_sink_params->playback_audio = true;
         if ((err = start_thread(audio_sink, (void *)audio_sink_params,
                                 &audio_sink_thread)) != 0) {

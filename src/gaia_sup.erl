@@ -31,13 +31,14 @@ start_link() ->
 
 init([]) ->
     GaiaId = config:lookup([gaia, 'gaia-id']),
-    BindAddress = config:lookup([gaia, 'bind-address']),
+    Port = config:lookup([gaia, port]),
+    UseOpusCodec = config:lookup([gaia, 'use-opus-codec']),
     CapturePcmName = ?b2l(config:lookup([gaia, 'capture-pcm-name'])),
     PlaybackPcmName = ?b2l(config:lookup([gaia, 'playback-pcm-name'])),
     GaiaServ =
 	#{id => gaia_serv,
           start => {gaia_serv, start_link,
-                    [GaiaId, BindAddress, PlaybackPcmName]}},
+                    [GaiaId, Port, PlaybackPcmName]}},
     GaiaAudioSourceServ =
 	#{id => gaia_audio_source_serv,
           start => {gaia_audio_source_serv, start_link,
@@ -51,7 +52,6 @@ init([]) ->
     GaiaNetworkSenderServ =
 	#{id => gaia_network_sender_serv,
           start => {gaia_network_sender_serv, start_link,
-                    [GaiaId, BindAddress, _UseCallback = true,
-                     ?OPUS_ENABLED]}},
+                    [GaiaId, _UseCallback = true, UseOpusCodec]}},
     {ok, {#{strategy => one_for_all},
           [GaiaServ, GaiaAudioSourceServ, GaiaNetworkSenderServ]}}.

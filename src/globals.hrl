@@ -23,10 +23,14 @@
 -define(start_threshold(PeriodSizeInFrames, BufferPeriods),
         (PeriodSizeInFrames * (BufferPeriods - 1))).
 
--define(OPUS_ENABLED, false).
 -define(OPUS_COMPLEXITY, 5).
 -define(OPUS_MAX_PACKET_LEN_IN_BYTES, 1276).
 
 -define(PLAYBACK_AUDIO, true).
+
+%% |gaia_id:4|timestamp:8|seqnum:4|packet_len:2|flags:1| = 19 bytes
+-define(HEADER_SIZE, (4 + 8 + 4 + 2 + 1)).
+
+-define(OPUS_ENABLED_FLAG, (1 bsl 0)).
 
 -endif.

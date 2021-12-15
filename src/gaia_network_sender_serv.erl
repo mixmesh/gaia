@@ -1,7 +1,8 @@
 -module(gaia_network_sender_serv).
--export([start_link/4, stop/1, set_dest_addresses/2]).
+-export([start_link/3, stop/1, set_dest_addresses/2]).
 -export([message_handler/1]).
 -include_lib("apptools/include/serv.hrl").
+-include_lib("apptools/include/bits.hrl").
 -include_lib("kernel/include/logger.hrl").
 -include("globals.hrl").
 
@@ -11,10 +12,10 @@
 %% Exported: start_link
 %%
 
-start_link(GaiaId, BindAddress, UseCallback, OpusEnabled) ->
+start_link(GaiaId, UseCallback, OpusEnabled) ->
     ?spawn_server(
        fun(Parent) ->
-               init(Parent, GaiaId, BindAddress, UseCallback, OpusEnabled)
+               init(Parent, GaiaId, UseCallback, OpusEnabled)
        end,
        fun initial_message_handler/1).
 
@@ -36,9 +37,8 @@ set_dest_addresses(Pid, DestAddresses) ->
 %% Server
 %%
 
-init(Parent, GaiaId, {IpAddress, _Port}, UseCallback, OpusEnabled) ->
-    case gen_udp:open(0, [{ifaddr, IpAddress}, {mode, binary},
-                          {active, false}]) of
+init(Parent, GaiaId, UseCallback, OpusEnabled) ->
+    case gen_udp:open(0, [{mode, binary}, {active, false}]) of
         {ok, Socket} ->
             ?LOG_INFO("Gaia network sender server has been started"),
             {ok, #{parent => Parent,
@@ -47,6 +47,7 @@ init(Parent, GaiaId, {IpAddress, _Port}, UseCallback, OpusEnabled) ->
                    opus_encoder => create_opus_encoder(OpusEnabled),
                    socket => Socket,
                    seqnum => 1,
+                   flags => set_flags([{opus_enabled, OpusEnabled}]),
                    dest_addresses => [],
                    subscription => false}};
         {error, Reason} ->
@@ -77,6 +78,7 @@ message_handler(#{parent := Parent,
                   opus_encoder := OpusEncoder,
                   socket := Socket,
                   seqnum := Seqnum,
+                  flags := Flags,
                   dest_addresses := DestAddresses} = State) ->
     receive
         {call, From, stop} ->
@@ -95,7 +97,7 @@ message_handler(#{parent := Parent,
                                      subscription => false}};
                 {[], SortedNewDestAddresses} when UseCallback ->
                     Callback = create_callback(
-                                 GaiaId, OpusEncoder, Socket, Seqnum,
+                                 GaiaId, OpusEncoder, Socket, Seqnum, Flags,
                                  SortedNewDestAddresses),
                     ok = gaia_audio_source_serv:subscribe(AudioSourcePid, Callback),
                     {noreply, State#{dest_addresses => SortedNewDestAddresses}};
@@ -106,8 +108,8 @@ message_handler(#{parent := Parent,
                     {noreply, State#{dest_addresses => SortedNewDestAddresses}}
             end;
         {subscription_packet, Packet} ->
-            ok = send_packet(GaiaId, OpusEncoder, Socket, Seqnum, DestAddresses,
-                             Packet),
+            ok = send_packet(GaiaId, OpusEncoder, Socket, Seqnum, Flags,
+                             DestAddresses, Packet),
             {noreply, State#{seqnum => Seqnum + 1}};
         {system, From, Request} ->
             ?LOG_DEBUG(#{module => ?MODULE, system => Request}),
@@ -119,31 +121,44 @@ message_handler(#{parent := Parent,
             noreply
     end.
 
-create_callback(GaiaId, OpusEncoder, Socket, Seqnum, DestAddresses) ->
+set_flags(Options) ->
+    set_flags(Options, 0).
+
+set_flags([], Flags) ->
+    Flags;
+set_flags([{opus_enabled, true}|Rest], Flags) ->
+    set_flags(Rest, ?bit_set(Flags, ?OPUS_ENABLED_FLAG)).
+
+create_callback(GaiaId, OpusEncoder, Socket, Seqnum, Flags, DestAddresses) ->
     fun(Packet) when is_binary(Packet) ->
-            ok = send_packet(GaiaId, OpusEncoder, Socket, Seqnum, DestAddresses,
-                             Packet),
-            create_callback(GaiaId, OpusEncoder, Socket, Seqnum + 1, DestAddresses);
+            ok = send_packet(GaiaId, OpusEncoder, Socket, Seqnum, Flags,
+                             DestAddresses, Packet),
+            create_callback(GaiaId, OpusEncoder, Socket, Seqnum + 1, Flags,
+                            DestAddresses);
        (OldCallback) when is_function(OldCallback) ->
             OldSeqnum = OldCallback(seqnum),
-            create_callback(GaiaId, OpusEncoder, Socket, OldSeqnum, DestAddresses);
+            create_callback(GaiaId, OpusEncoder, Socket, OldSeqnum, Flags,
+                            DestAddresses);
        (seqnum) ->
             Seqnum
     end.
 
-send_packet(GaiaId, {opus_encoder, OpusEncoder}, Socket, Seqnum,
+send_packet(GaiaId, {opus_encoder, OpusEncoder}, Socket, Seqnum, Flags,
             DestAddresses, Packet) ->
     {ok, EncodedPacket} =
         opus:encode(OpusEncoder, ?OPUS_MAX_PACKET_LEN_IN_BYTES, ?CHANNELS,
                     ?SAMPLE_SIZE_IN_BYTES, Packet),
-    send_packet(GaiaId, opus_encoded, Socket, Seqnum, DestAddresses,
+    send_packet(GaiaId, opus_encoded, Socket, Seqnum, Flags, DestAddresses,
                 EncodedPacket);
-send_packet(GaiaId, _OpusEncoder, Socket, Seqnum, DestAddresses, Packet) ->
+send_packet(GaiaId, _OpusEncoder, Socket, Seqnum, Flags, DestAddresses, Packet) ->
     Timestamp = erlang:system_time(microsecond) -
         ?SECONDS_BETWEEN_1970_and_2021 * 1000000,
     PacketLen = size(Packet),
-    Buf = <<GaiaId:32/unsigned-integer, Timestamp:64/unsigned-integer,
-            Seqnum:32/unsigned-integer, PacketLen:16/unsigned-integer,
+    Buf = <<GaiaId:32/unsigned-integer,
+            Timestamp:64/unsigned-integer,
+            Seqnum:32/unsigned-integer,
+            PacketLen:16/unsigned-integer,
+            Flags:8/unsigned-integer,
             Packet/binary>>,
     lists:foreach(
       fun({IpAddress, Port}) ->

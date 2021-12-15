@@ -1,4 +1,5 @@
 #include "audio.h"
+#include "bits.h"
 #include "jb_table.h"
 #include "audio_sink.h"
 #include "globals.h"
@@ -35,8 +36,8 @@ void *audio_sink(void *arg) {
                       jb->gaia_id);
                 reset_playback_delay(jb);
             } else if (jb->playback == jb->tail) {
-                INFOF("Jitter buffer playback is exhausted for gaia-id %d",
-                      jb->gaia_id);
+                DEBUGF("Jitter buffer playback is exhausted for gaia-id %d",
+                       jb->gaia_id);
                 jb->exhausted = true;
                 skip_packet = true;
             } else if (jb->playback->seqnum != jb->playback_seqnum) {
@@ -68,7 +69,7 @@ entry %d but got %d (%d will be reused as %d!)",
             }
 
             if (!skip_packet) {
-                if (params->opus_enabled) {
+                if (CHK_FLAG(jb->playback->udp_buf[18], OPUS_ENABLED_FLAG)) {
                     uint16_t packet_len =
                         ntohs(*(uint16_t *)&jb->playback->udp_buf[16]);
                     int frames;
