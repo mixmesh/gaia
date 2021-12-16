@@ -20,7 +20,7 @@ sudo bluetoothctl trust $1 || exit 1
 device=`echo -n $1 | sed s/\\\./_/g`
 pacmd set-card-profile bluez_card.${device} a2dp_sink || exit 1
 pacmd set-default-sink bluez_sink.${device}.a2dp_sink || exit 1
-hcitool cmd 0x3F 0x01C 0x01 0x02 0x00 0x01 0x01 || exit 1
+sudo hcitool cmd 0x3F 0x01C 0x01 0x02 0x00 0x01 0x01 || exit 1
 pacmd set-card-profile bluez_card.${device} headset_head_unit || exit 1
 pacmd set-default-sink bluez_sink.${device}.headset_head_unit || exit 1
 pacmd set-default-source bluez_source.${device}.headset_head_unit || exit 1
