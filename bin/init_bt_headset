@@ -13,7 +13,7 @@ if [ $# -ne 1 ]; then
     usage
 fi
 
-bluetoothctl pair $1 || exit 1
+bluetoothctl pair $1
 bluetoothctl connect $1 || exit 1
 bluetoothctl trust $1 || exit 1
 device=`echo -n $1 | sed s/\\\./_/g`
