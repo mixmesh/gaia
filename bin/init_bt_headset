@@ -5,7 +5,7 @@
 usage () {
     >&2 echo "Usage: $0 device"
     >&2 echo "Example:"
-    >&2 echo "  sudo $0 20:74:CF:DF:EC:1E"
+    >&2 echo "  $0 20:74:CF:DF:EC:1E"
     exit 1
 }
 
@@ -14,9 +14,9 @@ if [ $# -ne 1 ]; then
 fi
 
 pulseaudio --start
-bluetoothctl pair $1
-bluetoothctl connect $1 || exit 1
-bluetoothctl trust $1 || exit 1
+sudo bluetoothctl pair $1
+sudo bluetoothctl connect $1 || exit 1
+sudo bluetoothctl trust $1 || exit 1
 device=`echo -n $1 | sed s/\\\./_/g`
 pacmd set-card-profile bluez_card.${device} a2dp_sink || exit 1
 pacmd set-default-sink bluez_sink.${device}.a2dp_sink || exit 1
