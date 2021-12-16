@@ -30,7 +30,15 @@ start_link() ->
 %%
 
 init([]) ->
-    GaiaId = config:lookup([gaia, 'gaia-id']),
+    GaiaId =
+        case config:lookup([gaia, 'gaia-id']) of
+            -1 ->
+                [{nodeid, Nodeid}] = nodis:get_node_info([nodeid]),
+                binary:decode_unsigned(
+                  binary:part(Nodeid, {byte_size(Nodeid), -4}));
+            Id ->
+                Id
+        end,
     Port = config:lookup([gaia, port]),
     UseOpusCodec = config:lookup([gaia, 'use-opus-codec']),
     CapturePcmName = ?b2l(config:lookup([gaia, 'capture-pcm-name'])),
