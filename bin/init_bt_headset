@@ -23,8 +23,9 @@ sudo bluetoothctl trust $1 || exit 1
 
 device=`echo -n $1 | sed s/\\\./_/g`
 
-echo 33
+echo 32
 
+echo "pacmd set-card-profile bluez_card.${device} a2dp_sink || exit 1"
 pacmd set-card-profile bluez_card.${device} a2dp_sink || exit 1
 
 echo 33
