@@ -14,14 +14,39 @@ if [ $# -ne 1 ]; then
 fi
 
 pulseaudio --start
+
 sudo bluetoothctl pair $1
+
 sudo bluetoothctl connect $1 || exit 1
+
 sudo bluetoothctl trust $1 || exit 1
+
 device=`echo -n $1 | sed s/\\\./_/g`
+
+echo 33
+
 pacmd set-card-profile bluez_card.${device} a2dp_sink || exit 1
+
+echo 33
+
 pacmd set-default-sink bluez_sink.${device}.a2dp_sink || exit 1
+
+echo 35
+
 sudo hcitool cmd 0x3F 0x01C 0x01 0x02 0x00 0x01 0x01 || exit 1
+
+echo 36
+
 pacmd set-card-profile bluez_card.${device} headset_head_unit || exit 1
+
+echo 37
+
 pacmd set-default-sink bluez_sink.${device}.headset_head_unit || exit 1
+
+echo 38
+
 pacmd set-default-source bluez_source.${device}.headset_head_unit || exit 1
+
+echo 39
+
 aplay /usr/share/sounds/alsa/Front_Center.wav
