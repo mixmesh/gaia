@@ -13,8 +13,6 @@ if [ $# -ne 1 ]; then
     usage
 fi
 
-pulseaudio --start
-
 sudo bluetoothctl pair $1
 
 sudo bluetoothctl connect $1 || exit 1
