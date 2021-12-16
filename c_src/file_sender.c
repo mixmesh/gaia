@@ -25,7 +25,7 @@ void *file_sender(void *arg) {
     // Check file size
     fseek(fd, 0L, SEEK_END);
     if (ftell(fd) < FILE_CACHE_SIZE) {
-        fprintf(stderr, "%s is smaller than %d bytes\n", params->filename,
+        fprintf(stderr, "%s is smaller than %u bytes\n", params->filename,
                 FILE_CACHE_SIZE);
         fclose(fd);
         exit(FILE_ERROR);
@@ -102,7 +102,7 @@ void *file_sender(void *arg) {
     char file_cache[FILE_CACHE_SIZE];
     uint32_t file_cache_index = FILE_CACHE_SIZE;
 
-    printf("Period size is %d bytes (%d frames, %ldns)\n",
+    printf("Period size is %u bytes (%u frames, %luns)\n",
            PERIOD_SIZE_IN_BYTES, PERIOD_SIZE_IN_FRAMES,
            period_size_as_tsp.tv_nsec);
 

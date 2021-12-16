@@ -33,8 +33,8 @@ Options:\n\
   -L Do not start network sender thread\n\
   -M Do not start network receiver thread\n\
   -N Do not start audio sink thread\n\
-  -d Send audio streams to this destination address and port (%s:%d)\n\
-  -s Bind to this source port (%d)\n\
+  -d Send audio streams to this destination address and port (%s:%u)\n\
+  -s Bind to this source port (%u)\n\
   -x Enable Opus audio codec\n",
             argv[0], argv[0], DEFAULT_PCM_NAME, DEFAULT_PCM_NAME,
             DEFAULT_ADDR, DEFAULT_PORT, DEFAULT_PORT);

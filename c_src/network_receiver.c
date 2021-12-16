@@ -59,7 +59,7 @@ void *network_receiver(void *arg) {
 
     uint8_t drain_buf[DRAIN_BUF_SIZE];
 
-    INFOF("Jitter buffer contains %dms of audio data (%d periods, %d bytes)",
+    INFOF("Jitter buffer contains %ums of audio data (%u periods, %u bytes)",
           JITTER_BUFFER_SIZE_IN_MS,
           PERIODS_IN_JITTER_BUFFER,
           JITTER_BUFFER_SIZE_IN_BYTES);
@@ -203,9 +203,9 @@ gaia-id");
 
             if (jb->nentries > 0) {
                 if (jb->tail->seqnum == seqnum) {
-                    INFOF("Duplicated UDP packet (%d)", seqnum);
+                    INFOF("Duplicated UDP packet (%u)", seqnum);
                 } else if (jb->tail->seqnum + 1 != seqnum) {
-                    INFOF("Missing UDP packet %d. Got %d instead.",
+                    INFOF("Missing UDP packet %u. Got %u instead.",
                           jb->tail->seqnum + 1, seqnum);
                 }
             }

@@ -150,7 +150,7 @@ void audio_free(audio_info_t *audio_info) {
 }
 
 void audio_print_parameters(audio_info_t *audio_info, char *who) {
-#ifdef INFO
+#ifdef DEBUG
     snd_output_t *output;
     snd_output_stdio_attach(&output, stderr, 0);
     snd_output_printf(output, "Audio %s settings:\n", who);

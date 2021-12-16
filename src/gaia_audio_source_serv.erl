@@ -67,10 +67,7 @@ message_handler(#{parent := Parent,
             ?LOG_DEBUG(#{module => ?MODULE, call => stop}),
             {stop, From, ok};
         {call, From, {subscribe, Pid, Callback}} ->
-            ?LOG_DEBUG(#{module => ?MODULE,
-                         call => subscribe,
-                         pid => Pid,
-                         subscribers => Subscribers}),
+            ?LOG_DEBUG(#{module => ?MODULE, call => subscribe}),
             case lists:keytake(Pid, 1, Subscribers) of
                 {value, {Pid, MonitorRef, _OldCallback}, PurgedSubscribers} ->
                     UpdatedSubscribers =
@@ -87,10 +84,7 @@ message_handler(#{parent := Parent,
                      State#{subscribers => UpdatedSubscribers}}
             end;
         {call, From, {unsubscribe, Pid}} ->
-            ?LOG_DEBUG(#{module => ?MODULE,
-                         call => unsubscribe,
-                         pid => Pid,
-                         subscribers => Subscribers}),
+            ?LOG_DEBUG(#{module => ?MODULE, call => unsubscribe}),
             case lists:keysearch(Pid, 1, Subscribers) of
                 {value, {_Pid, MonitorRef, _Callback}} ->
                     UpdatedSubscribers = lists:keydelete(Pid, 1, Subscribers),
@@ -168,18 +162,12 @@ audio_producer(AlsaHandle, PeriodSizeInFrames, CurrentSubscribers) ->
     Subscribers =
         receive
             {subscribers, UpdatedSubscribers} ->
-                ?LOG_DEBUG("NEW SUBSCRIBERS"),
                 lists:map(
                   fun({Pid, MonitorRef, Callback} = Subscriber) ->
                           case lists:keysearch(Pid, 1, CurrentSubscribers) of
                               {value, {Pid, MonitorRef, OldCallback}} ->
-                                  A = Callback(OldCallback),
-                                  io:format("An UPDATED subscription: ~p\n",
-                                            [{Callback(seqnum), A(seqnum)}]),
-
-
-
-                                  %% NOTE: All this to requse the existing seqnum
+                                  %% NOTE: All this to reuse the already
+                                  %% running seqnum
                                   {Pid, MonitorRef, Callback(OldCallback)};
                               false ->
                                   Subscriber

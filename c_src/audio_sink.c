@@ -32,17 +32,17 @@ void *audio_sink(void *arg) {
         if (jb->nentries > JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS) {
             bool skip_packet = false;
             if (jb->playback == NULL) {
-                INFOF("Jitter buffer (re)initializes playback for gaia-id %d",
+                INFOF("Jitter buffer (re)initializes playback for gaia-id %u",
                       jb->gaia_id);
                 reset_playback_delay(jb);
             } else if (jb->playback == jb->tail) {
-                DEBUGF("Jitter buffer playback is exhausted for gaia-id %d",
+                DEBUGF("Jitter buffer playback is exhausted for gaia-id %u",
                        jb->gaia_id);
                 jb->exhausted = true;
                 skip_packet = true;
             } else if (jb->playback->seqnum != jb->playback_seqnum) {
                 INFOF("Jitter buffer playback has wrapped around for gaia-id \
-%d",
+%u",
                       jb->gaia_id);
                 reset_playback_delay(jb);
             } else {
@@ -57,8 +57,8 @@ void *audio_sink(void *arg) {
                         // Seqnum mismatch. Use the old playback entry
                         // again!
                         assert(jb->playback->prev->seqnum > next_seqnum);
-                        INFOF("Jitter buffer for gaia-id %d expected playback \
-entry %d but got %d (%d will be reused as %d!)",
+                        INFOF("Jitter buffer for gaia-id %u expected playback \
+entry %u but got %u (%u will be reused as %u!)",
                               jb->gaia_id, next_seqnum,
                               jb->playback->prev->seqnum,
                               jb->playback->prev->seqnum, next_seqnum);
@@ -94,7 +94,7 @@ entry %d but got %d (%d will be reused as %d!)",
             /*
             // NOTE: This debug printout is too expensive
             uint32_t index = jb_get_index(jb, jb->playback);
-            INFOF("Playback index now is %d out of %d total entries",
+            INFOF("Playback index now is %u out of %u total entries",
             index, jb->entries);
             */
         }
@@ -179,7 +179,7 @@ entry %d but got %d (%d will be reused as %d!)",
                 audio_info = NULL;
                 INFOF("Audio device has been closed for playback");
             }
-            INFOF("Audio sink sleeps for %dms", WAIT_IN_MS);
+            INFOF("Audio sink sleeps for %ums", WAIT_IN_MS);
             msleep(WAIT_IN_MS);
         }
     }

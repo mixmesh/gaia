@@ -86,9 +86,7 @@ message_handler(#{parent := Parent,
             {stop, From, ok};
         {cast, {set_dest_addresses, NewDestAddresses}} ->
             ?LOG_DEBUG(#{module => ?MODULE,
-                         call => {set_dest_addresses,
-                                  {old, DestAddresses},
-                                  {new, NewDestAddresses}}}),
+                         call => {set_dest_addresses, NewDestAddresses}}),
             case {DestAddresses, lists:sort(NewDestAddresses)} of
                 {_, DestAddresses} ->
                     noreply;
