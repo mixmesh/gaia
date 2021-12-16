@@ -13,13 +13,14 @@ if [ $# -ne 1 ]; then
     usage
 fi
 
-echo bluetoothctl pair $1 || exit 1
-echo bluetoothctl connect $1 || exit 1
-echo bluetoothctl trust $1 || exit 1
+bluetoothctl pair $1 || exit 1
+bluetoothctl connect $1 || exit 1
+bluetoothctl trust $1 || exit 1
 device=`echo -n $1 | sed s/\\\./_/g`
-echo pacmd set-card-profile bluez_card.${device} a2dp_sink || exit 1
-echo pacmd set-default-sink bluez_sink.${device}.a2dp_sink || exit 1
-echo hcitool cmd 0x3F 0x01C 0x01 0x02 0x00 0x01 0x01 || exit 1
-echo pacmd set-card-profile bluez_card.${device} headset_head_unit || exit 1
-echo pacmd set-default-sink bluez_sink.${device}.headset_head_unit || exit 1
-echo pacmd set-default-source bluez_source.${device}.headset_head_unit || exit 1
+pacmd set-card-profile bluez_card.${device} a2dp_sink || exit 1
+pacmd set-default-sink bluez_sink.${device}.a2dp_sink || exit 1
+hcitool cmd 0x3F 0x01C 0x01 0x02 0x00 0x01 0x01 || exit 1
+pacmd set-card-profile bluez_card.${device} headset_head_unit || exit 1
+pacmd set-default-sink bluez_sink.${device}.headset_head_unit || exit 1
+pacmd set-default-source bluez_source.${device}.headset_head_unit || exit 1
+aplay /usr/share/sounds/alsa/Front_Center.wav
