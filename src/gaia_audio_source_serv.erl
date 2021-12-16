@@ -168,10 +168,18 @@ audio_producer(AlsaHandle, PeriodSizeInFrames, CurrentSubscribers) ->
     Subscribers =
         receive
             {subscribers, UpdatedSubscribers} ->
+                ?LOG_DEBUG("NEW SUBSCRIBERS"),
                 lists:map(
                   fun({Pid, MonitorRef, Callback} = Subscriber) ->
                           case lists:keysearch(Pid, 1, CurrentSubscribers) of
                               {value, {Pid, MonitorRef, OldCallback}} ->
+                                  A = Callback(OldCallback),
+                                  io:format("An UPDATED subscription: ~p\n",
+                                            [{Callback(seqnum), A(seqnum)}]),
+
+
+
+                                  %% NOTE: All this to requse the existing seqnum
                                   {Pid, MonitorRef, Callback(OldCallback)};
                               false ->
                                   Subscriber
