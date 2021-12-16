@@ -29,6 +29,7 @@ pacmd set-card-profile bluez_card.${device} a2dp_sink || exit 1
 
 echo 33
 
+echo "pacmd set-default-sink bluez_sink.${device}.a2dp_sink || exit 1"
 pacmd set-default-sink bluez_sink.${device}.a2dp_sink || exit 1
 
 echo 35
