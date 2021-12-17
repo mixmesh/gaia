@@ -187,7 +187,7 @@ entry %u but got %u (%u will be reused as %u!)",
                 INFOF("Audio sink sleeps for %ums", sleep_time);
                 msleep(sleep_time);
             } else {
-                uint32_t sleep_time = PERIOD_SIZE_IN_MS * pow(2, ++silence_cycles);
+                uint32_t sleep_time = PERIOD_SIZE_IN_MS * pow(2, silence_cycles++);
                 INFOF("Audio sink sleeps for %ums", sleep_time);
                 msleep(sleep_time);
                 if (params->playback_audio && audio_info != NULL) {
