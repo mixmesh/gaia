@@ -179,7 +179,7 @@ entry %u but got %u (%u will be reused as %u!)",
                 INFOF("Audio device has been closed for playback");
             }
             */
-            uint32_t sleep_time = JITTER_BUFFER_SIZE_IN_MS / 2;
+            uint32_t sleep_time = JITTER_BUFFER_SIZE_IN_MS;
             INFOF("Audio sink sleeps for %ums", sleep_time);
             msleep(sleep_time);
         }
