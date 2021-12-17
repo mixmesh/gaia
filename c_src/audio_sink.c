@@ -1,3 +1,4 @@
+#include <math.h>
 #include "audio.h"
 #include "bits.h"
 #include "jb_table.h"
@@ -10,6 +11,8 @@ extern jb_table_t *jb_table;
 extern bool kill_audio_sink;
 extern uint8_t *playback_packet;
 extern thread_mutex_t *playback_packet_mutex;
+
+#define MAX_SILENCE_CYCLES 8
 
 void reset_playback_delay(jb_t *jb) {
     jb->playback = jb_get_entry(jb, JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS);
@@ -108,6 +111,7 @@ entry %u but got %u (%u will be reused as %u!)",
     clock_gettime(CLOCK_MONOTONIC, &time);
 
     bool holding_playback_packet_mutex = false;
+    uint16_t silence_cycles = 0;
 
     // Read from jitter buffer, mix and write to audio device
     while (!kill_audio_sink) {
@@ -169,19 +173,27 @@ entry %u but got %u (%u will be reused as %u!)",
 
             assert(thread_mutex_unlock(playback_packet_mutex) == 0);
             holding_playback_packet_mutex = false;
+            silence_cycles = 0;
         } else {
             INFOF("No data available in jitter buffers");
-            // Close audio device and wait a bit
-            /*
-            if (params->playback_audio && audio_info != NULL) {
-                audio_free(audio_info);
-                audio_info = NULL;
-                INFOF("Audio device has been closed for playback");
+            // Exponential fallback
+            if (silence_cycles > MAX_SILENCE_CYCLES) {
+                if (params->playback_audio && audio_info != NULL) {
+                    audio_free(audio_info);
+                    audio_info = NULL;
+                    INFOF("Audio device has been closed for playback");
+                }
+                uint32_t sleep_time = PERIOD_SIZE_IN_MS * pow(2, MAX_SILENCE_CYCLES);
+                INFOF("Audio sink sleeps for %ums", sleep_time);
+                msleep(sleep_time);
+            } else {
+                uint32_t sleep_time = PERIOD_SIZE_IN_MS * pow(2, ++silence_cycles);
+                INFOF("Audio sink sleeps for %ums", sleep_time);
+                msleep(sleep_time);
+                if (params->playback_audio && audio_info != NULL) {
+                    snd_pcm_recover(audio_info->pcm, 0, 1);
+                }
             }
-            */
-            uint32_t sleep_time = JITTER_BUFFER_SIZE_IN_MS;
-            INFOF("Audio sink sleeps for %ums", sleep_time);
-            msleep(sleep_time);
         }
     }
 
