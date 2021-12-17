@@ -183,11 +183,11 @@ entry %u but got %u (%u will be reused as %u!)",
                     audio_info = NULL;
                     INFOF("Audio device has been closed for playback");
                 }
-                uint32_t sleep_time = PERIOD_SIZE_IN_MS * pow(2, MAX_SILENCE_CYCLES);
+                uint32_t sleep_time = (PERIOD_SIZE_IN_MS * 3) * pow(2, MAX_SILENCE_CYCLES);
                 INFOF("Audio sink sleeps for %ums", sleep_time);
                 msleep(sleep_time);
             } else {
-                uint32_t sleep_time = PERIOD_SIZE_IN_MS * pow(2, silence_cycles++);
+                uint32_t sleep_time = (PERIOD_SIZE_IN_MS * 3) * pow(2, silence_cycles++);
                 INFOF("Audio sink sleeps for %ums", sleep_time);
                 msleep(sleep_time);
                 if (params->playback_audio && audio_info != NULL) {
