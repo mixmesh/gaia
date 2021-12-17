@@ -12,7 +12,7 @@ extern bool kill_audio_sink;
 extern uint8_t *playback_packet;
 extern thread_mutex_t *playback_packet_mutex;
 
-#define MAX_SILENCE_CYCLES 8
+#define MAX_SILENCE_CYCLES 4
 
 void reset_playback_delay(jb_t *jb) {
     jb->playback = jb_get_entry(jb, JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS);
