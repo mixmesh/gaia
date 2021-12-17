@@ -6,8 +6,6 @@
 #include "timing.h"
 #include "gaia_utils.h"
 
-#define WAIT_IN_MS 4000
-
 extern jb_table_t *jb_table;
 extern bool kill_audio_sink;
 extern uint8_t *playback_packet;
@@ -174,13 +172,16 @@ entry %u but got %u (%u will be reused as %u!)",
         } else {
             INFOF("No data available in jitter buffers");
             // Close audio device and wait a bit
+            /*
             if (params->playback_audio && audio_info != NULL) {
                 audio_free(audio_info);
                 audio_info = NULL;
                 INFOF("Audio device has been closed for playback");
             }
-            INFOF("Audio sink sleeps for %ums", WAIT_IN_MS);
-            msleep(WAIT_IN_MS);
+            */
+            uint32_t sleep_time = JITTER_BUFFER_SIZE_IN_MS / 2;
+            INFOF("Audio sink sleeps for %ums", sleep_time);
+            msleep(sleep_time);
         }
     }
 

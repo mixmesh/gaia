@@ -98,7 +98,8 @@ message_handler(#{parent := Parent,
                     Callback = create_callback(
                                  GaiaId, OpusEncoder, Socket, Seqnum, Flags,
                                  SortedNewDestAddresses),
-                    ok = gaia_audio_source_serv:subscribe(AudioSourcePid, Callback),
+                    ok = gaia_audio_source_serv:subscribe(
+                           AudioSourcePid, Callback),
                     {noreply, State#{dest_addresses => SortedNewDestAddresses}};
                 {_, SortedNewDestAddresses}  ->
                     ok = gaia_audio_source_serv:subscribe(AudioSourcePid),
