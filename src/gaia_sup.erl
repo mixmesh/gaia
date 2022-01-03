@@ -30,36 +30,45 @@ start_link() ->
 %%
 
 init([]) ->
-    GaiaId =
-        case config:lookup([gaia, 'gaia-id']) of
+    MixmeshDir = config:lookup([system, 'mixmesh-dir']),
+    GaiaDir = filename:join([MixmeshDir, <<"gaia">>]),
+    ConfigGaia = config:lookup([gaia]),
+    [PeerName, RawPeerId, GaiaPort, UseOpusCodec, CapturePcmName,
+     PlaybackPcmName] =
+        config:lookup_children(
+          ['peer-name', 'peer-id', 'gaia-port', 'use-opus-codec',
+           'capture-pcm-name', 'playback-pcm-name'], ConfigGaia),
+    PeerId =
+        case RawPeerId of
             -1 ->
-                [{nodeid, Nodeid}] = nodis:get_node_info([nodeid]),
-                binary:decode_unsigned(
-                  binary:part(Nodeid, {byte_size(Nodeid), -4}));
-            Id ->
-                Id
+                gaia_serv:generate_artificial_id(PeerName);
+            _ ->
+                RawPeerId
         end,
-    Port = config:lookup([gaia, port]),
-    UseOpusCodec = config:lookup([gaia, 'use-opus-codec']),
-    CapturePcmName = ?b2l(config:lookup([gaia, 'capture-pcm-name'])),
-    PlaybackPcmName = ?b2l(config:lookup([gaia, 'playback-pcm-name'])),
     GaiaServ =
 	#{id => gaia_serv,
           start => {gaia_serv, start_link,
-                    [GaiaId, Port, PlaybackPcmName]}},
+                    [GaiaDir, PeerName, PeerId, GaiaPort,
+                     ?b2l(PlaybackPcmName)]}},
+    GaiaRestService =
+	#{id => gaia_rest_service,
+          start => {gaia_rest_service, start_link, [PeerId]}},
     GaiaAudioSourceServ =
 	#{id => gaia_audio_source_serv,
           start => {gaia_audio_source_serv, start_link,
-		    [[{device, CapturePcmName}]]}},
+		    [[{device, ?b2l(CapturePcmName)}]]}},
     %% WARNING: To start the audio sink server playback_audio *must* be
     %% set to false in ../c_src/audio_sink.c
     _GaiaAudioSinkServ =
 	#{id => gaia_audio_sink_serv,
           start => {gaia_audio_sink_serv, start_link,
-		    [[{device, PlaybackPcmName}]]}},
+		    [[{device, ?b2l(PlaybackPcmName)}]]}},
     GaiaNetworkSenderServ =
 	#{id => gaia_network_sender_serv,
           start => {gaia_network_sender_serv, start_link,
-                    [GaiaId, _UseCallback = true, UseOpusCodec]}},
+                    [PeerId, _UseCallback = true, UseOpusCodec]}},
     {ok, {#{strategy => one_for_all},
-          [GaiaServ, GaiaAudioSourceServ, GaiaNetworkSenderServ]}}.
+          [GaiaServ,
+           GaiaRestService,
+           GaiaAudioSourceServ,
+           GaiaNetworkSenderServ]}}.

@@ -150,7 +150,8 @@ send_packet(GaiaId, {opus_encoder, OpusEncoder}, Socket, Seqnum, Flags,
                     ?SAMPLE_SIZE_IN_BYTES, Packet),
     send_packet(GaiaId, opus_encoded, Socket, Seqnum, Flags, DestAddresses,
                 EncodedPacket);
-send_packet(GaiaId, _OpusEncoder, Socket, Seqnum, Flags, DestAddresses, Packet) ->
+send_packet(GaiaId, _OpusEncoder, Socket, Seqnum, Flags, DestAddresses,
+            Packet) ->
     Timestamp = erlang:system_time(microsecond) -
         ?SECONDS_BETWEEN_1970_and_2021 * 1000000,
     PacketLen = size(Packet),

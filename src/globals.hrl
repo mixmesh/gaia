@@ -7,6 +7,7 @@
 -define(DEFAULT_ADDR, {127, 0, 0, 1}).
 -define(DEFAULT_ADDR_STRING, "127.0.0.1").
 -define(DEFAULT_PORT, 2305).
+-define(DEFAULT_REST_PORT, 45689).
 
 -define(FORMAT, s16_le).
 -define(CHANNELS, 1).

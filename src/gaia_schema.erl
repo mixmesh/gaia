@@ -9,30 +9,89 @@ get() ->
       [{enabled,
         #json_type{
            name = bool,
-           typical = false,
            reloadable = false}},
-       {'gaia-id',
+       {'peer-name',
+        #json_type{
+           name = string,
+           reloadable = false}},
+       {'peer-id',
         #json_type{
            name = {integer, -1, 65535},
            typical = -1,
            reloadable = false}},
-       {port,
+       {'gaia-port',
         #json_type{
            name = {integer, 1024, 65535},
-           typical = 2305,
            reloadable = false}},
        {'use-opus-codec',
         #json_type{
            name = bool,
-           typical = true,
            reloadable = false}},
        {'capture-pcm-name',
         #json_type{
            name = string,
-           typical = <<"plughw:0,0">>,
+           typical = <<"default">>,
            reloadable = false}},
        {'playback-pcm-name',
         #json_type{
            name = string,
-           typical = <<"plughw:0,0">>,
-           reloadable = false}}]}].
+           typical = <<"default">>,
+           reloadable = false}},
+       {peers,
+        [[{name,
+           #json_type{
+              name = string,
+              reloadable = false}},
+          {id,
+           #json_type{
+              name = {integer, -1, 65535},
+              reloadable = false}},
+          {modes,
+           [#json_type{
+               name = string,
+               transform =
+                   fun(<<"direct">>) -> direct;
+                      (<<"override-if-busy">>) -> override_if_busy;
+                      (<<"ask">>) -> ask;
+                      (<<"ignore">>) -> ignore;
+                      (<<"mute">>) -> mute;
+                      (<<"cleartext">>) -> cleartext;
+                      (_) ->
+                           throw(
+                             {failed,
+                              "Must be one of direct, override-if-busy, ask, ignore, mute or cleartext"})
+                   end,
+               reloadable = true}]}]]},
+       {groups,
+        [[{name,
+           #json_type{
+              name = string,
+              reloadable = false}},
+          {id,
+           #json_type{
+              name = {integer, -1, 65535},
+              reloadable = false}},
+          {modes,
+           [#json_type{
+               name = string,
+               transform =
+                   fun(<<"direct">>) -> direct;
+                      (<<"override-if-busy">>) -> override_if_busy;
+                      (<<"ask">>) -> ask;
+                      (<<"ignore">>) -> ignore;
+                      (<<"mute">>) -> mute;
+                      (<<"cleartext">>) -> cleartext;
+                      (_) ->
+                           throw(
+                             {failed,
+                              "Must be one of direct, override-if-busy, ask, ignore, mute or cleartext"})
+                   end,
+               reloadable = true}]},
+          {admin,
+           #json_type{
+              name = string,
+              reloadable = true}},
+          {members,
+           [#json_type{
+               name = string,
+               reloadable = true}]}]]}]}].
