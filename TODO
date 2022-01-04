@@ -1,7 +1,14 @@
-* Test with to nodes
+* Test
   * Check that they both can stop and start talking with the API
-  * Extended heder with group id (and let also peer id be a 8 bytes binary) + C code
-  * Make sure REST serice work and use it
+    * with two nodes
+    * with three
+* Extended heder with group id (and let peer id be a 8 bytes binary as well) + C code
+
+== STOP! THINK!
+
+* add a gaia_nif:set_src_addresses/1
+
+* Make sure REST serice work and use it
   * Add a gaia_nif:set_src_addresses()
 
 * write gaia_command_serv.erl
