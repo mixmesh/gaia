@@ -139,7 +139,7 @@ get_by_name(Name) ->
 
 -spec generate_artificial_id(peer_name()) -> peer_id().
 
-generate_artificial_id(PeerName) when size(PeerName) < 4 ->
+generate_artificial_id(PeerName) when size(PeerName) < 5 ->
     binary:decode_unsigned(PeerName);
 generate_artificial_id(PeerName) ->
     binary:decode_unsigned(binary:part(PeerName, {byte_size(PeerName), -4})).
@@ -154,8 +154,7 @@ init(Parent, GaiaDir, PeerName, PeerId, GaiaPort, PlaybackPcmName) ->
                          #{pcm_name => PlaybackPcmName,
                            playback_audio => ?PLAYBACK_AUDIO}}),
     ?LOG_INFO("Gaia NIF has been initialized"),
-    ok = nodis:set_node_info(#{gaia => #{peer_id => PeerId,
-                                         gaia_port => GaiaPort}}),
+    ok = nodis:set_node_info(#{gaia => #{id => PeerId, port => GaiaPort}}),
     ok = config_serv:subscribe(),
     {ok, NodisSubscription} = nodis_serv:subscribe(),
     ?LOG_INFO("Gaia server has been started"),
@@ -509,6 +508,12 @@ new_db(GaiaDir) ->
     ?LOG_DEBUG(#{module => ?MODULE, db_created => ets:tab2list(Tab)}),
     Db.
 
+db_all_peers({Tab, _DetsTab}) ->
+    ets:match_object(Tab, #gaia_peer{_ = '_'}).
+
+db_all_groups({Tab, _DetsTab}) ->
+    ets:match_object(Tab, #gaia_group{_ = '_'}).
+
 sync_db({Tab, DetsTab} = Db) ->
     ok = sync_with_config(Db),
     DetsTab = ets:to_dets(Tab, DetsTab),
@@ -518,8 +523,7 @@ sync_db({Tab, DetsTab} = Db) ->
 change_db(Db, NodisAddress, Info) ->
     MaxPeerId = math:pow(2,32) - 1,
     case lists:keysearch(gaia, 1, Info) of
-        {value, {gaia, #{peer_id := PeerId, gaia_port := GaiaPort},
-                 _PreviousGaiaInfo}}
+        {value, {gaia, #{id := PeerId, port := GaiaPort}, _PreviousGaiaInfo}}
           when is_integer(PeerId) andalso
                PeerId > 0 andalso PeerId =< MaxPeerId andalso
                is_integer(GaiaPort) andalso
@@ -539,9 +543,8 @@ change_db(Db, NodisAddress, Info) ->
     end.
 
 sync_with_config(Db) ->
-    OldConfigPeers = config:lookup([gaia, peers]),
-    OldConfigGroups = config:lookup([gaia, groups]),
     PeerId = config:lookup([gaia, 'peer-id']),
+    %% Update existing peers and groups
     {NewConfigPeers, NewConfigGroups} =
         db_foldl(
           fun(#gaia_peer{id = Id} = Peer, {ConfigPeers, ConfigGroups}) ->
@@ -559,7 +562,8 @@ sync_with_config(Db) ->
                   case lists:keytake(id, 1, ConfigGroups) of
                       {value, ConfigGroup, RemainingConfigGroups} ->
                           [Modes, Members] =
-                              config:lookup_children([modes, members], ConfigGroup),
+                              config:lookup_children([modes, members],
+                                                     ConfigGroup),
                           UpdatedGroup =
                               Group#gaia_group{
                                 modes = Modes,
@@ -571,7 +575,9 @@ sync_with_config(Db) ->
                           true = db_delete(Db, Id),
                           {ConfigPeers, ConfigGroups}
                   end
-          end, {OldConfigPeers, OldConfigGroups}, Db),
+          end, {config:lookup([gaia, peers]),
+                config:lookup([gaia, groups])}, Db),
+    %% Create new peers
     lists:foreach(
       fun(ConfigPeer) ->
               [Name, Id, Modes] =
@@ -582,6 +588,7 @@ sync_with_config(Db) ->
                         modes = Modes},
               true = db_insert(Db, Peer)
       end, NewConfigPeers),
+    %% Create new groups
     lists:foreach(
       fun(ConfigGroup) ->
               [Name, Id, Modes, Members] =
@@ -608,7 +615,7 @@ add_peer_id([<<"*">>|Rest]) ->
 add_peer_id([PeerName|Rest]) ->
     case config:lookup([gaia, peers, {name, PeerName}]) of
         not_found ->
-            PeerName = config:lookup([gaia, 'peer-name']),
+            PeerName = config:lookup([gaia, 'peer-name']), %% should be true!
             [{config:lookup([gaia, 'peer-id']), PeerName}|add_peer_id(Rest)];
         Peer ->
             [Id] = config:lookup_children([id], Peer),
@@ -642,9 +649,3 @@ db_get_peer_by_nodis_address({Tab, _DetsTab}, NodisAddress) ->
 
 db_foldl(Fun, Acc, {Tab, _DetsTab}) ->
     ets:foldl(Fun, Acc, Tab).
-
-db_all_peers({Tab, _DetsTab}) ->
-    ets:match_object(Tab, #gaia_peer{_ = '_'}).
-
-db_all_groups({Tab, _DetsTab}) ->
-    ets:match_object(Tab, #gaia_group{_ = '_'}).
