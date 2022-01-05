@@ -87,10 +87,6 @@ get() ->
                               "Must be one of direct, override-if-busy, ask, ignore, mute or cleartext"})
                    end,
                reloadable = true}]},
-          {admin,
-           #json_type{
-              name = string,
-              reloadable = true}},
           {members,
            [#json_type{
                name = string,

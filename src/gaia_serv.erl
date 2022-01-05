@@ -541,6 +541,7 @@ change_db(Db, NodisAddress, Info) ->
 sync_with_config(Db) ->
     OldConfigPeers = config:lookup([gaia, peers]),
     OldConfigGroups = config:lookup([gaia, groups]),
+    PeerId = config:lookup([gaia, 'peer-id']),
     {NewConfigPeers, NewConfigGroups} =
         db_foldl(
           fun(#gaia_peer{id = Id} = Peer, {ConfigPeers, ConfigGroups}) ->
@@ -557,13 +558,12 @@ sync_with_config(Db) ->
              (#gaia_group{id = Id} = Group, {ConfigPeers, ConfigGroups}) ->
                   case lists:keytake(id, 1, ConfigGroups) of
                       {value, ConfigGroup, RemainingConfigGroups} ->
-                          [Modes, Admin, Members] =
-                              config:lookup_children([modes, admin, members],
-                                                     ConfigGroup),
+                          [Modes, Members] =
+                              config:lookup_children([modes, members], ConfigGroup),
                           UpdatedGroup =
                               Group#gaia_group{
                                 modes = Modes,
-                                admin = lookup_peer_id(Admin),
+                                admin = PeerId,
                                 members = add_peer_id(Members)},
                           true = db_insert(Db, UpdatedGroup),
                           {ConfigPeers, RemainingConfigGroups};
@@ -584,14 +584,14 @@ sync_with_config(Db) ->
       end, NewConfigPeers),
     lists:foreach(
       fun(ConfigGroup) ->
-              [Name, Id, Modes, Admin, Members] =
-                  config:lookup_children([name, id, modes, admin, members],
+              [Name, Id, Modes, Members] =
+                  config:lookup_children([name, id, modes, members],
                                          ConfigGroup),
               Peer = #gaia_group{
                         name = Name,
                         id = generate_id(Id, Name),
                         modes = Modes,
-                        admin = lookup_peer_id(Admin),
+                        admin = PeerId,
                         members = add_peer_id(Members)},
               true = db_insert(Db, Peer)
       end, NewConfigGroups).
@@ -601,22 +601,19 @@ generate_id(-1, Name) ->
 generate_id(Id, _Name) ->
     Id.
 
-lookup_peer_id(PeerName) ->
-    case config:lookup([gaia, peers, {name, PeerName}]) of
-        not_found ->
-            PeerName = config:lookup([gaia, 'peer-name']),
-            config:lookup([gaia, 'peer-id']);
-        Peer ->
-            [Id] = config:lookup_children([id], Peer),
-            generate_id(Id, PeerName)
-    end.
-
 add_peer_id([]) ->
     [];
 add_peer_id([<<"*">>|Rest]) ->
     [{-1, <<"*">>}|add_peer_id(Rest)];
 add_peer_id([PeerName|Rest]) ->
-    [{lookup_peer_id(PeerName), PeerName}|add_peer_id(Rest)].
+    case config:lookup([gaia, peers, {name, PeerName}]) of
+        not_found ->
+            PeerName = config:lookup([gaia, 'peer-name']),
+            [{config:lookup([gaia, 'peer-id']), PeerName}|add_peer_id(Rest)];
+        Peer ->
+            [Id] = config:lookup_children([id], Peer),
+            [generate_id(Id, PeerName)|add_peer_id(Rest)]
+    end.
 
 db_insert({Tab, DetsTab}, PeerOrGroup) ->
     ok = dets:insert(DetsTab, PeerOrGroup),
