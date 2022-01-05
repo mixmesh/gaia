@@ -1,9 +1,9 @@
 -module(gaia_serv).
 -export([start_link/5, stop/0]).
 -export([get_status/0, set_status/1,
-         get_by_id/1, get_by_name/1,
          all_peers/0, all_groups/0,
          currently_talking_to/0, start_talking_to/1, stop_talking_to/1,
+         get_by_id/1, get_by_name/1,
          generate_artificial_id/1]).
 -export([message_handler/1]).
 -export_type([id/0, peer_id/0, group_id/0, name/0, peer_name/0, group_name/0,
@@ -69,24 +69,6 @@ set_status(Status) ->
     serv:call(?MODULE, {set_status, Status}).
 
 %%
-%% Exported: get_by_id
-%%
-
--spec get_by_id(id()) -> [#gaia_peer{}|#gaia_group{}].
-
-get_by_id(Id) ->
-    serv:call(?MODULE, {get_by_id, Id}).
-
-%%
-%% Exported: get_by_name
-%%
-
--spec get_by_name(name()) -> [#gaia_peer{}|#gaia_group{}].
-
-get_by_name(Name) ->
-    serv:call(?MODULE, {get_by_name, Name}).
-
-%%
 %% Exported: all_peers
 %%
 
@@ -132,6 +114,24 @@ start_talking_to(IdOrName) ->
 
 stop_talking_to(IdOrName) ->
     serv:call(?MODULE, {stop_talking_to, IdOrName}).
+
+%%
+%% Exported: get_by_id
+%%
+
+-spec get_by_id(id()) -> [#gaia_peer{}|#gaia_group{}].
+
+get_by_id(Id) ->
+    serv:call(?MODULE, {get_by_id, Id}).
+
+%%
+%% Exported: get_by_name
+%%
+
+-spec get_by_name(name()) -> [#gaia_peer{}|#gaia_group{}].
+
+get_by_name(Name) ->
+    serv:call(?MODULE, {get_by_name, Name}).
 
 %%
 %% generate_artificial_id
