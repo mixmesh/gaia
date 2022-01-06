@@ -67,7 +67,7 @@ void *network_receiver(void *arg) {
     // Read from socket and write to jitter buffer
     while (!kill_network_receiver) {
         // Waiting for incoming audio
-        INFOF("Waiting for incoming audio...");
+        DEBUGF("Waiting for incoming audio...");
         fd_set readfds;
         FD_ZERO(&readfds);
         FD_SET(sockfd, &readfds);
