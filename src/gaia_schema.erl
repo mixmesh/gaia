@@ -16,7 +16,7 @@ get() ->
            reloadable = false}},
        {'peer-id',
         #json_type{
-           name = {integer, -1, 65535},
+           name = {integer, -1, math:pow(2, 32) - 1},
            typical = -1,
            reloadable = false}},
        {'gaia-port',
@@ -44,7 +44,7 @@ get() ->
               reloadable = false}},
           {id,
            #json_type{
-              name = {integer, -1, 65535},
+              name = {integer, -1, math:pow(2, 32) - 1},
               reloadable = false}},
           {modes,
            [#json_type{
@@ -69,7 +69,7 @@ get() ->
               reloadable = false}},
           {id,
            #json_type{
-              name = {integer, -1, 65535},
+              name = {integer, -1, math:pow(2, 32) - 1},
               reloadable = false}},
           {modes,
            [#json_type{
