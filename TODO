@@ -1,8 +1,29 @@
 * Test
-  * Check that they both can stop and start talking with the API
-    * with two nodes
-    * with three
+    a
+      group-a: with a, b and c
+    b
+    c
+
+  * test direct for a
+    * toggle set_status
+
+  * test ask for a
+  * test start talking, stop talking
+  * test that it works to toggle status
+
+  * test * peer
+  * test * group
+
+* add gaia_nif:set_src_address/1
+
+* remove gaiaid ->peerid
+
+* add rest server
 * Extended heder with group id (and let peer id be a 8 bytes binary as well) + C code
+
+  * test start taling, stop talking group
+
+
 
 == STOP! THINK!
 
@@ -22,7 +43,7 @@
 * Extend hole punching server with HLR functionality
 * Encrypt streams
 
-* No tech
+* No tech 
 * Real-time communication
 * Gaia
 * PinePhone without screen?

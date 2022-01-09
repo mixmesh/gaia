@@ -161,7 +161,7 @@ init(Parent, GaiaDir, PeerName, PeerId, GaiaPort, PlaybackPcmName) ->
     {ok, #{parent => Parent,
            peer_name => PeerName,
            peer_id => PeerId,
-           status => busy,
+           status => available,
            db => new_db(GaiaDir),
            nodis_subscription => NodisSubscription,
            gaia_addresses => #{}}}.
@@ -350,11 +350,14 @@ set_dest_addresses(Db, Status, NetworkSenderPid, GaiaAddresses) ->
     AllDestAddresses =
         db_foldl(
           fun(#gaia_peer{name = <<"*">>, talks_to = true}, _Acc) ->
+                  ?LOG_DEBUG(#{set_dest_addresses => wildcard}),
                   [wildcard];
-             (#gaia_peer{talks_to = true,
+             (#gaia_peer{name = PeerName,
+                         talks_to = true,
                          modes = Modes,
                          nodis_address = {IpAddress, _SyncPort},
                          gaia_port = GaiaPort}, Acc) ->
+                  ?LOG_DEBUG(#{set_dest_addresses => {PeerName, true}}),
                   case lists:member(mute, Modes) of
                       true ->
                           Acc;
@@ -368,9 +371,11 @@ set_dest_addresses(Db, Status, NetworkSenderPid, GaiaAddresses) ->
                       false when Status == available ->
                           [{IpAddress, GaiaPort}|Acc]
                   end;
-             (#gaia_group{talks_to = true,
+             (#gaia_group{name = GroupName,
+                          talks_to = true,
                           modes = Modes,
                           members = Members}, Acc) ->
+                  ?LOG_DEBUG(#{set_dest_addresses => {GroupName, true}}),
                   case lists:member(mute, Modes) of
                       true ->
                           Acc;
@@ -384,7 +389,8 @@ set_dest_addresses(Db, Status, NetworkSenderPid, GaiaAddresses) ->
                       false when Status == available ->
                           member_peer_addresses(Db, Members) ++ Acc
                   end;
-             (_, Acc) ->
+             (A, Acc) ->
+                  ?LOG_DEBUG(#{set_dest_addresses => {ignore, A}}),
                   Acc
           end, [], Db),
     UniqueDestAddresses = lists:usort(AllDestAddresses),
@@ -475,17 +481,18 @@ update_db(Db, Status) ->
 nodis_change(Db, Status, {IpAddress, _SyncPort} = NodisAddress, Info) ->
     MaxPeerId = math:pow(2, 32) - 1,
     case lists:keysearch(gaia, 1, Info) of
-        {value, {gaia, #{id := NewPeerId, port:= NewGaiaPort}, _PreviousGaiaInfo}}
+        {value, {gaia, #{id := NewPeerId, port := NewGaiaPort}, _PreviousGaiaInfo}}
           when is_integer(NewPeerId) andalso
                NewPeerId > 0 andalso NewPeerId =< MaxPeerId andalso
                is_integer(NewGaiaPort) andalso
                NewGaiaPort >= 1024 andalso NewGaiaPort < 65536 ->
             case db_get_peer_by_id(Db, NewPeerId) of
-                [#gaia_peer{id = PeerId, gaia_port = GaiaPort} = Peer]
-                  when PeerId /= NewPeerId orelse GaiaPort /= NewGaiaPort ->
-                    true = db_insert(Db, Peer#gaia_peer{nodis_address = NodisAddress,
-                                                        gaia_port = NewGaiaPort}),
-                    _ = update_peer(Db, Status, Peer),
+                [#gaia_peer{gaia_port = GaiaPort} = Peer]
+                  when GaiaPort /= NewGaiaPort ->
+                    UpdatedPeer = Peer#gaia_peer{nodis_address = NodisAddress,
+                                                 gaia_port = NewGaiaPort},
+                    true = db_insert(Db, UpdatedPeer),
+                    _ = update_peer(Db, Status, UpdatedPeer),
                     {ok, {IpAddress, NewGaiaPort}};
                 [Peer] ->
                     _ = update_peer(Db, Status, Peer),
@@ -671,3 +678,6 @@ db_get_peer_by_nodis_address({Tab, _DetsTab}, NodisAddress) ->
 
 db_foldl(Fun, Acc, {Tab, _DetsTab}) ->
     ets:foldl(Fun, Acc, Tab).
+
+db_dump({Tab, _DetsTab}) ->
+    ets:tab2list(Tab).
