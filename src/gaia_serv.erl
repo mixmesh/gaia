@@ -668,7 +668,12 @@ db_get_by_id({Tab, _DetsTab}, Id) ->
     ets:lookup(Tab, Id).
 
 db_get_by_name({Tab, _DetsTab}, Name) ->
-    ets:match_object(Tab, {name = Name, _ = '_'}).
+    case ets:match_object(Tab, #gaia_peer{name = Name, _ = '_'}) of
+	[] ->
+            ets:match_object(Tab, #gaia_group{name = Name, _ = '_'});
+        Peers ->
+            Peers
+    end.
 
 db_get_peer_by_id({Tab, _DetsTab}, PeerId) ->
     ets:match_object(Tab, #gaia_peer{id = PeerId, _ = '_'}).

@@ -167,9 +167,9 @@ send_packet(GaiaId, _OpusEncoder, Socket, Seqnum, Flags, DestAddresses,
                   ok ->
                       ok;
                   {error, Reason} ->
-                      ?LOG_ERROR(#{module => ?MODULE,
-                                   function => {gen_udp, send, 4},
-                                   reason => file:format_error(Reason)}),
+%                      ?LOG_ERROR(#{module => ?MODULE,
+%                                   function => {gen_udp, send, 4},
+%                                   reason => file:format_error(Reason)}),
                       ok
               end
       end, DestAddresses).
