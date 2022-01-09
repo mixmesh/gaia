@@ -164,7 +164,7 @@ init(Parent, GaiaDir, PeerName, PeerId, GaiaPort, PlaybackPcmName) ->
            status => busy,
            db => new_db(GaiaDir),
            nodis_subscription => NodisSubscription,
-           all_addresses => #{}}}.
+           gaia_addresses => #{}}}.
 
 initial_message_handler(State) ->
     receive
@@ -184,7 +184,7 @@ message_handler(#{parent := Parent,
                   status := Status,
                   network_sender_pid := NetworkSenderPid,
                   nodis_subscription := NodisSubscription,
-                  all_addresses := AllAddresses} = State) ->
+                  gaia_addresses := GaiaAddresses} = State) ->
     receive
         {call, From, stop} ->
             ?LOG_DEBUG(#{module => ?MODULE, call => stop}),
@@ -196,7 +196,7 @@ message_handler(#{parent := Parent,
         {call, From, {set_status, NewStatus}} ->
             ?LOG_DEBUG(#{module => ?MODULE, call => {set_status, Status}}),
             true = update_db(Db, NewStatus),
-            ok = set_addresses(Db, NewStatus, NetworkSenderPid ,AllAddresses),
+            ok = set_addresses(Db, NewStatus, NetworkSenderPid ,GaiaAddresses),
             {reply, From, ok, State#{status => NewStatus}};
         {call, From, {get_by_id, Id}} ->
             ?LOG_DEBUG(#{module => ?MODULE, call => {get_by_id, Id}}),
@@ -234,14 +234,14 @@ message_handler(#{parent := Parent,
                     %% FIXME: update with session_key from rest server iff my_id > peer_id
 
                     true = db_insert(Db, Peer#gaia_peer{talks_to = true}),
-                    ok = set_addresses(Db, Status, NetworkSenderPid ,AllAddresses),
+                    ok = set_addresses(Db, Status, NetworkSenderPid ,GaiaAddresses),
                     {reply, From, ok};
                 [Group] when is_record(Group, gaia_group) ->
 
                     %% FIXME: create group with the help of the rest server if admin /= me
 
                     true = db_insert(Db, Group#gaia_group{talks_to = true}),
-                    ok = set_addresses(Db, Status, NetworkSenderPid, AllAddresses),
+                    ok = set_addresses(Db, Status, NetworkSenderPid, GaiaAddresses),
                     {reply, From, ok};
                 [] ->
                     case IdOrName of
@@ -263,7 +263,7 @@ message_handler(#{parent := Parent,
                  (_, Acc) ->
                       Acc
               end, true, Db),
-            ok = set_addresses(Db, Status, NetworkSenderPid, AllAddresses),
+            ok = set_addresses(Db, Status, NetworkSenderPid, GaiaAddresses),
             {reply, From, ok};
         {call, From, {stop_talking_to, IdOrName}} ->
             case db_get_by(Db, IdOrName) of
@@ -276,12 +276,12 @@ message_handler(#{parent := Parent,
                     %% FIXME: remove session key??
 
                     true = db_insert(Db, Peer#gaia_peer{talks_to = false}),
-                    ok = set_addresses(Db, Status, NetworkSenderPid, AllAddresses),
+                    ok = set_addresses(Db, Status, NetworkSenderPid, GaiaAddresses),
                     {reply, From, ok};
                 [Group] when is_record(Group, gaia_group) ->
                     %% FIXME: remove group if admin /= me
                     true = db_insert(Db, Group#gaia_group{talks_to = false}),
-                    ok = set_addresses(Db, Status, NetworkSenderPid, AllAddresses),
+                    ok = set_addresses(Db, Status, NetworkSenderPid, GaiaAddresses),
                     {reply, From, ok};
                 [] ->
                     case IdOrName of
@@ -294,7 +294,7 @@ message_handler(#{parent := Parent,
         config_update ->
             ?LOG_DEBUG(#{module => ?MODULE, message => config_update}),
             true = sync_db(Db),
-            ok = set_addresses(Db, Status, NetworkSenderPid, AllAddresses),
+            ok = set_addresses(Db, Status, NetworkSenderPid, GaiaAddresses),
             noreply;
         {nodis, NodisSubscription, {pending, NodisAddress}} ->
             ?LOG_DEBUG(#{module => ?MODULE, nodis => {pending, NodisAddress}}),
@@ -305,26 +305,15 @@ message_handler(#{parent := Parent,
         {nodis, NodisSubscription, {change, NodisAddress, Info}} ->
             ?LOG_DEBUG(#{module => ?MODULE,
                          nodis => {change, NodisAddress, Info}}),
-            case update_peer(Db, Status, NodisAddress, Info) of
-                {ok, How} ->
-                    ?LOG_DEBUG(#{module => ?MODULE, update_peer => {ok, How}}),
-                    UpdatedAllAddresses = AllAddresses#{NodisAddress => Info},
+            case nodis_change(Db, Status, NodisAddress, Info) of
+                {ok, GaiaAddress} ->
+                    UpdatedGaiaAddresses =
+                        GaiaAddresses#{NodisAddress => GaiaAddress},
                     ok = set_addresses(Db, Status, NetworkSenderPid,
-                                       UpdatedAllAddresses),
-                    {noreply, State#{all_addresses => UpdatedAllAddresses}};
-                {not_updated, Reason} ->
-                    ?LOG_DEBUG(#{module => ?MODULE,
-                                 updated_peer => {not_updated, Reason}}),
-                    noreply;
-                {error, unknown_peer} ->
-                    ?LOG_DEBUG(#{module => ?MODULE,
-                                 update_peer => {error, unknown_peer}}),
-                    {noreply,
-                     State#{all_addresses =>
-                                AllAddresses#{NodisAddress => Info}}};
+                                       UpdatedGaiaAddresses),
+                    {noreply, State#{gaia_addresses => UpdatedGaiaAddresses}};
                 {error, Reason} ->
-                    ?LOG_ERROR(#{module => ?MODULE,
-                                 update_peer => {error, Reason}}),
+                    ?LOG_ERROR(#{module => ?MODULE, update_peer => Reason}),
                     noreply
             end;
         {nodis, NodisSubscription, {wait, NodisAddress}} ->
@@ -332,19 +321,16 @@ message_handler(#{parent := Parent,
             noreply;
         {nodis, NodisSubscription, {down, NodisAddress}} ->
             ?LOG_DEBUG(#{module => ?MODULE, nodis => {down, NodisAddress}}),
+            UpdatedGaiaAddresses = maps:remove(NodisAddress, GaiaAddresses),
             case db_get_peer_by_nodis_address(Db, NodisAddress) of
                 [] ->
-                    {noreply,
-                     State#{all_addresses =>
-                                maps:remove(NodisAddress, AllAddresses)}};
+                    {noreply, State#{gaia_addresses => UpdatedGaiaAddresses}};
                 [Peer] ->
                     true = db_insert(Db, Peer#gaia_peer{
                                            nodis_address = undefined,
                                            gaia_port = undefined}),
-                    ok = set_addresses(Db, Status, NetworkSenderPid, AllAddresses),
-                    {noreply,
-                     State#{all_addresses =>
-                                maps:remove(NodisAddress, AllAddresses)}}
+                    ok = set_addresses(Db, Status, NetworkSenderPid, UpdatedGaiaAddresses),
+                    {noreply, State#{gaia_addresses => UpdatedGaiaAddresses}}
             end;
         {system, From, Request} ->
             ?LOG_DEBUG(#{module => ?MODULE, system => Request}),
@@ -356,11 +342,11 @@ message_handler(#{parent := Parent,
             noreply
     end.
 
-set_addresses(Db, Status, NetworkSenderPid, AllAddresses) ->
-    ok = set_dest_addresses(Db,Status,  NetworkSenderPid, AllAddresses),
-    set_src_addresses(Db, Status, NetworkSenderPid, AllAddresses).
+set_addresses(Db, Status, NetworkSenderPid, GaiaAddresses) ->
+    ok = set_dest_addresses(Db,Status,  NetworkSenderPid, GaiaAddresses),
+    set_src_addresses(Db, Status, NetworkSenderPid, GaiaAddresses).
 
-set_dest_addresses(Db, Status, NetworkSenderPid, AllAddresses) ->
+set_dest_addresses(Db, Status, NetworkSenderPid, GaiaAddresses) ->
     AllDestAddresses =
         db_foldl(
           fun(#gaia_peer{name = <<"*">>, talks_to = true}, _Acc) ->
@@ -405,7 +391,7 @@ set_dest_addresses(Db, Status, NetworkSenderPid, AllAddresses) ->
     DestAddresses =
         case lists:member(wildcard, UniqueDestAddresses) of
             true ->
-                AllAddresses;
+                maps:values(GaiaAddresses);
             false ->
                 UniqueDestAddresses
         end,
@@ -427,7 +413,7 @@ member_peer_addresses(Db, [{Id, _Name}|Rest]) ->
             member_peer_addresses(Db, Rest)
     end.
 
-set_src_addresses(Db, Status, _NetworkSenderPid, AllAddresses) ->
+set_src_addresses(Db, Status, _NetworkSenderPid, GaiaAddresses) ->
     AllSrcAddresses =
         db_foldl(
           fun(#gaia_peer{name = <<"*">>, talks_to = true}, _Acc) ->
@@ -472,7 +458,7 @@ set_src_addresses(Db, Status, _NetworkSenderPid, AllAddresses) ->
     SrcAddresses =
         case lists:member(wildcard, UniqueSrcAddresses) of
             true ->
-                AllAddresses;
+                maps:values(GaiaAddresses);
             false ->
                 UniqueSrcAddresses
         end,
@@ -480,20 +466,32 @@ set_src_addresses(Db, Status, _NetworkSenderPid, AllAddresses) ->
     %% FIXME: Call gaia_nif and set src addresses
     ok.
 
-update_peer(Db, Status, NodisAddress, Info) ->
+update_db(Db, Status) ->
+    db_foldl(fun(Peer, true) ->
+                     _ = update_peer(Db, Status, Peer),
+                     true
+             end, true, Db).
+
+nodis_change(Db, Status, {IpAddress, _SyncPort} = NodisAddress, Info) ->
     MaxPeerId = math:pow(2, 32) - 1,
     case lists:keysearch(gaia, 1, Info) of
-        {value, {gaia, #{id := PeerId, port:= GaiaPort}, _PreviousGaiaInfo}}
-          when is_integer(PeerId) andalso
-               PeerId > 0 andalso PeerId =< MaxPeerId andalso
-               is_integer(GaiaPort) andalso
-               GaiaPort >= 1024 andalso GaiaPort < 65536 ->
-            case db_get_peer_by_id(Db, PeerId) of
+        {value, {gaia, #{id := NewPeerId, port:= NewGaiaPort}, _PreviousGaiaInfo}}
+          when is_integer(NewPeerId) andalso
+               NewPeerId > 0 andalso NewPeerId =< MaxPeerId andalso
+               is_integer(NewGaiaPort) andalso
+               NewGaiaPort >= 1024 andalso NewGaiaPort < 65536 ->
+            case db_get_peer_by_id(Db, NewPeerId) of
+                [#gaia_peer{id = PeerId, gaia_port = GaiaPort} = Peer]
+                  when PeerId /= NewPeerId orelse GaiaPort /= NewGaiaPort ->
+                    true = db_insert(Db, Peer#gaia_peer{nodis_address = NodisAddress,
+                                                        gaia_port = NewGaiaPort}),
+                    _ = update_peer(Db, Status, Peer),
+                    {ok, {IpAddress, NewGaiaPort}};
                 [Peer] ->
-                    update_peer(Db, Status, NodisAddress, PeerId, GaiaPort,
-                                Peer);
+                    _ = update_peer(Db, Status, Peer),
+                    {ok, {IpAddress, NewGaiaPort}};
                 [] ->
-                    {error, unknown_peer}
+                    {ok, {IpAddress, NewGaiaPort}}
             end;
         {value, {gaia, GaiaInfo, _PreviousGaiaInfo}} ->
             {error, {bad_gaia_info, GaiaInfo}};
@@ -501,73 +499,41 @@ update_peer(Db, Status, NodisAddress, Info) ->
             {error, no_gaia_info}
     end.
 
-update_peer(Db, Status, NodisAddress, PeerId, GaiaPort, Peer) ->
-    case Peer of
-        #gaia_peer{talks_to = true}
-          when PeerId /= Peer#gaia_peer.id orelse
-               GaiaPort /= Peer#gaia_peer.gaia_port ->
-            ?LOG_DEBUG(#{module => ?MODULE, update_peer => new_nodis_address}),
-            true = db_insert(Db, Peer#gaia_peer{nodis_address = NodisAddress,
-                                                gaia_port = GaiaPort}),
-            {ok, new_nodis_address};
-        #gaia_peer{name = PeerName,
-                   talks_to = false,
-                   modes = Modes,
-                   nodis_address = CurrentNodisAddress} ->
-            case lists:member(direct, Modes) of
-                true when Status == busy ->
-                    case lists:member(override_if_busy, Modes) of
-                        true ->
-                            true = db_insert(
-                                     Db, Peer#gaia_peer{
-                                           talks_to = true,
-                                           nodis_address = NodisAddress,
-                                           gaia_port = GaiaPort}),
-                            {ok, direct_busy_override};
-                        false ->
-                            {not_updated, direct_busy}
-                    end;
-                true when Status == available ->
-                    true = db_insert(Db, Peer#gaia_peer{
-                                           talks_to = true,
-                                           nodis_address = NodisAddress,
-                                           gaia_port = GaiaPort}),
-                    {ok, direct_available};
-                false when Status == busy ->
-                    {not_updated, not_direct_busy};
-                false when Status == available andalso
-                           CurrentNodisAddress == undefined ->
-                    {not_updated, not_direct_available_not_online};
-                false when Status == available ->
-                    case lists:member(ask, Modes) of
-                        true ->
-                            ok = gaia_command_serv:ask(PeerName),
-                            {not_updated, not_direct_available_ask};
-                        false ->
-                            {not_updated, not_direct_available_do_not_ask}
-                    end
+update_peer(Db, Status, #gaia_peer{name = PeerName,
+                                   talks_to = false,
+                                   modes = Modes,
+                                   nodis_address = NodisAddress} = Peer) ->
+    case lists:member(direct, Modes) of
+        true when Status == busy ->
+            case lists:member(override_if_busy, Modes) of
+                true ->
+                    ?LOG_DEBUG(#{module => ?MODULE,
+                                 direct_override_busy => PeerName}),
+                    db_insert(Db, Peer#gaia_peer{talks_to = true});
+                false ->
+                    ?LOG_DEBUG(#{module => ?MODULE, direct_busy => PeerName})
             end;
-        #gaia_peer{name = PeerName} ->
-            {not_updated, {no_change, PeerName}}
-    end.
-
-update_db(Db, Status) ->
-    db_foldl(
-      fun(#gaia_peer{id = PeerId,
-                     nodis_address = NodisAddress,
-                     gaia_port = GaiaPort} = Peer, true) ->
-              case update_peer(Db, Status, NodisAddress, PeerId, GaiaPort,
-                               Peer) of
-                  {error, Reason} ->
-                      ?LOG_ERROR(#{module => ?MODULE, update_peer => Reason}),
-                      true;
-                  Result ->
-                      ?LOG_DEBUG(#{module => ?MODULE, update_peer => Result}),
-                      true
-              end;
-         (_, true) ->
-              true
-      end, true, Db).
+        true when Status == available ->
+            ?LOG_DEBUG(#{module => ?MODULE, direct_available => PeerName}),
+            db_insert(Db, Peer#gaia_peer{talks_to = true});
+        false when Status == busy ->
+            ?LOG_DEBUG(#{module => ?MODULE, not_direct_busy => PeerName});
+        false when Status == available andalso NodisAddress == undefined ->
+            ?LOG_DEBUG(#{module => ?MODULE,
+                         not_direct_available_not_online => PeerName});
+        false when Status == available ->
+            case lists:member(ask, Modes) of
+                true ->
+                    ?LOG_DEBUG(#{module => ?MODULE,
+                                 not_direct_available_ask => PeerName}),
+                    gaia_command_serv:ask(PeerName);
+                false ->
+                    ?LOG_DEBUG(#{module => ?MODULE,
+                                 not_direct_available_do_not_ask => PeerName})
+            end
+    end;
+update_peer(_Db, _Status, _Peer) ->
+    true.
 
 %%
 %% Peer and group database
