@@ -1,5 +1,5 @@
 -module(gaia_nif).
--export([start/1, stop/0, set_params/1, read_packet/0]).
+-export([start/1, stop/0, set_params/1, read_packet/0, set_src_ip_addresses/1]).
 -export([init/0, preloaded_atoms/0]). % internal
 -on_load(init/0).
 
@@ -64,4 +64,13 @@ set_params(_Params) ->
 -spec read_packet() -> binary().
 
 read_packet() ->
+    exit(nif_library_not_loaded).
+
+%%
+%% Exported: set_src_ip_addresses
+%%
+
+-spec set_src_ip_addresses([inet:ip_address()]) -> ok.
+
+set_src_ip_addresses(_IpAddresses) ->
     exit(nif_library_not_loaded).

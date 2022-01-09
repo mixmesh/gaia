@@ -10,6 +10,7 @@
 #include "gaia_utils.h"
 
 #define MAX_NETWORK_SENDER_ADDR_PORTS 256
+#define MAX_SRC_ADDRS 256
 
 // Shared data (same as in gaia_nif.c)
 jb_table_t *jb_table;
@@ -18,6 +19,8 @@ bool kill_network_receiver = false;
 bool kill_audio_sink = false;
 uint8_t *playback_packet;
 thread_mutex_t *playback_packet_mutex;
+uint16_t nsrc_addrs = 0;
+struct sockaddr_in src_addrs[MAX_SRC_ADDRS];
 
 void usage(char *argv[]) {
     fprintf(stderr,

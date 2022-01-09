@@ -60,3 +60,7 @@ int set_fifo_scheduling(pthread_attr_t *attr, int8_t priority_offset) {
     }
     return 0;
 }
+
+int ip4_to_int(int first, int second, int third, int fourth) {
+    return (first << 24) | (second << 16) | (third << 8) | (fourth);
+}

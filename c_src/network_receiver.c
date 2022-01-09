@@ -15,6 +15,21 @@
 
 extern jb_table_t *jb_table;
 extern bool kill_network_receiver;
+extern uint16_t nsrc_addrs;
+extern struct sockaddr_in *src_addrs;
+
+bool is_src_address(struct sockaddr_in *src_addr) {
+    if (nsrc_addrs == 0) {
+        return false;
+    } else {
+        for (int i = 0; i < nsrc_addrs; i++) {
+            if (src_addr->sin_addr.s_addr == src_addrs[i].sin_addr.s_addr) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
 
 uint16_t root_mean_square(uint16_t *peak_values, uint16_t n) {
     double sum = 0.0;
@@ -130,9 +145,11 @@ void *network_receiver(void *arg) {
 
             // Peek into socket and extract buffer header
             uint8_t header_buf[HEADER_SIZE];
+            struct sockaddr src_addr;
+            socklen_t addrlen = sizeof(src_addr);
             int n;
-            if ((n = recvfrom(sockfd, header_buf, HEADER_SIZE, MSG_PEEK, NULL,
-                              NULL)) < 0) {
+            if ((n = recvfrom(sockfd, header_buf, HEADER_SIZE, MSG_PEEK,
+                              &src_addr, &addrlen)) < 0) {
                 perror("recvfrom: Failed to peek into socket and extract \
 gaia-id");
                 goto bail_out;
@@ -140,6 +157,12 @@ gaia-id");
                 ERRORF("recvfrom: Ignored truncated UDP packet!");
                 break;
             }
+
+            // Just ignore unknown src addresses
+            if (!is_src_address((struct sockaddr_in *)&src_addr)) {
+                continue;
+            }
+
             uint32_t new_gaia_id = ntohl(*(uint32_t *)&header_buf[0]);
             uint16_t packet_len = ntohs(*(uint16_t *)&header_buf[16]);
 

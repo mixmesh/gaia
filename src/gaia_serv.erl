@@ -420,26 +420,25 @@ member_peer_addresses(Db, [{Id, _Name}|Rest]) ->
     end.
 
 set_src_addresses(Db, Status, _NetworkSenderPid, GaiaAddresses) ->
-    AllSrcAddresses =
+    AllSrcIpAddresses =
         db_foldl(
           fun(#gaia_peer{name = <<"*">>, talks_to = true}, _Acc) ->
                   [wildcard];
              (#gaia_peer{talks_to = true,
                          modes = Modes,
-                         nodis_address = {IpAddress, _SyncPort},
-                         gaia_port = GaiaPort}, Acc) ->
+                         nodis_address = {IpAddress, _SyncPort}}, Acc) ->
                   case lists:member(ignore, Modes) of
                       true ->
                           Acc;
                       false when Status == busy ->
                           case lists:member(override_if_busy, Modes) of
                               true ->
-                                  [{IpAddress, GaiaPort}|Acc];
+                                  [IpAddress|Acc];
                               false ->
                                   Acc
                           end;
                       false when Status == available ->
-                          [{IpAddress, GaiaPort}|Acc]
+                          [IpAddress|Acc]
                   end;
              (#gaia_group{talks_to = true,
                           modes = Modes,
@@ -450,27 +449,40 @@ set_src_addresses(Db, Status, _NetworkSenderPid, GaiaAddresses) ->
                       false when Status == busy ->
                           case lists:member(override_if_busy, Modes) of
                               true ->
-                                  member_peer_addresses(Db, Members) ++ Acc;
+                                  member_peer_ip_addresses(Db, Members) ++ Acc;
                               false ->
                                   Acc
                           end;
                       false when Status == availabe ->
-                          member_peer_addresses(Db, Members) ++ Acc
+                          member_peer_ip_addresses(Db, Members) ++ Acc
                   end;
              (_, Acc) ->
                   Acc
           end, [], Db),
-    UniqueSrcAddresses = lists:usort(AllSrcAddresses),
-    SrcAddresses =
-        case lists:member(wildcard, UniqueSrcAddresses) of
+    UniqueSrcIpAddresses = lists:usort(AllSrcIpAddresses),
+    SrcIpAddresses =
+        case lists:member(wildcard, UniqueSrcIpAddresses) of
             true ->
-                maps:values(GaiaAddresses);
+                [IpAddress ||
+                    {IpAddress, _GaiaPort} <- maps:values(GaiaAddresses)];
             false ->
-                UniqueSrcAddresses
+                UniqueSrcIpAddresses
         end,
-    ?LOG_DEBUG(#{module => ?MODULE, set_src_addresses => SrcAddresses}),
-    %% FIXME: Call gaia_nif and set src addresses
-    ok.
+    ?LOG_DEBUG(#{module => ?MODULE,
+                 set_src_ip_addresses => SrcIpAddresses}),
+    gaia_nif:set_src_ip_addresses(SrcIpAddresses).
+
+member_peer_ip_addresses(_Db, []) ->
+    [];
+member_peer_ip_addresses(_Db, [{_Id, <<"*">>}|_]) ->
+    [wildcard];
+member_peer_ip_addresses(Db, [{Id, _Name}|Rest]) ->
+    case db_get_peer_by_id(Db, Id) of
+        [#gaia_peer{nodis_address = {IpAddress, _SyncPort}}] ->
+            [IpAddress|member_peer_ip_addresses(Db, Rest)];
+        _ ->
+            member_peer_ip_addresses(Db, Rest)
+    end.
 
 update_db(Db, Status) ->
     db_foldl(fun(Peer, true) ->
@@ -684,5 +696,5 @@ db_get_peer_by_nodis_address({Tab, _DetsTab}, NodisAddress) ->
 db_foldl(Fun, Acc, {Tab, _DetsTab}) ->
     ets:foldl(Fun, Acc, Tab).
 
-db_dump({Tab, _DetsTab}) ->
-    ets:tab2list(Tab).
+%db_dump({Tab, _DetsTab}) ->
+%    ets:tab2list(Tab).

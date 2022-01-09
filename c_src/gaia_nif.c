@@ -30,6 +30,7 @@ DECL_ATOM(pcm_name);
 
 #define MAX_ADDR_LEN 64
 #define MAX_PCM_NAME_LEN 64
+#define MAX_SRC_ADDRS 256
 
 bool started = false;
 pthread_rwlock_t *params_rwlock;
@@ -46,6 +47,8 @@ bool kill_network_receiver = false;
 bool kill_audio_sink = false;
 uint8_t *playback_packet;
 thread_mutex_t *playback_packet_mutex;
+uint16_t nsrc_addrs = 0;
+struct sockaddr_in src_addrs[MAX_SRC_ADDRS];
 
 void take_params_rdlock(void) {
     assert(pthread_rwlock_rdlock(params_rwlock) == 0);
@@ -117,7 +120,6 @@ bool parse_params(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
         } else {
             return false;
         }
-
 
         receiver_params.port = network_receiver_port;
 
@@ -247,6 +249,39 @@ static ERL_NIF_TERM _read_packet(ErlNifEnv* env, int argc,
 }
 
 /*
+ * set_src_ip_addresses
+ */
+
+static ERL_NIF_TERM _set_src_ip_addresses(ErlNifEnv* env, int argc,
+                                          const ERL_NIF_TERM argv[]) {
+    if (enif_is_list(env, argv[0])) {
+        nsrc_addrs = 0;
+        ERL_NIF_TERM item, items = argv[0];
+        // FIXME: Only supports ipv4
+        while(enif_get_list_cell(env, items, &item, &items)) {
+            const ERL_NIF_TERM *tuple;
+            int arity;
+            if (!enif_get_tuple(env, item, &arity, &tuple) || arity != 4) {
+                return enif_make_badarg(env);
+            }
+            unsigned int first, second, third, fourth;
+            if (!(enif_get_uint(env, tuple[0], &first) &&
+                  enif_get_uint(env, tuple[1], &second) &&
+                  enif_get_uint(env, tuple[2], &third) &&
+                  enif_get_uint(env, tuple[3], &fourth))) {
+                return enif_make_badarg(env);
+            }
+            src_addrs[nsrc_addrs].sin_addr.s_addr =
+                ip4_to_int(first, second, third, fourth);
+            nsrc_addrs++;
+        }
+    } else {
+        return enif_make_badarg(env);
+    }
+    return ATOM(ok);
+}
+
+/*
  * load
  */
 
@@ -280,7 +315,8 @@ static ErlNifFunc nif_funcs[] =
      {"start", 1, _start, 0},
      {"stop", 0, _stop, ERL_NIF_DIRTY_JOB_IO_BOUND},
      {"set_params", 1, _set_params, 0},
-     {"read_packet", 0, _read_packet, ERL_NIF_DIRTY_JOB_IO_BOUND}
+     {"read_packet", 0, _read_packet, ERL_NIF_DIRTY_JOB_IO_BOUND},
+     {"set_src_ip_addresses", 1, _set_src_ip_addresses, 0}
     };
 
 ERL_NIF_INIT(gaia_nif, nif_funcs, load, NULL, NULL, unload);
