@@ -488,7 +488,7 @@ get_sources(Db, Status, Wildcard) ->
       end, [], Db).
 
 use_source_peer(_Wildcard, #gaia_peer{nodis_address = undefined}) ->
-    false;
+    {false, undefined};
 use_source_peer({UsesWildcard, WildcardPeer},
                 #gaia_peer{mode = Mode,
                            ephemeral = Ephemeral,
