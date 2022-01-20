@@ -19,9 +19,9 @@ get() ->
            name = {integer, -1, math:pow(2, 32) - 1},
            typical = -1,
            reloadable = false}},
-       {'gaia-port',
+       {'rest-port',
         #json_type{
-           name = {integer, 1024, 65535},
+           name = {integer, 0, 65535},
            reloadable = false}},
        {'use-opus-codec',
         #json_type{
@@ -46,20 +46,27 @@ get() ->
            #json_type{
               name = {integer, -1, math:pow(2, 32) - 1},
               reloadable = false}},
-          {modes,
-           [#json_type{
-               name = string,
+          {mode,
+           #json_type{
+              name = atom,
                transform =
-                   fun(<<"direct">>) -> direct;
-                      (<<"override-if-busy">>) -> override_if_busy;
-                      (<<"ask">>) -> ask;
-                      (<<"ignore">>) -> ignore;
-                      (<<"mute">>) -> mute;
-                      (<<"cleartext">>) -> cleartext;
-                      (_) ->
-                           throw(
-                             {failed,
-                              "Must be one of direct, override-if-busy, ask, ignore, mute or cleartext"})
+                   fun(Mode) ->
+                       case lists:member(Mode, [direct, ask, ignore]) of
+                           true ->
+                               Mode;
+                           false ->
+                               throw(
+                                 {failed,
+                                  "Must be one of direct, ask or ignore"})
+                       end
+                   end,
+              reloadable = true}},
+          {options,
+           [#json_type{
+               name = atom,
+               transform =
+                   fun('override-busy') -> override_busy;
+                      (_) -> throw({failed, "Must be override-busy"})
                    end,
                reloadable = true}]}]]},
        {groups,
@@ -71,23 +78,52 @@ get() ->
            #json_type{
               name = {integer, -1, math:pow(2, 32) - 1},
               reloadable = false}},
-          {modes,
-           [#json_type{
-               name = string,
+          {mode,
+           #json_type{
+              name = atom,
                transform =
-                   fun(<<"direct">>) -> direct;
-                      (<<"override-if-busy">>) -> override_if_busy;
-                      (<<"ask">>) -> ask;
-                      (<<"ignore">>) -> ignore;
-                      (<<"mute">>) -> mute;
-                      (<<"cleartext">>) -> cleartext;
-                      (_) ->
-                           throw(
-                             {failed,
-                              "Must be one of direct, override-if-busy, ask, ignore, mute or cleartext"})
+                   fun(Mode) ->
+                       case lists:member(Mode, [direct, ask, ignore]) of
+                           true ->
+                               Mode;
+                           false ->
+                               throw(
+                                 {failed,
+                                  "Must be one of direct, ask or ignore"})
+                       end
+                   end,
+              reloadable = true}},
+          {options,
+           [#json_type{
+               name = atom,
+               transform =
+                   fun('override-busy') -> override_busy;
+                      (_) -> throw({failed, "Must be override-busy"})
                    end,
                reloadable = true}]},
+          {port,
+           #json_type{
+              name = {integer, 1024, 65535},
+              reloadable = false}},
+          {type,
+           #json_type{
+              name = atom,
+              transform =
+                  fun(Type) ->
+                          case lists:member(Type, [open, closed]) of
+                              true ->
+                                  Type;
+                              false ->
+                                  throw(
+                                    {failed, "Must be one of open or closed"})
+                          end
+                  end,
+              reloadable = true}},
           {members,
            [#json_type{
                name = string,
-               reloadable = true}]}]]}]}].
+               reloadable = true}]},
+          {admin,
+           #json_type{
+              name = string,
+              reloadable = false}}]]}]}].

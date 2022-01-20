@@ -233,8 +233,47 @@ static ERL_NIF_TERM _set_params(ErlNifEnv* env, int argc,
     return ATOM(ok);
 }
 
+
+/* static ERL_NIF_TERM _open_peer_socket(ErlNifEnv* env, int argc, */
+/*                                       const ERL_NIF_TERM argv[]) { */
+/*     // Create and bind socket */
+/*     int sockfd; */
+/*     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { */
+/*         return enif_make_tuple2(env, ATOM(error), */
+/*                                 enif_make_string(env, */
+
+
+/*         strerror_r(ERRNO, buf, buflen); */
+
+
+/*         perror("socket: Socket creation failed"); */
+/*         return ATOM(thread_exit(&retval); */
+/*     } */
+
+/*     struct sockaddr_in addr; */
+/*     memset(&addr, 0, sizeof(addr)); */
+/*     addr.sin_family = AF_INET; */
+/*     addr.sin_addr.s_addr = htonl(INADDR_ANY); */
+/*     addr.sin_port = htons(params->port); */
+
+/*     if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0) { */
+/*         perror("bind: Binding of socket failed"); */
+/*         int retval = SOCKET_ERROR; */
+/*         thread_exit(&retval); */
+/*     } */
+
+
+
+/*     int sockfd; */
+/*     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { */
+/*         perror("socket: Socket creation failed"); */
+/*         int retval = SOCKET_ERROR; */
+/*         thread_exit(&retval); */
+/*     } */
+
+
 /*
- * set_params
+ * read_packet
  */
 
 static ERL_NIF_TERM _read_packet(ErlNifEnv* env, int argc,
