@@ -24,7 +24,7 @@
 -type name() :: binary().
 -type peer_name() :: name().
 -type group_name() :: name().
--type id() :: binary().
+-type id() :: non_neg_integer().
 -type peer_id() :: id().
 -type group_id() :: id().
 -type mode() :: direct | ask | ignore.
@@ -535,7 +535,7 @@ negotiate_with_peers(Db, [{peer, PeerId}|Rest]) ->
                 rest_port = RestPort,
                 local_port = LocalPort} = Peer] =
         db_get_peer_by_id(Db, PeerId),
-    case rest_service_serv:negotiate_with_peer(PeerId, {IpAddress, RestPort},
+    case gaia_rest_service:negotiate_with_peer(PeerId, {IpAddress, RestPort},
                                                LocalPort) of
         {ok, NewRemotePort} ->
             true = db_insert(Db, Peer#gaia_peer{remote_port = NewRemotePort}),
@@ -615,11 +615,13 @@ change_peer(Db, NewNodisAddress, Info) ->
 down_peer(Db, NodisAddress) ->
     case db_get_peer_by_nodis_address(Db, NodisAddress) of
         [#gaia_peer{id = PeerId, ephemeral = true}] ->
-            true = db_delete(Db, PeerId);
+            true = db_delete(Db, PeerId),
+            ok;
         [Peer] ->
             true = db_insert(Db, Peer#gaia_peer{
                                    nodis_address = undefined,
-                                   rest_port = undefined});
+                                   rest_port = undefined}),
+            ok;
         [] ->
             {error, no_such_nodis_address}
     end.
@@ -705,14 +707,16 @@ sync_with_config(Db, _DeleteEphemeralPeers = false) ->
     %% Create new groups
     lists:foreach(
       fun(ConfigGroup) ->
-              [Name, Id, Mode, Options, Members, Admin] =
-                  config:lookup_children([name, id, mode, options, members, admin],
-                                         ConfigGroup),
+              [Name, Id, Mode, Options, Port, Type, Members, Admin] =
+                  config:lookup_children([name, id, mode, options, port, type,
+                                          members, admin], ConfigGroup),
               Peer = #gaia_group{
                         name = Name,
                         id = generate_id_if_needed(Id, Name),
                         mode = Mode,
                         options = Options,
+                        port = Port,
+                        type = Type,
                         members = Members,
                         admin = Admin},
               true = db_insert(Db, Peer)

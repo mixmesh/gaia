@@ -16,7 +16,7 @@ get() ->
            reloadable = false}},
        {'peer-id',
         #json_type{
-           name = {integer, -1, math:pow(2, 32) - 1},
+           name = {integer, -1, trunc(math:pow(2, 32) - 1)},
            typical = -1,
            reloadable = false}},
        {'rest-port',
@@ -44,7 +44,7 @@ get() ->
               reloadable = false}},
           {id,
            #json_type{
-              name = {integer, -1, math:pow(2, 32) - 1},
+              name = {integer, -1, trunc(math:pow(2, 32) - 1)},
               reloadable = false}},
           {mode,
            #json_type{
@@ -76,7 +76,7 @@ get() ->
               reloadable = false}},
           {id,
            #json_type{
-              name = {integer, -1, math:pow(2, 32) - 1},
+              name = {integer, -1, trunc(math:pow(2, 32) - 1)},
               reloadable = false}},
           {mode,
            #json_type{

@@ -6,6 +6,7 @@
 -include_lib("kernel/include/logger.hrl").
 -include_lib("rester/include/rester.hrl").
 -include_lib("rester/include/rester_http.hrl").
+-include_lib("apptools/include/shorthand.hrl").
 -include("globals.hrl").
 
 -define(HTTPC_TIMEOUT, 2000).
@@ -24,7 +25,8 @@ start_link(PeerId, RestPort) ->
 	  {?MODULE, handle_http_request, [{peer_id, PeerId}]}},
 	 {nodelay, true},
 	 {reuseaddr, true}],
-    ?LOG_INFO("Gaia REST service has been started"),
+    ?LOG_INFO("Gaia REST service has been started on port 0.0.0.0:~w",
+              [RestPort]),
     rester_http_server:start_link(RestPort, ResterHttpArgs).
 
 %%
@@ -42,27 +44,27 @@ start_link(PeerId, RestPort) ->
            {http_error, Reason :: term()}}.
 
 negotiate_with_peer(PeerId, {IpAddress, RestPort}, LocalPort) ->
-    Url = io_lib:format("http://~s:~w/negotiate",
-                        [inet:ntoa(IpAddress), RestPort]),
+    Url = lists:flatten(io_lib:format("http://~s:~w/negotiate",
+                                      [inet:ntoa(IpAddress), RestPort])),
     RequestBody = encode_json([{<<"port">>, LocalPort}]),
-    Nonce = <<"FIXME">>,
-    HMAC = <<"FIXME">>,
+    Nonce = keydir_service:bin_to_hexstr(<<"FIXME">>),
+    HMAC = keydir_service:bin_to_hexstr(<<"FIXME">>),
     case httpc:request(
-           post, {Url,
-                  [{"gaia-peer-id", binary:encode_unsigned(PeerId)},
-                   {"gaia-nonce", Nonce},
-                   {"gaia-hmac", HMAC}],
-                  "application/json",
-                  RequestBody},
+           post,
+           {Url, [{"connection", "close"},
+                  {"gaia-peer-id", ?i2l(PeerId)},
+                  {"gaia-nonce", Nonce},
+                  {"gaia-hmac", HMAC}],
+            "application/json",
+            RequestBody},
            [{timeout, ?HTTPC_TIMEOUT}],
-           [{body_format, binary}],
-           ?MODULE) of
-        {ok, {200, _ResponseHeaders, ResponseBody}} ->
+           [{body_format, binary}]) of
+        {ok, {{_Version, 200, ReasonPhrase}, Headers, ResponseBody}} ->
             try
                 case jsone:try_decode(ResponseBody) of
                     {ok, [{<<"port">>, Port}], _} when is_integer(Port) ->
                         {ok, Port};
-                    {ok, JsonValue} ->
+                    {ok, JsonValue, _} ->
                         {error, {invalid_response_body, JsonValue}}
                 end
             catch
@@ -150,4 +152,9 @@ negotiate_post(Request, RemotePort) ->
     end.
 
 get_gaia_headers(_Request) ->
+    io:format("BAJS: ~p\n", [_Request]),
+
+
+
+
     'FIXME'.
