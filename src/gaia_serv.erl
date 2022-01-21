@@ -176,7 +176,7 @@ generate_artificial_id(PeerName) ->
 %%
 
 -spec peer_wants_to_negotiate(peer_id(), inet:port_number()) ->
-          {ok, inet:port_number()} | {error, no_such_peer_id}.
+          {ok, inet:port_number()} | {error, no_such_peer_id | not_available}.
 
 peer_wants_to_negotiate(PeerId, RemotePort) ->
     serv:call(?MODULE, {peer_wants_to_negotiate, PeerId, RemotePort}).
@@ -332,7 +332,12 @@ message_handler(#{parent := Parent,
                                            remote_port = RemotePort}),
                     ok = update_network(
                            Db, Status, Muted, NetworkSenderPid, false),
-                    {reply, From, ok};
+                    case db_get_peer_by_id(Db, PeerId) of
+                        [#gaia_peer{local_port = undefined}] ->
+                            {reply, From, {error, not_available}};
+                        [_] ->
+                            {reply, From, ok}
+                    end;
                 [] ->
                     {reply, From, {error, no_such_peer_id}}
             end;
@@ -493,8 +498,12 @@ use_source_peer({UsesWildcard, WildcardPeer},
                 #gaia_peer{mode = Mode,
                            ephemeral = Ephemeral,
                            options = Options,
-                           talks_to = TalksTo}) ->
+                           talks_to = TalksTo,
+                           local_port = LocalPort,
+                           remote_port = RemotePort}) ->
     if
+        LocalPort == undefined andalso RemotePort /= undefined ->
+            {true, Options};
         UsesWildcard andalso Ephemeral ->
             {true, WildcardPeer#gaia_peer.options};
         TalksTo ->
@@ -809,5 +818,5 @@ db_delete_ephemeral_peers({Tab, DetsTab}) ->
     ok = dets:match_delete(DetsTab, #gaia_peer{ephemeral = true}),
     ets:match_delete(Tab, #gaia_peer{ephemeral = true}).
 
-db_dump({Tab, _DetsTab}) ->
-    ets:tab2list(Tab).
+%db_dump({Tab, _DetsTab}) ->
+%    ets:tab2list(Tab).

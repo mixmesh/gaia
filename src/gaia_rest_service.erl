@@ -47,8 +47,8 @@ negotiate_with_peer(PeerId, {IpAddress, RestPort}, LocalPort) ->
     Url = lists:flatten(io_lib:format("http://~s:~w/negotiate",
                                       [inet:ntoa(IpAddress), RestPort])),
     RequestBody = encode_json([{<<"port">>, LocalPort}]),
-    Nonce = keydir_service:bin_to_hexstr(<<"FIXME">>),
-    HMAC = keydir_service:bin_to_hexstr(<<"FIXME">>),
+    Nonce = ?b2l(keydir_service:bin_to_hexstr(<<"FIXME">>)),
+    HMAC = ?b2l(keydir_service:bin_to_hexstr(<<"FIXME">>)),
     case httpc:request(
            post,
            {Url, [{"connection", "close"},
@@ -129,6 +129,8 @@ handle_http_post(Socket, Request, Body, _Options) ->
                     rest_util:response(
                       Socket, Request, negotiate_post(Request, Port));
                 _ ->
+                    ?LOG_ERROR(#{module => ?MODULE,
+                                 invalid_request_body => Body}),
                     rest_util:response(
                       Socket, Request,
                       {error, bad_request, "Invalid request body"})
@@ -144,8 +146,10 @@ negotiate_post(Request, RemotePort) ->
             case gaia_serv:peer_wants_to_negotiate(PeerId, RemotePort) of
                 {ok, LocalPort} ->
                     {ok, {format, [{<<"port">>, LocalPort}]}};
-                {error, no_such_peer_id} ->
-                    {error, {bad_request, "Unknown peer"}}
+                {error, Reason} ->
+                    ?LOG_ERROR(#{module => ?MODULE,
+                                 peer_wants_to_negotiate => Reason}),
+                    {error, no_access}
             end;
         missing_headers ->
             {error, {bad_request, "Missing GAIA HTTP headers"}}
