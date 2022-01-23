@@ -27,6 +27,7 @@
 -type id() :: non_neg_integer().
 -type peer_id() :: id().
 -type group_id() :: id().
+%% FIXME: ask has not been implemented fully
 -type mode() :: direct | ask | ignore.
 -type options() :: [override_busy].
 -type group_type() :: open | closed.
@@ -127,7 +128,7 @@ currently_talking_to() ->
 %%
 
 -spec start_talking_to(id() | {name, name()}) ->
-          ok | {error, no_such_id | no_such_name | already_talking_to}. %% FIXME: more
+          ok | {error, no_such_id | no_such_name | already_talking_to}.
 
 start_talking_to(IdOrName) ->
     serv:call(?MODULE, {start_talking_to, IdOrName}).
@@ -137,7 +138,7 @@ start_talking_to(IdOrName) ->
 %%
 
 -spec stop_talking_to(id() | {name, name()} | all) ->
-          ok | {error, no_such_id | no_such_name | not_talking_to}.  %% FIXME: more
+          ok | {error, no_such_id | no_such_name | not_talking_to}.
 
 stop_talking_to(IdOrName) ->
     serv:call(?MODULE, {stop_talking_to, IdOrName}).
@@ -187,9 +188,8 @@ peer_wants_to_negotiate(PeerId, RemotePort) ->
 
 init(Parent, GaiaDir, PeerName, PeerId, RestPort, PlaybackPcmName) ->
     ?LOG_INFO("Gaia NIF is initializing..."),
-    ok = gaia_nif:start({#{port => 2305}, %% FIXME: Remove this and replace with indidual ports later
-                         #{pcm_name => PlaybackPcmName,
-                           playback_audio => ?PLAYBACK_AUDIO}}),
+    ok = gaia_nif:start(#{pcm_name => PlaybackPcmName,
+                          playback_audio => ?PLAYBACK_AUDIO}),
     ?LOG_INFO("Gaia NIF has been initialized"),
     ok = nodis:set_node_info(
            #{gaia => #{peer_id => PeerId, rest_port => RestPort}}),
@@ -517,23 +517,21 @@ use_source_peer({UsesWildcard, WildcardPeer},
 use_source_group(#gaia_group{talks_to = TalksTo}) ->
     TalksTo.
 
-update_network_receiver(_Db, Sources) ->
+update_network_receiver(Db, Sources) ->
     ?LOG_INFO(#{module => ?MODULE, sources => Sources}),
-    ok.
-    %% FIXME: Implement gaia_nif:set_sources/1
-    %% LocalPorts = gaia_nif:set_sources(Sources),
-    %% lists:foreach(
-    %%   fun({{peer, PeerId}, NewLocalPort}) ->
-    %%           case db_get_peer_by_id(Db, PeerId) of
-    %%               [#gaia_peer{local_port = NewLocalPort}] ->
-    %%                   ok;
-    %%               [Peer] ->
-    %%                   db_insert(Db, Peer#gaia_peer{local_port = NewLocalPort})
-    %%           end;
-    %%      ({{group, GroupId}, NewGroupPort}) ->
-    %%           [#gaia_group{port = NewGroupPort}] =
-    %%               db_get_group_by_id(Db, GroupId)
-    %%   end, LocalPorts).
+    LocalPorts = gaia_nif:set_sources(Sources),
+    lists:foreach(
+      fun({{peer, PeerId}, NewLocalPort}) ->
+              case db_get_peer_by_id(Db, PeerId) of
+                  [#gaia_peer{local_port = NewLocalPort}] ->
+                      ok;
+                  [Peer] ->
+                      db_insert(Db, Peer#gaia_peer{local_port = NewLocalPort})
+              end;
+         ({{group, GroupId}, NewGroupPort}) ->
+              [#gaia_group{port = NewGroupPort}] =
+                  db_get_group_by_id(Db, GroupId)
+      end, LocalPorts).
 
 negotiate_with_peers(_Db, []) ->
     ok;
@@ -555,7 +553,7 @@ negotiate_with_peers(Db, [{peer, PeerId}|Rest]) ->
             negotiate_with_peers(Db, Rest)
     end.
 
-update_network_sender(Db, _NetworkSenderPid, Destinations) ->
+update_network_sender(Db, NetworkSenderPid, Destinations) ->
     DestinationAddresses =
         lists:foldl(
           fun({peer, PeerId}, Acc) ->
@@ -577,10 +575,8 @@ update_network_sender(Db, _NetworkSenderPid, Destinations) ->
           end, [], Destinations),
     ?LOG_INFO(#{module => ?MODULE,
                 destination_addresses => DestinationAddresses}),
-    ok.
-    %% FIXME: Use this function!
-    %%gaia_network_sender_serv:set_destinations(
-    %%  NetworkSenderPid, DestinationAddresses).
+    gaia_network_sender_serv:set_destinations(
+      NetworkSenderPid, DestinationAddresses).
 
 change_peer(Db, NewNodisAddress, Info) ->
     MaxPeerId = math:pow(2, 32) - 1,

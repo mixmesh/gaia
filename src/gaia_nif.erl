@@ -1,5 +1,5 @@
 -module(gaia_nif).
--export([start/1, stop/0, set_params/1, read_packet/0, set_src_ip_addresses/1]).
+-export([start/1, stop/0, set_params/1, read_packet/0, set_sources/1]).
 -export([init/0, preloaded_atoms/0]). % internal
 -on_load(init/0).
 
@@ -67,10 +67,13 @@ read_packet() ->
     exit(nif_library_not_loaded).
 
 %%
-%% Exported: set_src_ip_addresses
+%% Exported: set_sources
 %%
 
--spec set_src_ip_addresses([inet:ip_address()]) -> ok.
+-spec set_sources([{peer, gaia_serv:peer_id()}|
+                   {group, gaia_serv:group_id(), inet:port_number()}]) ->
+          [{{peer, gaia_serv:peer_id()}, inet:port_number()}|
+           {{group, gaia_serv:group_id()}, inet:port_number()}].
 
-set_src_ip_addresses(_IpAddresses) ->
+set_sources(_Sources) ->
     exit(nif_library_not_loaded).

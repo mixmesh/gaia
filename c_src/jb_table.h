@@ -4,9 +4,15 @@
 #include <stdbool.h>
 #include "jb.h"
 #include "threadlib.h"
+#include "uthash/uthash.h"
 
 #define JB_TABLE_SUCCESS 0
 #define JB_TABLE_ALREADY_EXISTS -1
+
+#define HASH_FIND_UINT32(head, findint, out) \
+    HASH_FIND(hh, head, findint, sizeof(uint32_t), out)
+#define HASH_ADD_UINT32(head, intfield, add) \
+    HASH_ADD(hh, head, intfield, sizeof(uint32_t), add)
 
 typedef struct {
     jb_t *jb;

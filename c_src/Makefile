@@ -11,7 +11,7 @@ EXECS=gaia gaia_file_sender
 
 all: $(EXECS)
 
-gaia: audio.o audio_sink.o gaia.o gaia_utils.o jb.o jb_table.o network_receiver.o network_sender.o threadlib.o timing.o
+gaia: audio.o audio_sink.o gaia.o gaia_utils.o jb.o jb_table.o network_receiver.o network_sender.o threadlib.o source.o source_table.o timing.o
 
 gaia_file_sender: file_sender.o gaia_file_sender.o gaia_utils.o timing.o
 

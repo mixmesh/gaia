@@ -9,26 +9,27 @@
 #include "network_receiver.h"
 #include "globals.h"
 #include "gaia_utils.h"
+#include "source_table.h"
 
+#define WAIT_FOR_INCOMING_AUDIO_TIMEOUT 2000
 #define FOUR_SECONDS_IN_US (4 * 1000000)
 #define DRAIN_BUF_SIZE 1
 
 extern jb_table_t *jb_table;
 extern bool kill_network_receiver;
-extern uint16_t nsrc_addrs;
-extern struct sockaddr_in *src_addrs;
+extern source_table_t *source_table;
 
-bool is_src_address(struct sockaddr_in *src_addr) {
-    if (nsrc_addrs == 0) {
-        return false;
-    } else {
-        for (int i = 0; i < nsrc_addrs; i++) {
-            if (src_addr->sin_addr.s_addr == src_addrs[i].sin_addr.s_addr) {
-                return true;
-            }
-        }
-        return false;
+int set_fds(fd_set *fds) {
+    FD_ZERO(fds);
+    int sockfd = -1;
+    void set_fd(source_t *source) {
+        FD_SET(source->sockfd, fds);
+        sockfd = source->sockfd > sockfd ? source->sockfd : sockfd;
     }
+    source_table_take_mutex(source_table);
+    source_table_foreach(source_table, set_fd);
+    source_table_release_mutex(source_table);
+    return sockfd;
 }
 
 uint16_t root_mean_square(uint16_t *peak_values, uint16_t n) {
@@ -39,40 +40,15 @@ uint16_t root_mean_square(uint16_t *peak_values, uint16_t n) {
 }
 
 void *network_receiver(void *arg) {
-    int sockfd = -1;
-
-    // Parameters
-    network_receiver_params_t *params = (network_receiver_params_t *)arg;
-
-    // Create and bind socket
-    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        perror("socket: Socket creation failed");
-        int retval = SOCKET_ERROR;
-        thread_exit(&retval);
-    }
-
-    struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    addr.sin_port = htons(params->port);
-
-    if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-        perror("bind: Binding of socket failed");
-        int retval = SOCKET_ERROR;
-        thread_exit(&retval);
-    }
-
+    fd_set readfds;
     struct timeval zero_timeout = {.tv_usec = 0, .tv_sec = 0};
-    struct timeval one_second_timeout = {.tv_usec = 0, .tv_sec = 1};
-    struct timeval two_second_timeout = {.tv_usec = 0, .tv_sec = 2};
+    struct timeval wait_for_incoming_audio_timeout =
+        {.tv_usec = 0, .tv_sec = 2};
 
     ssize_t udp_max_buf_size =
         OPUS_MAX_PACKET_LEN_IN_BYTES > PERIOD_SIZE_IN_BYTES ?
         HEADER_SIZE + OPUS_MAX_PACKET_LEN_IN_BYTES :
         HEADER_SIZE + PERIOD_SIZE_IN_BYTES;
-
-    uint8_t drain_buf[DRAIN_BUF_SIZE];
 
     INFOF("Jitter buffer contains %ums of audio data (%u periods, %u bytes)",
           JITTER_BUFFER_SIZE_IN_MS,
@@ -83,10 +59,12 @@ void *network_receiver(void *arg) {
     while (!kill_network_receiver) {
         // Waiting for incoming audio
         DEBUGF("Waiting for incoming audio...");
-        fd_set readfds;
-        FD_ZERO(&readfds);
-        FD_SET(sockfd, &readfds);
-        struct timeval timeout = two_second_timeout;
+        int sockfd = set_fds(&readfds);
+        if (sockfd == -1) {
+            msleep(WAIT_FOR_INCOMING_AUDIO_TIMEOUT);
+            continue;
+        }
+        struct timeval timeout = wait_for_incoming_audio_timeout;
         int nfds = select(sockfd + 1, &readfds, 0, 0, &timeout);
         if (nfds < 0) {
             perror("select: Failed to wait for incoming audio");
@@ -95,52 +73,50 @@ void *network_receiver(void *arg) {
             continue;
         }
 
-        // Drain socket receive buffer
-        while (true) {
-            FD_ZERO(&readfds);
-            FD_SET(sockfd, &readfds);
-            struct timeval timeout = zero_timeout;
-            int nfds = select(sockfd + 1, &readfds, 0, 0, &timeout);
-            if (nfds < 0) {
-                perror("select: Failed to drain socket receive buffer\n");
-                goto bail_out;
-            } else if (nfds == 0) {
-                // Socket receiver buffer has been drained!
-                break;
+        // Drain socket receive buffers
+        void drain_socket_receive_buffer(source_t *source) {
+            if (!FD_ISSET(source->sockfd, &readfds)) {
+                return;
             }
-            if (recvfrom(sockfd, drain_buf, DRAIN_BUF_SIZE, 0, NULL,
-                         NULL) < 0) {
-                perror("recvfrom: Failed to drain socket receive buffer\n");
-                goto bail_out;
+
+            fd_set sourcefds;
+            while (true) {
+                FD_ZERO(&sourcefds);
+                FD_SET(source->sockfd, &sourcefds);
+                struct timeval timeout = zero_timeout;
+                int nfds = select(source->sockfd + 1, &sourcefds, 0, 0,
+                                  &timeout);
+                if (nfds < 0) {
+                    perror("select: Failed to drain socket receive buffer\n");
+                    return;
+                } else if (nfds == 0) {
+                    // Socket receiver buffer has been drained!
+                    return;
+                }
+                uint8_t drain_buf[DRAIN_BUF_SIZE];
+                if (recvfrom(source->sockfd, drain_buf, DRAIN_BUF_SIZE, 0, NULL,
+                             NULL) < 0) {
+                    perror("recvfrom: Failed to drain socket receive buffer\n");
+                    return;
+                }
             }
-            FD_ZERO(&readfds);
-            FD_SET(sockfd, &readfds);
-        }
+        };
+        source_table_take_mutex(source_table);
+        source_table_foreach(source_table, drain_socket_receive_buffer);
+        source_table_release_mutex(source_table);
         INFOF("Socket receive buffer has been drained");
 
         INFOF("Erase all stale jitter buffers");
         jb_table_free(jb_table, true);
 
-        uint64_t gaia_id = 0;
+        uint32_t peer_id = 0;
         jb_t *jb = NULL;
         double latency = 0;
         uint64_t last_latency_printout = 0;
 
-        // Read from socket and write to jitter buffer
-        INFOF("Receiving audio...");
-        while (!kill_network_receiver) {
-            // Wait for incoming socket data (or timeout)
-            FD_ZERO(&readfds);
-            FD_SET(sockfd, &readfds);
-            struct timeval timeout = one_second_timeout;
-            int nfds = select(sockfd + 1, &readfds, 0, 0, &timeout);
-            if (nfds < 0) {
-                perror("select: Failed to wait for incoming socket data");
-                goto bail_out;
-            } else if (nfds == 0) {
-                // Timeout
-                INFOF("No longer receiving audio!\n");
-                break;
+        void read_from_source(source_t *source) {
+            if (!FD_ISSET(source->sockfd, &readfds)) {
+                return;
             }
 
             // Peek into socket and extract buffer header
@@ -148,35 +124,30 @@ void *network_receiver(void *arg) {
             struct sockaddr src_addr;
             socklen_t addrlen = sizeof(src_addr);
             int n;
-            if ((n = recvfrom(sockfd, header_buf, HEADER_SIZE, MSG_PEEK,
+            if ((n = recvfrom(source->sockfd, header_buf, HEADER_SIZE, MSG_PEEK,
                               &src_addr, &addrlen)) < 0) {
                 perror("recvfrom: Failed to peek into socket and extract \
 gaia-id");
-                goto bail_out;
+                return;
             } else if (n != HEADER_SIZE) {
                 ERRORF("recvfrom: Ignored truncated UDP packet!");
-                break;
+                return;
             }
 
-            // Just ignore unknown src addresses
-            if (!is_src_address((struct sockaddr_in *)&src_addr)) {
-                continue;
-            }
-
-            uint32_t new_gaia_id = ntohl(*(uint32_t *)&header_buf[0]);
+            uint32_t new_peer_id = ntohl(*(uint32_t *)&header_buf[0]);
             uint16_t packet_len = ntohs(*(uint16_t *)&header_buf[16]);
 
             // Get jitter buffer
-            if (gaia_id != new_gaia_id) {
+            if (peer_id != new_peer_id) {
                 jb_table_take_rdlock(jb_table);
-                if ((jb = jb_table_find(jb_table, new_gaia_id)) == NULL) {
-                    jb = jb_new(new_gaia_id, true);
+                if ((jb = jb_table_find(jb_table, new_peer_id)) == NULL) {
+                    jb = jb_new(new_peer_id, true);
                     jb_table_upgrade_to_wrlock(jb_table);
                     assert(jb_table_add(jb_table, jb) == JB_TABLE_SUCCESS);
                     jb_table_downgrade_to_rdlock(jb_table);
                 }
                 jb_table_release_rdlock(jb_table);
-                gaia_id = new_gaia_id;
+                peer_id = new_peer_id;
             }
 
             // Jitter buffer is exhausted according to audio sink
@@ -196,13 +167,13 @@ gaia-id");
 
             // Read from socket
             ssize_t udp_buf_size = HEADER_SIZE + packet_len;
-            if ((n = recvfrom(sockfd, jb_entry->udp_buf, udp_buf_size, 0, NULL,
-                              NULL)) < 0) {
+            if ((n = recvfrom(source->sockfd, jb_entry->udp_buf, udp_buf_size,
+                              0, NULL, NULL)) < 0) {
                 perror("recvfrom: Failed to read from socket");
-                goto bail_out;
+                return;
             } else if (n != udp_buf_size) {
                 ERRORF("recvfrom: Ignored truncated UDP packet!");
-                break;
+                return;
             }
 
             // Calculate latency (for developement debugging only)
@@ -257,12 +228,33 @@ gaia-id");
             jb_take_wrlock(jb);
             assert(jb_insert(jb, jb_entry) != 0);
             jb_release_wrlock(jb);
+        };
+
+        // Read from socket and write to jitter buffer
+        INFOF("Receiving audio...");
+        while (!kill_network_receiver) {
+            // Wait for incoming socket data (or timeout)
+            int sockfd = set_fds(&readfds);
+            assert(sockfd != -1);
+            struct timeval timeout = wait_for_incoming_audio_timeout;
+            int nfds = select(sockfd + 1, &readfds, 0, 0, &timeout);
+            if (nfds < 0) {
+                perror("select: Failed to wait for incoming socket data");
+                break;
+            } else if (nfds == 0) {
+                // Timeout
+                INFOF("No longer receiving audio!\n");
+                break;
+            }
+
+            source_table_take_mutex(source_table);
+            source_table_foreach(source_table, read_from_source);
+            source_table_release_mutex(source_table);
         }
     }
 
- bail_out:
     INFOF("network_receiver is shutting down!!!");
-    close(sockfd);
+    source_table_free(source_table);
     int retval = NETWORK_RECEIVER_DIED;
     thread_exit(&retval);
     return NULL;

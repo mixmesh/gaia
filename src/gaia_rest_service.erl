@@ -59,7 +59,7 @@ negotiate_with_peer(PeerId, {IpAddress, RestPort}, LocalPort) ->
             RequestBody},
            [{timeout, ?HTTPC_TIMEOUT}],
            [{body_format, binary}]) of
-        {ok, {{_Version, 200, ReasonPhrase}, Headers, ResponseBody}} ->
+        {ok, {{_Version, 200, _ReasonPhrase}, _Headers, ResponseBody}} ->
             try
                 case jsone:try_decode(ResponseBody) of
                     {ok, [{<<"port">>, Port}], _} when is_integer(Port) ->

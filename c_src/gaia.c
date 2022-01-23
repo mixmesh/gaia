@@ -8,6 +8,7 @@
 #include "timing.h"
 #include "globals.h"
 #include "gaia_utils.h"
+#include "source_table.h"
 
 #define MAX_NETWORK_SENDER_ADDR_PORTS 256
 #define MAX_SRC_ADDRS 256
@@ -19,8 +20,7 @@ bool kill_network_receiver = false;
 bool kill_audio_sink = false;
 uint8_t *playback_packet;
 thread_mutex_t *playback_packet_mutex;
-uint16_t nsrc_addrs = 0;
-struct sockaddr_in src_addrs[MAX_SRC_ADDRS];
+source_table_t *source_table;
 
 void usage(char *argv[]) {
     fprintf(stderr,
@@ -156,6 +156,9 @@ int main (int argc, char *argv[]) {
     // Create jitter buffer table
     jb_table = jb_table_new();
 
+    // Create source table
+    source_table = source_table_new();
+
     // Create playback packet data and mutex
     playback_packet = malloc(PERIOD_SIZE_IN_BYTES);
     playback_packet_mutex = malloc(sizeof(thread_mutex_t));
@@ -180,11 +183,8 @@ int main (int argc, char *argv[]) {
 
     // Start receiver thread
     pthread_t receiver_thread;
-    network_receiver_params_t *receiver_params;
     if (!disable_network_receiver) {
-        receiver_params = malloc(sizeof(network_receiver_params_t));
-        receiver_params->port = src_port;
-        if ((err = start_thread(network_receiver, (void *)receiver_params,
+        if ((err = start_thread(network_receiver, NULL,
                                 &receiver_thread)) != 0) {
             exit(err);
         }
@@ -211,7 +211,6 @@ int main (int argc, char *argv[]) {
     }
     if (!disable_network_receiver) {
         pthread_join(receiver_thread, NULL);
-        free(receiver_params);
     }
     if (!disable_audio_sink) {
         pthread_join(audio_sink_thread, NULL);
@@ -220,6 +219,9 @@ int main (int argc, char *argv[]) {
 
     // Remove jitter buffer table
     jb_table_free(jb_table, false);
+
+    // Remove source table
+    source_table_free(source_table);
 
     // Remove playback packet data and mutex
     assert(thread_mutex_lock(playback_packet_mutex) == 0);

@@ -8,6 +8,7 @@
 #include "timing.h"
 #include "globals.h"
 #include "gaia_utils.h"
+#include "source_table.h"
 
 #define ATOM(name) atm_##name
 #define DECL_ATOM(name) ERL_NIF_TERM atm_##name = 0
@@ -27,6 +28,8 @@ DECL_ATOM(bad_params);
 DECL_ATOM(port);
 DECL_ATOM(playback_audio);
 DECL_ATOM(pcm_name);
+DECL_ATOM(peer);
+DECL_ATOM(group);
 
 #define MAX_ADDR_LEN 64
 #define MAX_PCM_NAME_LEN 64
@@ -36,7 +39,6 @@ bool started = false;
 pthread_rwlock_t *params_rwlock;
 uint64_t params_last_updated;
 ErlNifTid network_receiver_tid;
-network_receiver_params_t receiver_params;
 ErlNifTid audio_sink_tid;
 audio_sink_params_t audio_sink_params = {.pcm_name = NULL};
 
@@ -47,8 +49,7 @@ bool kill_network_receiver = false;
 bool kill_audio_sink = false;
 uint8_t *playback_packet;
 thread_mutex_t *playback_packet_mutex;
-uint16_t nsrc_addrs = 0;
-struct sockaddr_in src_addrs[MAX_SRC_ADDRS];
+source_table_t *source_table;
 
 void take_params_rdlock(void) {
     assert(pthread_rwlock_rdlock(params_rwlock) == 0);
@@ -63,69 +64,37 @@ void release_params_lock(void) {
 }
 
 bool parse_params(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
-    const ERL_NIF_TERM *params_tuple;
-    int arity;
-
-    if (enif_get_tuple(env, argv[0], &arity, &params_tuple)) {
-        if (arity != 2) {
-            return false;
-        }
-
-        ErlNifMapIterator iter;
-
-        // Type: gaia_nif:network_receiver_params()
-        unsigned int network_receiver_port;
-        if (enif_map_iterator_create(env, params_tuple[0], &iter,
-                                     ERL_NIF_MAP_ITERATOR_FIRST)) {
-            ERL_NIF_TERM key, value;
-            while (enif_map_iterator_get_pair(env, &iter, &key, &value)) {
-                if (key == ATOM(port)) {
-                    if (!enif_get_uint(env, value, &network_receiver_port)) {
-                        return false;
-                    }
+    // Type: gaia_nif:audio_sink_params()
+    ErlNifMapIterator iter;
+    char audio_sink_pcm_name[MAX_PCM_NAME_LEN];
+    bool audio_sink_playback_audio = true;
+    if (enif_map_iterator_create(env, argv[0], &iter,
+                                 ERL_NIF_MAP_ITERATOR_FIRST)) {
+        ERL_NIF_TERM key, value;
+        while (enif_map_iterator_get_pair(env, &iter, &key, &value)) {
+            if (key == ATOM(pcm_name)) {
+                if (enif_get_string(env, value, audio_sink_pcm_name,
+                                    MAX_PCM_NAME_LEN, ERL_NIF_LATIN1) < 1) {
+                    return false;
+                }
+            } else if (key == ATOM(playback_audio)) {
+                if (value == ATOM(true)) {
+                    audio_sink_playback_audio = true;
+                } else if (value == ATOM(false)) {
+                    audio_sink_playback_audio = false;
                 } else {
                     return false;
                 }
-                enif_map_iterator_next(env, &iter);
+            } else {
+                return false;
             }
-        } else {
-            return false;
+            enif_map_iterator_next(env, &iter);
         }
-
-        // Type: gaia_nif:audio_sink_params()
-        char audio_sink_pcm_name[MAX_PCM_NAME_LEN];
-        bool audio_sink_playback_audio = true;
-        if (enif_map_iterator_create(env, params_tuple[1], &iter,
-                                     ERL_NIF_MAP_ITERATOR_FIRST)) {
-            ERL_NIF_TERM key, value;
-            while (enif_map_iterator_get_pair(env, &iter, &key, &value)) {
-                if (key == ATOM(pcm_name)) {
-                    if (enif_get_string(env, value, audio_sink_pcm_name,
-                                        MAX_PCM_NAME_LEN, ERL_NIF_LATIN1) < 1) {
-                        return false;
-                    }
-                } else if (key == ATOM(playback_audio)) {
-                    if (value == ATOM(true)) {
-                        audio_sink_playback_audio = true;
-                    } else if (value == ATOM(false)) {
-                        audio_sink_playback_audio = false;
-                    } else {
-                        return false;
-                    }
-                } else {
-                    return false;
-                }
-                enif_map_iterator_next(env, &iter);
-            }
-        } else {
-            return false;
-        }
-
-        receiver_params.port = network_receiver_port;
 
         if (audio_sink_params.pcm_name != NULL) {
             free(audio_sink_params.pcm_name);
         }
+
         audio_sink_params.pcm_name = strdup(audio_sink_pcm_name);
         audio_sink_params.playback_audio = audio_sink_playback_audio;
 
@@ -135,6 +104,7 @@ bool parse_params(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
     } else {
         return false;
     }
+
 }
 
 /*
@@ -158,6 +128,9 @@ static ERL_NIF_TERM _start(ErlNifEnv* env, int argc,
     // Create jitter buffer table
     jb_table = jb_table_new();
 
+    // Create source table
+    source_table = source_table_new();
+
     // Create playback packet data and mutex
     playback_packet = malloc(PERIOD_SIZE_IN_BYTES);
     playback_packet_mutex = malloc(sizeof(thread_mutex_t));
@@ -166,7 +139,7 @@ static ERL_NIF_TERM _start(ErlNifEnv* env, int argc,
 
     // Start network receiver thread
     enif_thread_create("network_receiver", &network_receiver_tid,
-                       network_receiver, (void *)&receiver_params, NULL);
+                       network_receiver, NULL, NULL);
 
     // Start audio sink thread
     enif_thread_create("audio_sink", &audio_sink_tid, audio_sink,
@@ -207,6 +180,9 @@ static ERL_NIF_TERM _stop(ErlNifEnv* env, int argc,
     // Remove jitter buffer table
     jb_table_free(jb_table, false);
 
+    // Remove source table
+    source_table_free(source_table);
+
     // Remove playback packet data and mutex
     assert(thread_mutex_lock(playback_packet_mutex) == 0);
     free(playback_packet);
@@ -233,45 +209,6 @@ static ERL_NIF_TERM _set_params(ErlNifEnv* env, int argc,
     return ATOM(ok);
 }
 
-
-/* static ERL_NIF_TERM _open_peer_socket(ErlNifEnv* env, int argc, */
-/*                                       const ERL_NIF_TERM argv[]) { */
-/*     // Create and bind socket */
-/*     int sockfd; */
-/*     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { */
-/*         return enif_make_tuple2(env, ATOM(error), */
-/*                                 enif_make_string(env, */
-
-
-/*         strerror_r(ERRNO, buf, buflen); */
-
-
-/*         perror("socket: Socket creation failed"); */
-/*         return ATOM(thread_exit(&retval); */
-/*     } */
-
-/*     struct sockaddr_in addr; */
-/*     memset(&addr, 0, sizeof(addr)); */
-/*     addr.sin_family = AF_INET; */
-/*     addr.sin_addr.s_addr = htonl(INADDR_ANY); */
-/*     addr.sin_port = htons(params->port); */
-
-/*     if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0) { */
-/*         perror("bind: Binding of socket failed"); */
-/*         int retval = SOCKET_ERROR; */
-/*         thread_exit(&retval); */
-/*     } */
-
-
-
-/*     int sockfd; */
-/*     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { */
-/*         perror("socket: Socket creation failed"); */
-/*         int retval = SOCKET_ERROR; */
-/*         thread_exit(&retval); */
-/*     } */
-
-
 /*
  * read_packet
  */
@@ -288,36 +225,119 @@ static ERL_NIF_TERM _read_packet(ErlNifEnv* env, int argc,
 }
 
 /*
- * set_src_ip_addresses
+ * set_sources
  */
 
-static ERL_NIF_TERM _set_src_ip_addresses(ErlNifEnv* env, int argc,
-                                          const ERL_NIF_TERM argv[]) {
+static ERL_NIF_TERM _set_sources(ErlNifEnv* env, int argc,
+                                 const ERL_NIF_TERM argv[]) {
     if (enif_is_list(env, argv[0])) {
-        nsrc_addrs = 0;
+        source_table_take_mutex(source_table);
+
+        // Mark all sources as not used
+        void mark_source_as_unused(source_t *source) {
+            source->used = false;
+        }
+        source_table_foreach(source_table, mark_source_as_unused);
+
+        // Generate [{{peer | group, gaia_serv:id()}, LocalPort :: integer()}]
         ERL_NIF_TERM item, items = argv[0];
-        // FIXME: Only supports ipv4
+        ERL_NIF_TERM return_value = enif_make_list(env, 0);
         while(enif_get_list_cell(env, items, &item, &items)) {
             const ERL_NIF_TERM *tuple;
             int arity;
-            if (!enif_get_tuple(env, item, &arity, &tuple) || arity != 4) {
-                return enif_make_badarg(env);
+            if (enif_get_tuple(env, item, &arity, &tuple)) {
+                if (!((arity == 2 && tuple[0] == ATOM(peer)) ||
+                      (arity == 3 && tuple[0] == ATOM(group)))) {
+                    source_table_release_mutex(source_table);
+                    return enif_make_badarg(env);
+                }
+                unsigned int id;
+                if (!enif_get_uint(env, tuple[1], &id)) {
+                    source_table_release_mutex(source_table);
+                    return enif_make_badarg(env);
+                }
+                source_t *source = source_table_find(source_table, id);
+                if (source == NULL) {
+                    unsigned int local_port;
+                    if (arity == 2) { // peer
+                        local_port = 0;
+                    } else { // group
+                        if (!enif_get_uint(env, tuple[2], &local_port)) {
+                            source_table_release_mutex(source_table);
+                            return enif_make_badarg(env);
+                        }
+                    }
+                    // Create and bind new UDP socket
+                    int sockfd;
+                    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+                        perror("socket: Socket creation failed");
+                        source_table_release_mutex(source_table);
+                        return enif_make_badarg(env);
+                    }
+                    struct sockaddr_in addr;
+                    memset(&addr, 0, sizeof(addr));
+                    addr.sin_family = AF_INET;
+                    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+                    addr.sin_port = local_port;
+                    if (bind(sockfd, (struct sockaddr *)&addr,
+                             sizeof(addr)) < 0) {
+                        perror("bind: Binding of socket failed");
+                        close(sockfd);
+                        source_table_release_mutex(source_table);
+                        return enif_make_badarg(env);
+                    }
+                    if (arity == 2) { // peer
+                        // Figure out local port number
+                        struct sockaddr_in local_addr;
+                        socklen_t local_addrlen;
+                        if (getsockname(sockfd, (struct sockaddr*)&local_addr,
+                                        &local_addrlen) == -1) {
+                            close(sockfd);
+                            source_table_release_mutex(source_table);
+                            return enif_make_badarg(env);
+                        }
+                        local_port = (int)ntohs(local_addr.sin_port);
+                    }
+                    // Add the source to the source table
+                    source_t *new_source = source_new();
+                    new_source->sockfd = sockfd;
+                    new_source->port = local_port;
+                    new_source->used = true;
+                    source_table_add(source_table, new_source);
+                    // Add local port to return value list
+                    ERL_NIF_TERM id_tuple;
+                    if (arity == 2) {
+                        id_tuple = enif_make_tuple2(env, ATOM(peer),
+                                                    enif_make_int(env, id));
+                    } else {
+                        id_tuple = enif_make_tuple2(env, ATOM(group),
+                                                    enif_make_int(env, id));
+                    }
+                    ERL_NIF_TERM source_tuple =
+                        enif_make_tuple2(env, id_tuple,
+                                         enif_make_int(env, local_port));
+                    return_value =
+                        enif_make_list_cell(env, source_tuple, return_value);
+                } else {
+                    source->used = true;
+                }
             }
-            unsigned int first, second, third, fourth;
-            if (!(enif_get_uint(env, tuple[0], &first) &&
-                  enif_get_uint(env, tuple[1], &second) &&
-                  enif_get_uint(env, tuple[2], &third) &&
-                  enif_get_uint(env, tuple[3], &fourth))) {
-                return enif_make_badarg(env);
-            }
-            src_addrs[nsrc_addrs].sin_addr.s_addr =
-                ip4_to_int(first, second, third, fourth);
-            nsrc_addrs++;
         }
+
+        // Delete unused sources
+        void delete_unused_source(source_t *source) {
+            if (source->used) {
+                source_table_delete(source_table, source);
+            }
+        }
+        source_table_foreach(source_table, delete_unused_source);
+
+        source_table_release_mutex(source_table);
+        return return_value;
     } else {
+        source_table_release_mutex(source_table);
         return enif_make_badarg(env);
     }
-    return ATOM(ok);
 }
 
 /*
@@ -335,6 +355,8 @@ static int load(ErlNifEnv *env, void **priv_data, ERL_NIF_TERM load_info) {
     LOAD_ATOM(port);
     LOAD_ATOM(playback_audio);
     LOAD_ATOM(pcm_name);
+    LOAD_ATOM(peer);
+    LOAD_ATOM(group);
     return 0;
 }
 
@@ -355,7 +377,7 @@ static ErlNifFunc nif_funcs[] =
      {"stop", 0, _stop, ERL_NIF_DIRTY_JOB_IO_BOUND},
      {"set_params", 1, _set_params, 0},
      {"read_packet", 0, _read_packet, ERL_NIF_DIRTY_JOB_IO_BOUND},
-     {"set_src_ip_addresses", 1, _set_src_ip_addresses, 0}
+     {"set_sources", 1, _set_sources, 0}
     };
 
 ERL_NIF_INIT(gaia_nif, nif_funcs, load, NULL, NULL, unload);

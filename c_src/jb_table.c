@@ -1,12 +1,6 @@
 #include <stdio.h>
 #include <assert.h>
-#include "uthash/uthash.h"
 #include "jb_table.h"
-
-#define HASH_FIND_UINT32(head, findint, out) \
-    HASH_FIND(hh, head, findint, sizeof(uint32_t), out)
-#define HASH_ADD_UINT32(head, intfield, add) \
-    HASH_ADD(hh, head, intfield, sizeof(uint32_t), add)
 
 jb_table_t *jb_table_new(void) {
     jb_table_t *jb_table = malloc(sizeof(jb_table_t));
@@ -63,7 +57,7 @@ uint16_t jb_table_count(jb_table_t *jb_table) {
     return HASH_COUNT(jb_table->jb);
 }
 
-void jb_table_foreach(jb_table_t *jb_table, void (*callback)(jb_t *t)) {
+void jb_table_foreach(jb_table_t *jb_table, void (*callback)(jb_t *)) {
     jb_t *jb, *tmp;
     HASH_ITER(hh, jb_table->jb, jb, tmp) {
         callback(jb);
