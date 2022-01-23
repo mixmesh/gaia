@@ -61,7 +61,7 @@ negotiate_with_peer(MyPeerId, {IpAddress, RestPort}, LocalPort) ->
            [{body_format, binary}]) of
         {ok, {{_Version, 200, _ReasonPhrase}, _Headers, ResponseBody}} ->
             try
-                case jsone:try_decode(ResponseBody) of
+                case jsone:try_decode(ResponseBody, [{object_format, proplist}]) of
                     {ok, [{<<"port">>, Port}], _} when is_integer(Port) ->
                         {ok, Port};
                     {ok, JsonValue, _} ->
