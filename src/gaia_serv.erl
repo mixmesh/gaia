@@ -520,6 +520,7 @@ use_source_group(#gaia_group{talks_to = TalksTo}) ->
 update_network_receiver(Db, Sources) ->
     ?LOG_INFO(#{module => ?MODULE, sources => Sources}),
     LocalPorts = gaia_nif:set_sources(Sources),
+    ?LOG_INFO(#{module => ?MODULE, local_ports => LocalPorts}),
     lists:foreach(
       fun({{peer, PeerId}, NewLocalPort}) ->
               case db_get_peer_by_id(Db, PeerId) of
@@ -575,7 +576,7 @@ update_network_sender(Db, NetworkSenderPid, Destinations) ->
           end, [], Destinations),
     ?LOG_INFO(#{module => ?MODULE,
                 destination_addresses => DestinationAddresses}),
-    gaia_network_sender_serv:set_destinations(
+    gaia_network_sender_serv:set_destination_addresses(
       NetworkSenderPid, DestinationAddresses).
 
 change_peer(Db, NewNodisAddress, Info) ->

@@ -1,5 +1,5 @@
 -module(gaia_network_sender_serv).
--export([start_link/3, stop/1, set_dest_addresses/2]).
+-export([start_link/3, stop/1, set_destination_addresses/2]).
 -export([message_handler/1]).
 -include_lib("apptools/include/serv.hrl").
 -include_lib("apptools/include/bits.hrl").
@@ -27,11 +27,11 @@ stop(Pid) ->
     serv:call(Pid, stop).
 
 %%
-%% Exported: set_dest_addresses
+%% Exported: set_destination_addresses
 %%
 
-set_dest_addresses(Pid, DestAddresses) ->
-    serv:cast(Pid, {set_dest_addresses, DestAddresses}).
+set_destination_addresses(Pid, DestinationAddresses) ->
+    serv:cast(Pid, {set_destination_addresses, DestinationAddresses}).
 
 %%
 %% Server
@@ -48,7 +48,7 @@ init(Parent, GaiaId, UseCallback, OpusEnabled) ->
                    socket => Socket,
                    seqnum => 1,
                    flags => set_flags([{opus_enabled, OpusEnabled}]),
-                   dest_addresses => [],
+                   destination_addresses => [],
                    subscription => false}};
         {error, Reason} ->
             {error, Reason}
@@ -79,35 +79,38 @@ message_handler(#{parent := Parent,
                   socket := Socket,
                   seqnum := Seqnum,
                   flags := Flags,
-                  dest_addresses := DestAddresses} = State) ->
+                  destination_addresses := DestinationAddresses} = State) ->
     receive
         {call, From, stop} ->
             ?LOG_DEBUG(#{module => ?MODULE, call => stop}),
             {stop, From, ok};
-        {cast, {set_dest_addresses, NewDestAddresses}} ->
+        {cast, {set_destination_addresses, NewDestinationAddresses}} ->
             ?LOG_DEBUG(#{module => ?MODULE,
-                         call => {set_dest_addresses, NewDestAddresses}}),
-            case {DestAddresses, lists:sort(NewDestAddresses)} of
-                {_, DestAddresses} ->
+                         call => {set_destination_addresses,
+                                  NewDestinationAddresses}}),
+            case {DestinationAddresses, lists:sort(NewDestinationAddresses)} of
+                {_, DestinationAddresses} ->
                     noreply;
                 {_, []} ->
                     _ = gaia_audio_source_serv:unsubscribe(AudioSourcePid),
-                    {noreply, State#{dest_addresses => [],
+                    {noreply, State#{destination_addresses => [],
                                      subscription => false}};
-                {_, SortedNewDestAddresses} when UseCallback ->
+                {_, SortedDestinationAddresses} when UseCallback ->
                     Callback = create_callback(
                                  GaiaId, OpusEncoder, Socket, Seqnum, Flags,
-                                 SortedNewDestAddresses),
+                                 SortedDestinationAddresses),
                     ok = gaia_audio_source_serv:subscribe(
                            AudioSourcePid, Callback),
-                    {noreply, State#{dest_addresses => SortedNewDestAddresses}};
-                {_, SortedNewDestAddresses}  ->
+                    {noreply, State#{destination_addresses =>
+                                         SortedDestinationAddresses}};
+                {_, SortedDestinationAddresses}  ->
                     ok = gaia_audio_source_serv:subscribe(AudioSourcePid),
-                    {noreply, State#{dest_addresses => SortedNewDestAddresses}}
+                    {noreply, State#{destination_addresses =>
+                                         SortedDestinationAddresses}}
             end;
         {subscription_packet, Packet} ->
             ok = send_packet(GaiaId, OpusEncoder, Socket, Seqnum, Flags,
-                             DestAddresses, Packet),
+                             DestinationAddresses, Packet),
             {noreply, State#{seqnum => Seqnum + 1}};
         {system, From, Request} ->
             ?LOG_DEBUG(#{module => ?MODULE, system => Request}),
@@ -129,28 +132,29 @@ set_flags([{opus_enabled, true}|Rest], Flags) ->
 set_flags([_|Rest], Flags) ->
     set_flags(Rest, Flags).
 
-create_callback(GaiaId, OpusEncoder, Socket, Seqnum, Flags, DestAddresses) ->
+create_callback(GaiaId, OpusEncoder, Socket, Seqnum, Flags,
+                DestinationAddresses) ->
     fun(Packet) when is_binary(Packet) ->
             ok = send_packet(GaiaId, OpusEncoder, Socket, Seqnum, Flags,
-                             DestAddresses, Packet),
+                             DestinationAddresses, Packet),
             create_callback(GaiaId, OpusEncoder, Socket, Seqnum + 1, Flags,
-                            DestAddresses);
+                            DestinationAddresses);
        (OldCallback) when is_function(OldCallback) ->
             OldSeqnum = OldCallback(seqnum),
             create_callback(GaiaId, OpusEncoder, Socket, OldSeqnum, Flags,
-                            DestAddresses);
+                            DestinationAddresses);
        (seqnum) ->
             Seqnum
     end.
 
 send_packet(GaiaId, {opus_encoder, OpusEncoder}, Socket, Seqnum, Flags,
-            DestAddresses, Packet) ->
+            DestinationAddresses, Packet) ->
     {ok, EncodedPacket} =
         opus:encode(OpusEncoder, ?OPUS_MAX_PACKET_LEN_IN_BYTES, ?CHANNELS,
                     ?SAMPLE_SIZE_IN_BYTES, Packet),
-    send_packet(GaiaId, opus_encoded, Socket, Seqnum, Flags, DestAddresses,
-                EncodedPacket);
-send_packet(GaiaId, _OpusEncoder, Socket, Seqnum, Flags, DestAddresses,
+    send_packet(GaiaId, opus_encoded, Socket, Seqnum, Flags,
+                DestinationAddresses, EncodedPacket);
+send_packet(GaiaId, _OpusEncoder, Socket, Seqnum, Flags, DestinationAddresses,
             Packet) ->
     Timestamp = erlang:system_time(microsecond) -
         ?SECONDS_BETWEEN_1970_and_2021 * 1000000,
@@ -172,4 +176,4 @@ send_packet(GaiaId, _OpusEncoder, Socket, Seqnum, Flags, DestAddresses,
 %                                   reason => file:format_error(Reason)}),
                       ok
               end
-      end, DestAddresses).
+      end, DestinationAddresses).
