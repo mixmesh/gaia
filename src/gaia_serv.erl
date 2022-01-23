@@ -464,12 +464,13 @@ get_destinations(Db, _Status, Wildcard) ->
               end
       end, [], Db).
 
-use_destination_peer(_Wildcard, #gaia_peer{nodis_address = undefined}) ->
-    false;
 use_destination_peer({UsesWildcard, _WildcardPeer},
                      #gaia_peer{ephemeral = Ephemeral,
-                                talks_to = TalksTo}) ->
+                                talks_to = TalksTo,
+                                nodis_address = NodisAddress}) ->
     if
+        NodisAddress == undefined ->
+            false;
         UsesWildcard andalso Ephemeral ->
             true;
         TalksTo ->
@@ -522,18 +523,19 @@ get_sources(Db, Status, Wildcard) ->
               end
       end, [], Db).
 
-use_source_peer(_Wildcard, #gaia_peer{nodis_address = undefined}) ->
-    {false, undefined};
 use_source_peer({UsesWildcard, WildcardPeer},
                 #gaia_peer{mode = Mode,
                            ephemeral = Ephemeral,
                            options = Options,
                            talks_to = TalksTo,
+                           nodis_address = NodisAddress,
                            local_port = LocalPort,
                            remote_port = RemotePort}) ->
     if
         LocalPort == undefined andalso RemotePort /= undefined ->
             {true, Options};
+        NodisAddress == undefined ->
+            {false, undefined};
         UsesWildcard andalso Ephemeral ->
             {true, WildcardPeer#gaia_peer.options};
         TalksTo ->
