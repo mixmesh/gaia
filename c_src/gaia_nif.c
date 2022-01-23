@@ -12,7 +12,7 @@
 
 #define ATOM(name) atm_##name
 #define DECL_ATOM(name) ERL_NIF_TERM atm_##name = 0
-#define LOAD_ATOM(name) \
+#define LOAD_ATOM(name)                         \
     do { \
         if (!enif_make_existing_atom(env, #name, &atm_##name, ERL_NIF_LATIN1)) \
             return -1; \
@@ -287,11 +287,12 @@ static ERL_NIF_TERM _set_sources(ErlNifEnv* env, int argc,
                         return enif_make_badarg(env);
                     }
                     if (arity == 2) { // peer
-                        // Figure out local port number
+                        // Figure out allocated port number
                         struct sockaddr_in local_addr;
-                        socklen_t local_addrlen;
+                        socklen_t local_addrlen = sizeof(local_addr);
                         if (getsockname(sockfd, (struct sockaddr*)&local_addr,
                                         &local_addrlen) == -1) {
+                            perror("getsockname: No port allocated for socket");
                             close(sockfd);
                             source_table_release_mutex(source_table);
                             return enif_make_badarg(env);

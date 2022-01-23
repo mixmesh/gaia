@@ -215,6 +215,7 @@ initial_message_handler(State) ->
     end.
 
 message_handler(#{parent := Parent,
+                  peer_id := MyPeerId,
                   db := Db,
                   status := Status,
                   muted := Muted,
@@ -230,15 +231,16 @@ message_handler(#{parent := Parent,
             {reply, From, Status};
         {call, From, {set_status, NewStatus}} ->
             ?LOG_DEBUG(#{module => ?MODULE, call => {set_status, Status}}),
-            ok = update_network(Db, NewStatus, Muted, NetworkSenderPid),
+            ok = update_network(MyPeerId, Db, NewStatus, Muted,
+                                NetworkSenderPid),
             {reply, From, ok, State#{status => NewStatus}};
         {call, From, mute} ->
             ?LOG_DEBUG(#{module => ?MODULE, call => mute}),
-            ok = update_network(Db, Status, Muted, NetworkSenderPid),
+            ok = update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid),
             {reply, From, ok, State#{muted => true}};
         {call, From, unmute} ->
             ?LOG_DEBUG(#{module => ?MODULE, call => unmute}),
-            ok = update_network(Db, Status, Muted, NetworkSenderPid),
+            ok = update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid),
             {reply, From, ok, State#{muted => false}};
         {call, From, {get_by_id, Id}} ->
             ?LOG_DEBUG(#{module => ?MODULE, call => {get_by_id, Id}}),
@@ -273,12 +275,14 @@ message_handler(#{parent := Parent,
                 [Peer] when is_record(Peer, gaia_peer) ->
                     UpdatedPeer = Peer#gaia_peer{talks_to = true},
                     true = db_insert(Db, UpdatedPeer),
-                    ok = update_network(Db, Status, Muted, NetworkSenderPid),
+                    ok = update_network(MyPeerId, Db, Status, Muted,
+                                        NetworkSenderPid),
                     {reply, From, ok};
                 [Group] when is_record(Group, gaia_group) ->
                     UpdatedGroup = Group#gaia_group{talks_to = true},
                     true = db_insert(Db, UpdatedGroup),
-                    ok = update_network(Db, Status, Muted, NetworkSenderPid),
+                    ok = update_network(MyPeerId, Db, Status, Muted,
+                                        NetworkSenderPid),
                     {reply, From, ok};
                 [] ->
                     case IdOrName of
@@ -299,7 +303,7 @@ message_handler(#{parent := Parent,
                  (_, Acc) ->
                       Acc
               end, undefined, Db),
-            ok = update_network(Db, Status, Muted, NetworkSenderPid),
+            ok = update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid),
             {reply, From, ok};
         {call, From, {stop_talking_to, IdOrName}} ->
             case db_get_by(Db, IdOrName) of
@@ -310,12 +314,14 @@ message_handler(#{parent := Parent,
                 [Peer] when is_record(Peer, gaia_peer) ->
                     UpdatedPeer = Peer#gaia_peer{talks_to = false},
                     true = db_insert(Db, UpdatedPeer),
-                    ok = update_network(Db, Status, Muted, NetworkSenderPid),
+                    ok = update_network(MyPeerId, Db, Status, Muted,
+                                        NetworkSenderPid),
                     {reply, From, ok};
                 [Group] when is_record(Group, gaia_group) ->
                     UpdatedGroup = Group#gaia_group{talks_to = false},
                     true = db_insert(Db, UpdatedGroup),
-                    ok = update_network(Db, Status, Muted, NetworkSenderPid),
+                    ok = update_network(MyPeerId, Db, Status, Muted,
+                                        NetworkSenderPid),
                     {reply, From, ok};
                 [] ->
                     case IdOrName of
@@ -331,7 +337,8 @@ message_handler(#{parent := Parent,
                     true = db_insert(Db, Peer#gaia_peer{
                                            remote_port = RemotePort}),
                     ok = update_network(
-                           Db, Status, Muted, NetworkSenderPid, false),
+                           MyPeerId, Db, Status, Muted, NetworkSenderPid,
+                           false),
                     case db_get_peer_by_id(Db, PeerId) of
                         [#gaia_peer{local_port = undefined}] ->
                             {reply, From, {error, not_available}};
@@ -344,7 +351,7 @@ message_handler(#{parent := Parent,
         config_update ->
             ?LOG_DEBUG(#{module => ?MODULE, message => config_update}),
             true = sync_db(Db),
-            ok = update_network(Db, Status, Muted, NetworkSenderPid),
+            ok = update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid),
             noreply;
         {nodis, NodisSubscription, {pending, NodisAddress}} ->
             ?LOG_DEBUG(#{module => ?MODULE, nodis => {pending, NodisAddress}}),
@@ -357,7 +364,8 @@ message_handler(#{parent := Parent,
                          nodis => {change, NodisAddress, Info}}),
             case change_peer(Db, NodisAddress, Info) of
                 ok ->
-                    ok = update_network(Db, Status, Muted, NetworkSenderPid),
+                    ok = update_network(MyPeerId, Db, Status, Muted,
+                                        NetworkSenderPid),
                     noreply;
                 {error, Reason} ->
                     ?LOG_ERROR(#{module => ?MODULE, change_peer => Reason}),
@@ -370,7 +378,8 @@ message_handler(#{parent := Parent,
             ?LOG_DEBUG(#{module => ?MODULE, nodis => {down, NodisAddress}}),
             case down_peer(Db, NodisAddress) of
                 ok ->
-                    ok = update_network(Db, Status, Muted, NetworkSenderPid),
+                    ok = update_network(MyPeerId, Db, Status, Muted,
+                                        NetworkSenderPid),
                     noreply;
                 {error, Reason} ->
                     ?LOG_ERROR(#{module => ?MODULE, change_peer => Reason}),
@@ -386,20 +395,21 @@ message_handler(#{parent := Parent,
             noreply
     end.
 
-update_network(Db, Status, Muted, NetworkSenderPid) ->
-    update_network(Db, Status, Muted, NetworkSenderPid, _Negotiate = true).
+update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid) ->
+    update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid,
+                   _Negotiate = true).
 
-update_network(Db, Status, Muted, NetworkSenderPid, Negotiate) ->
+update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid, Negotiate) ->
     case db_get_peer_by_name(Db, <<"*">>) of
         [#gaia_peer{talks_to = true} = WildcardPeer] ->
-            update_network(Db, Status, Muted, NetworkSenderPid,
+            update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid,
                            Negotiate, {true, WildcardPeer});
         _ ->
-            update_network(Db, Status, Muted, NetworkSenderPid,
+            update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid,
                            Negotiate, {false, undefined})
     end.
 
-update_network(Db, Status, Muted, NetworkSenderPid, Negotiate, Wildcard) ->
+update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid, Negotiate, Wildcard) ->
     Destinations =
         case Muted of
             true ->
@@ -411,7 +421,8 @@ update_network(Db, Status, Muted, NetworkSenderPid, Negotiate, Wildcard) ->
     ok = update_network_receiver(Db, Sources),
     case Negotiate of
         true ->
-            ok = negotiate_with_peers(Db, lists:usort(Destinations ++ Sources));
+            ok = negotiate_with_peers(MyPeerId, Db,
+                                      lists:usort(Destinations ++ Sources));
         false ->
             skip_negotation
     end,
@@ -534,26 +545,25 @@ update_network_receiver(Db, Sources) ->
                   db_get_group_by_id(Db, GroupId)
       end, LocalPorts).
 
-negotiate_with_peers(_Db, []) ->
+negotiate_with_peers(_MyPeerId, _Db, []) ->
     ok;
-negotiate_with_peers(Db, [{group, _GroupId, _GroupPort}|Rest]) ->
-    negotiate_with_peers(Db, Rest);
-negotiate_with_peers(Db, [{peer, PeerId}|Rest]) ->
+negotiate_with_peers(MyPeerId, Db, [{group, _GroupId, _GroupPort}|Rest]) ->
+    negotiate_with_peers(MyPeerId, Db, Rest);
+negotiate_with_peers(MyPeerId, Db, [{peer, PeerId}|Rest]) ->
     [#gaia_peer{nodis_address = {IpAddress, _SyncPort},
                 rest_port = RestPort,
                 local_port = LocalPort} = Peer] =
         db_get_peer_by_id(Db, PeerId),
-    case gaia_rest_service:negotiate_with_peer(PeerId, {IpAddress, RestPort},
+    case gaia_rest_service:negotiate_with_peer(MyPeerId, {IpAddress, RestPort},
                                                LocalPort) of
         {ok, NewRemotePort} ->
             true = db_insert(Db, Peer#gaia_peer{remote_port = NewRemotePort}),
-            negotiate_with_peers(Db, Rest);
+            negotiate_with_peers(MyPeerId, Db, Rest);
         {error, Reason} ->
             ?LOG_ERROR(#{module => ?MODULE,
                          {rest_service_client, negotiate} => Reason}),
-            negotiate_with_peers(Db, Rest)
+            negotiate_with_peers(MyPeerId, Db, Rest)
     end.
-
 update_network_sender(Db, NetworkSenderPid, Destinations) ->
     DestinationAddresses =
         lists:foldl(

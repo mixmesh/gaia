@@ -43,7 +43,7 @@ start_link(PeerId, RestPort) ->
            {bad_response, Result :: term()} |
            {http_error, Reason :: term()}}.
 
-negotiate_with_peer(PeerId, {IpAddress, RestPort}, LocalPort) ->
+negotiate_with_peer(MyPeerId, {IpAddress, RestPort}, LocalPort) ->
     Url = lists:flatten(io_lib:format("http://~s:~w/negotiate",
                                       [inet:ntoa(IpAddress), RestPort])),
     RequestBody = encode_json([{<<"port">>, LocalPort}]),
@@ -52,7 +52,7 @@ negotiate_with_peer(PeerId, {IpAddress, RestPort}, LocalPort) ->
     case httpc:request(
            post,
            {Url, [{"connection", "close"},
-                  {"gaia-peer-id", ?i2l(PeerId)},
+                  {"gaia-peer-id", ?i2l(MyPeerId)},
                   {"gaia-nonce", Nonce},
                   {"gaia-hmac", HMAC}],
             "application/json",
