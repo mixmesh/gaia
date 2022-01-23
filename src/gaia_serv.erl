@@ -342,8 +342,8 @@ message_handler(#{parent := Parent,
                     case db_get_peer_by_id(Db, PeerId) of
                         [#gaia_peer{local_port = undefined}] ->
                             {reply, From, {error, not_available}};
-                        [_] ->
-                            {reply, From, ok}
+                        [#gaia_peer{local_port = LocalPort}] ->
+                            {reply, From, {ok, LocalPort}}
                     end;
                 [] ->
                     {reply, From, {error, no_such_peer_id}}
