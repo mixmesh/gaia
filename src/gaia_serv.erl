@@ -267,6 +267,8 @@ message_handler(#{parent := Parent,
                   end, [], Db),
             {reply, From, PeersAndGroups};
         {call, From, {start_talking_to, IdOrName}} ->
+            ?LOG_DEBUG(#{module => ?MODULE,
+                         call => {start_talking_to, IdOrName}}),
             case db_get_by(Db, IdOrName) of
                 [#gaia_peer{talks_to = true}] ->
                     {reply, From, {error, already_talking_to}};
@@ -293,6 +295,7 @@ message_handler(#{parent := Parent,
                     end
             end;
         {call, From, {stop_talking_to, all}} ->
+            ?LOG_DEBUG(#{module => ?MODULE, call => {stop_talking_to, all}}),
             db_foldl(
               fun(#gaia_peer{talks_to = true} = Peer, Acc) ->
                       true = db_insert(Db, Peer#gaia_peer{talks_to = false}),
@@ -306,6 +309,8 @@ message_handler(#{parent := Parent,
             ok = update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid),
             {reply, From, ok};
         {call, From, {stop_talking_to, IdOrName}} ->
+            ?LOG_DEBUG(#{module => ?MODULE,
+                         call => {stop_talking_to, IdOrName}}),
             case db_get_by(Db, IdOrName) of
                 [#gaia_peer{talks_to = false}] ->
                     {reply, From, {error, not_talking_to}};
@@ -332,13 +337,22 @@ message_handler(#{parent := Parent,
                     end
             end;
         {call, From, {peer_wants_to_negotiate, PeerId, RemotePort}} ->
+            ?LOG_DEBUG(#{module => ?MODULE,
+                         call => {peer_wants_to_negotiate, PeerId,
+                                  RemotePort}}),
             case db_get_peer_by_id(Db, PeerId) of
                 [Peer] ->
                     true = db_insert(Db, Peer#gaia_peer{
                                            remote_port = RemotePort}),
+
+                    %% HERE
                     ok = update_network(
                            MyPeerId, Db, Status, Muted, NetworkSenderPid,
                            false),
+
+
+
+
                     case db_get_peer_by_id(Db, PeerId) of
                         [#gaia_peer{local_port = undefined}] ->
                             {reply, From, {error, not_available}};
@@ -472,6 +486,9 @@ get_sources(Db, Status, Wildcard) ->
       fun(#gaia_peer{name = <<"*">>}, Acc) ->
               Acc;
          (#gaia_peer{id = PeerId} = Peer, Acc) ->
+
+              ?LOG_INFO(#{bajjjjjjjjjjjjjjjjjjjs => Peer}),
+
               case use_source_peer(Wildcard, Peer) of
                   {true, Options} when Status == busy ->
                       case lists:member(override_busy, Options) of
@@ -481,8 +498,10 @@ get_sources(Db, Status, Wildcard) ->
                               Acc
                       end;
                   {true, _Options} ->
+                      ?LOG_INFO(#{bajjjjjjjjjjjjjjjjjjjs2 => yesysysysy}),
                       [{peer, PeerId}|Acc];
                   {false, _Options} ->
+                      ?LOG_INFO(#{bajjjjjjjjjjjjjjjjjjjs2 => nooooo}),
                       Acc
               end;
          (#gaia_group{id = GroupId,
