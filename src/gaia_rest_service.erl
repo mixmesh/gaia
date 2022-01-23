@@ -127,7 +127,7 @@ handle_http_post(Socket, Request, Body, _Options) ->
                       {error, bad_request, "Invalid JSON format"});
                 [{<<"port">>, Port}] when is_integer(Port) ->
                     rest_util:response(
-                      Socket, Request, negotiate_post(Request, Port));
+                      Socket, Request, negotiate(Request, Port));
                 _ ->
                     ?LOG_ERROR(#{module => ?MODULE,
                                  invalid_request_body => Body}),
@@ -140,9 +140,9 @@ handle_http_post(Socket, Request, Body, _Options) ->
 	    rest_util:response(Socket, Request, {error, not_found})
     end.
 
-negotiate_post(Request, RemotePort) ->
-    case get_gaia_headers(Request) of
-        {ok, PeerId, _Nonce, _HMAC} ->
+negotiate(#http_request{headers = #http_chdr{other = Headers}}, RemotePort) ->
+    case get_gaia_headers(Headers) of
+        {PeerId, _Nonce, _HMAC} when PeerId /= not_set ->
             case gaia_serv:peer_wants_to_negotiate(PeerId, RemotePort) of
                 {ok, LocalPort} ->
                     {ok, {format, [{<<"port">>, LocalPort}]}};
@@ -151,14 +151,21 @@ negotiate_post(Request, RemotePort) ->
                                  peer_wants_to_negotiate => Reason}),
                     {error, no_access}
             end;
-        missing_headers ->
+        _ ->
             {error, {bad_request, "Missing GAIA HTTP headers"}}
     end.
 
-get_gaia_headers(_Request) ->
-    io:format("BAJS: ~p\n", [_Request]),
+get_gaia_headers(Headers) ->
+    get_gaia_headers(Headers, {not_found, not_found, not_found}).
 
-
-
-
-    'FIXME'.
+get_gaia_headers([], Acc) ->
+    Acc;
+get_gaia_headers([{"Gaia-Peer-Id", PeerId}|Rest], {_, Nonce, HMAC}) ->
+    try
+        get_gaia_headers(Rest, {?l2i(PeerId), Nonce, HMAC})
+    catch
+        error:badarg ->
+            invalid_peer_id
+    end;
+get_gaia_headers([_|Rest], Acc) ->
+    get_gaia_headers(Rest, Acc).
