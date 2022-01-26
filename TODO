@@ -1,6 +1,3 @@
-* remove all gaia_id
-* implement config:insert/1 (kolla att mount points är lite mera lättviktiga)
-
 * write gaia_command_serv.erl
 
   * start talking to peer or wildcard peer (ask or direct)

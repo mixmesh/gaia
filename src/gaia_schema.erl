@@ -68,6 +68,10 @@ get() ->
                    fun('override-busy') -> override_busy;
                       (_) -> throw({failed, "Must be override-busy"})
                    end,
+               untransform =
+                   fun(override_busy) ->
+                           'override-busy'
+                   end,
                reloadable = true}]}]]},
        {groups,
         [[{name,
@@ -99,6 +103,10 @@ get() ->
                transform =
                    fun('override-busy') -> override_busy;
                       (_) -> throw({failed, "Must be override-busy"})
+                   end,
+               untransform =
+                   fun(override_busy) ->
+                           'override-busy'
                    end,
                reloadable = true}]},
           {port,
