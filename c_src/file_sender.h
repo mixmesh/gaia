@@ -6,7 +6,7 @@
 #include "gaia_utils.h"
 
 typedef struct {
-    uint32_t gaia_id;
+    uint32_t peer_id;
     char filename[128];
     uint8_t naddr_ports;
     addr_port_t *addr_ports;

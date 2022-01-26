@@ -12,10 +12,10 @@
 %% Exported: start_link
 %%
 
-start_link(GaiaId, UseCallback, OpusEnabled) ->
+start_link(PeerId, UseCallback, OpusEnabled) ->
     ?spawn_server(
        fun(Parent) ->
-               init(Parent, GaiaId, UseCallback, OpusEnabled)
+               init(Parent, PeerId, UseCallback, OpusEnabled)
        end,
        fun initial_message_handler/1).
 
@@ -37,12 +37,12 @@ set_destination_addresses(Pid, DestinationAddresses) ->
 %% Server
 %%
 
-init(Parent, GaiaId, UseCallback, OpusEnabled) ->
+init(Parent, PeerId, UseCallback, OpusEnabled) ->
     case gen_udp:open(0, [{mode, binary}, {active, false}]) of
         {ok, Socket} ->
             ?LOG_INFO("Gaia network sender server has been started"),
             {ok, #{parent => Parent,
-                   gaia_id => GaiaId,
+                   peer_id => PeerId,
                    use_callback => UseCallback,
                    opus_encoder => create_opus_encoder(OpusEnabled),
                    socket => Socket,
@@ -73,7 +73,7 @@ initial_message_handler(State) ->
 
 message_handler(#{parent := Parent,
                   audio_source_pid := AudioSourcePid,
-                  gaia_id := GaiaId,
+                  peer_id := PeerId,
                   use_callback := UseCallback,
                   opus_encoder := OpusEncoder,
                   socket := Socket,
@@ -97,7 +97,7 @@ message_handler(#{parent := Parent,
                                      subscription => false}};
                 {_, SortedDestinationAddresses} when UseCallback ->
                     Callback = create_callback(
-                                 GaiaId, OpusEncoder, Socket, Seqnum, Flags,
+                                 PeerId, OpusEncoder, Socket, Seqnum, Flags,
                                  SortedDestinationAddresses),
                     ok = gaia_audio_source_serv:subscribe(
                            AudioSourcePid, Callback),
@@ -109,7 +109,7 @@ message_handler(#{parent := Parent,
                                          SortedDestinationAddresses}}
             end;
         {subscription_packet, Packet} ->
-            ok = send_packet(GaiaId, OpusEncoder, Socket, Seqnum, Flags,
+            ok = send_packet(PeerId, OpusEncoder, Socket, Seqnum, Flags,
                              DestinationAddresses, Packet),
             {noreply, State#{seqnum => Seqnum + 1}};
         {system, From, Request} ->
@@ -132,34 +132,34 @@ set_flags([{opus_enabled, true}|Rest], Flags) ->
 set_flags([_|Rest], Flags) ->
     set_flags(Rest, Flags).
 
-create_callback(GaiaId, OpusEncoder, Socket, Seqnum, Flags,
+create_callback(PeerId, OpusEncoder, Socket, Seqnum, Flags,
                 DestinationAddresses) ->
     fun(Packet) when is_binary(Packet) ->
-            ok = send_packet(GaiaId, OpusEncoder, Socket, Seqnum, Flags,
+            ok = send_packet(PeerId, OpusEncoder, Socket, Seqnum, Flags,
                              DestinationAddresses, Packet),
-            create_callback(GaiaId, OpusEncoder, Socket, Seqnum + 1, Flags,
+            create_callback(PeerId, OpusEncoder, Socket, Seqnum + 1, Flags,
                             DestinationAddresses);
        (OldCallback) when is_function(OldCallback) ->
             OldSeqnum = OldCallback(seqnum),
-            create_callback(GaiaId, OpusEncoder, Socket, OldSeqnum, Flags,
+            create_callback(PeerId, OpusEncoder, Socket, OldSeqnum, Flags,
                             DestinationAddresses);
        (seqnum) ->
             Seqnum
     end.
 
-send_packet(GaiaId, {opus_encoder, OpusEncoder}, Socket, Seqnum, Flags,
+send_packet(PeerId, {opus_encoder, OpusEncoder}, Socket, Seqnum, Flags,
             DestinationAddresses, Packet) ->
     {ok, EncodedPacket} =
         opus:encode(OpusEncoder, ?OPUS_MAX_PACKET_LEN_IN_BYTES, ?CHANNELS,
                     ?SAMPLE_SIZE_IN_BYTES, Packet),
-    send_packet(GaiaId, opus_encoded, Socket, Seqnum, Flags,
+    send_packet(PeerId, opus_encoded, Socket, Seqnum, Flags,
                 DestinationAddresses, EncodedPacket);
-send_packet(GaiaId, _OpusEncoder, Socket, Seqnum, Flags, DestinationAddresses,
+send_packet(PeerId, _OpusEncoder, Socket, Seqnum, Flags, DestinationAddresses,
             Packet) ->
     Timestamp = erlang:system_time(microsecond) -
         ?SECONDS_BETWEEN_1970_and_2021 * 1000000,
     PacketLen = size(Packet),
-    Buf = <<GaiaId:32/unsigned-integer,
+    Buf = <<PeerId:32/unsigned-integer,
             Timestamp:64/unsigned-integer,
             Seqnum:32/unsigned-integer,
             PacketLen:16/unsigned-integer,

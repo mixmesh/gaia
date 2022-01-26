@@ -142,14 +142,14 @@ int main (int argc, char *argv[]) {
         usage(argv);
     }
 
-    uint32_t gaia_id;
+    uint32_t peer_id;
     long value;
     if (string_to_long(argv[optind], &value) < 0) {
         usage(argv);
     }
-    gaia_id = value;
+    peer_id = value;
 
-    if (gaia_id == 0) {
+    if (peer_id == 0) {
         usage(argv);
     }
 
@@ -171,7 +171,7 @@ int main (int argc, char *argv[]) {
     if (!disable_network_sender) {
         sender_params = malloc(sizeof(network_sender_params_t));
         sender_params->pcm_name = capture_pcm_name;
-        sender_params->gaia_id = gaia_id;
+        sender_params->peer_id = peer_id;
         sender_params->naddr_ports = ndest_addr_ports;
         sender_params->addr_ports = dest_addr_ports;
         sender_params->opus_enabled = opus_enabled;

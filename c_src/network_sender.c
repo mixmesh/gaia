@@ -96,8 +96,8 @@ void *network_sender(void *arg) {
     uint8_t *udp_buf = malloc(udp_max_buf_size);
 
     // Add gaia-id to UDP buffer header
-    uint32_t gaia_id_nl = htonl(params->gaia_id);
-    memcpy(udp_buf, &gaia_id_nl, sizeof(uint32_t));
+    uint32_t peer_id_nl = htonl(params->peer_id);
+    memcpy(udp_buf, &peer_id_nl, sizeof(uint32_t));
 
     // Create a period buffer
     uint8_t period_buf[PERIOD_SIZE_IN_BYTES];

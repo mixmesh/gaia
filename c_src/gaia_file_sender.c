@@ -30,7 +30,7 @@ int main (int argc, char *argv[]) {
     addr_ports[0].port = DEFAULT_PORT;
     int naddr_ports = 0;
 
-    uint32_t gaia_id = 1;
+    uint32_t peer_id = 1;
 
     bool opus_enabled = false;
 
@@ -50,8 +50,8 @@ int main (int argc, char *argv[]) {
             if (string_to_long(optarg, &value) < 0) {
                 usage(argv);
             }
-            gaia_id = value;
-            if (gaia_id == 0) {
+            peer_id = value;
+            if (peer_id == 0) {
                 usage(argv);
             }
             break;
@@ -89,7 +89,7 @@ int main (int argc, char *argv[]) {
         }
 
         params[i] = malloc(sizeof(file_sender_params_t));
-        params[i]->gaia_id = gaia_id++;
+        params[i]->peer_id = peer_id++;
         memcpy(params[i]->filename, filename, strlen(filename) + 1);
         params[i]->naddr_ports = naddr_ports;
         params[i]->addr_ports = addr_ports;

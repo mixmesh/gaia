@@ -28,7 +28,7 @@
 
 -define(PLAYBACK_AUDIO, true).
 
-%% |gaia_id:4|timestamp:8|seqnum:4|packet_len:2|flags:1| = 19 bytes
+%% |peer_id:4|timestamp:8|seqnum:4|packet_len:2|flags:1| = 19 bytes
 -define(HEADER_SIZE, (4 + 8 + 4 + 2 + 1)).
 
 -define(OPUS_ENABLED_FLAG, (1 bsl 0)).
