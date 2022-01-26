@@ -646,8 +646,7 @@ accept_peer(MyPeerName, _Status = busy, #gaia_peer{name = PeerName} = Peer,
             end
     end;
 accept_peer(MyPeerName, _Status = available,
-            #gaia_peer{name = PeerName}  = Peer, Mode, _Options,
-            _TalksTo = true) ->
+            #gaia_peer{name = PeerName}  = Peer, Mode, _Options, _TalksTo) ->
     case Mode of
         ask ->
             ?LOG_INFO(#{accept_peer => MyPeerName,
@@ -658,7 +657,7 @@ accept_peer(MyPeerName, _Status = available,
             ?LOG_INFO(
                #{accept_peer => MyPeerName,
                  accept_direct => {direct, available, PeerName}}),
-            {yes, Peer}
+            {yes, Peer#gaia_peer{talks_to = true}}
     end;
 accept_peer(MyPeerName, Status, Peer, Mode, Options, TalksTo) ->
     ?LOG_INFO(#{accept_peer => MyPeerName,
