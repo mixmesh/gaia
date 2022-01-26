@@ -6,7 +6,7 @@
          currently_talking_to/0, start_talking_to/1, stop_talking_to/1,
          get_by_id/1, get_by_name/1,
          generate_artificial_id/1,
-         peer_wants_to_negotiate/2]).
+         handle_peer_negotiation/2]).
 -export([message_handler/1]).
 -export_type([name/0, peer_name/0, group_name/0,
               id/0, peer_id/0, group_id/0,
@@ -173,14 +173,14 @@ generate_artificial_id(PeerName) ->
     binary:decode_unsigned(binary:part(PeerName, {byte_size(PeerName), -4})).
 
 %%
-%% Exported: peer_wants_to_negotiate
+%% Exported: handle_peer_negotiation
 %%
 
--spec peer_wants_to_negotiate(peer_id(), inet:port_number()) ->
+-spec handle_peer_negotiation(peer_id(), inet:port_number()) ->
           {ok, inet:port_number()} | {error, no_such_peer_id | not_available}.
 
-peer_wants_to_negotiate(PeerId, RemotePort) ->
-    serv:call(?MODULE, {peer_wants_to_negotiate, PeerId, RemotePort}).
+handle_peer_negotiation(PeerId, RemotePort) ->
+    serv:call(?MODULE, {handle_peer_negotiation, PeerId, RemotePort}).
 
 %%
 %% Server
@@ -216,6 +216,7 @@ initial_message_handler(State) ->
 
 message_handler(#{parent := Parent,
                   peer_id := MyPeerId,
+                  peer_name := MyPeerName,
                   db := Db,
                   status := Status,
                   muted := Muted,
@@ -336,28 +337,56 @@ message_handler(#{parent := Parent,
                             {reply, From, {error, no_such_id}}
                     end
             end;
-        {call, From, {peer_wants_to_negotiate, PeerId, RemotePort}} ->
-            ?LOG_DEBUG(#{module => ?MODULE,
-                         call => {peer_wants_to_negotiate, PeerId,
-                                  RemotePort}}),
+        {call, From, {handle_peer_negotiation, PeerId, RemotePort}} ->
+            ?LOG_DEBUG(
+               #{module => ?MODULE,
+                 call => {handle_peer_negotiation, PeerId, RemotePort}}),
             case db_get_peer_by_id(Db, PeerId) of
-                [Peer] ->
-                    true = db_insert(Db, Peer#gaia_peer{
-                                           remote_port = RemotePort}),
-
-                    %% HERE
-                    ok = update_network(
-                           MyPeerId, Db, Status, Muted, NetworkSenderPid,
-                           false),
-
-
-
-
-                    case db_get_peer_by_id(Db, PeerId) of
-                        [#gaia_peer{local_port = undefined}] ->
+                [#gaia_peer{name = PeerName,
+                            mode = Mode,
+                            options = Options,
+                            talks_to = TalksTo,
+                            local_port = LocalPort,
+                            remote_port = RemotePort} = Peer] ->
+                    AcceptPeer =
+                        case accept_peer(MyPeerName, Status, Peer, Mode,
+                                         Options, TalksTo) of
+                            no ->
+                                case db_get_peer_by_name(Db, <<"*">>) of
+                                    [#gaia_peer{mode = WildcardMode,
+                                                options = WildcardOptions,
+                                                talks_to = true}] ->
+                                        accept_peer(
+                                          MyPeerName, Status, Peer,
+                                          WildcardMode, WildcardOptions, true);
+                                    _ ->
+                                        no
+                                end;
+                            Yes ->
+                                Yes
+                        end,
+                    case AcceptPeer of
+                        no ->
                             {reply, From, {error, not_available}};
-                        [#gaia_peer{local_port = LocalPort}] ->
-                            {reply, From, {ok, LocalPort}}
+                        {yes, UpdatedPeer} ->
+                            true = db_insert(Db, UpdatedPeer#gaia_peer{
+                                                   remote_port = RemotePort}),
+                            ok = update_network(
+                                   MyPeerId, Db, Status, Muted,
+                                   NetworkSenderPid, false),
+                            case db_get_peer_by_id(Db, PeerId) of
+                                [#gaia_peer{local_port = undefined}] ->
+                                    ?LOG_INFO(
+                                       #{peer_negotiation_failed =>
+                                             {MyPeerName, PeerName}}),
+                                    {reply, From, {error, not_available}};
+                                [#gaia_peer{local_port = LocalPort}] ->
+                                    ?LOG_INFO(
+                                       #{peer_negotiation_succeeded =>
+                                             {MyPeerName, PeerName},
+                                         local_port => LocalPort}),
+                                    {reply, From, {ok, LocalPort}}
+                            end
                     end;
                 [] ->
                     {reply, From, {error, no_such_peer_id}}
@@ -409,29 +438,34 @@ message_handler(#{parent := Parent,
             noreply
     end.
 
+%%
+%% Update network
+%%
+
 update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid) ->
     update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid,
                    _Negotiate = true).
 
 update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid, Negotiate) ->
     case db_get_peer_by_name(Db, <<"*">>) of
-        [#gaia_peer{talks_to = true} = WildcardPeer] ->
+        [#gaia_peer{talks_to = true}] ->
             update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid,
-                           Negotiate, {true, WildcardPeer});
+                           Negotiate, _WildcardActivated = true);
         _ ->
             update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid,
-                           Negotiate, {false, undefined})
+                           Negotiate, _WildcardActivated = false)
     end.
 
-update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid, Negotiate, Wildcard) ->
+update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid, Negotiate,
+               WildcardActivated) ->
     Destinations =
         case Muted of
             true ->
                 [];
             false ->
-                get_destinations(Db, Status, Wildcard)
+                get_destinations(Db, Status, WildcardActivated)
         end,
-    Sources = get_sources(Db, Status, Wildcard),
+    Sources = get_sources(Db, Status, WildcardActivated),
     ok = update_network_receiver(Db, Sources),
     case Negotiate of
         true ->
@@ -442,112 +476,69 @@ update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid, Negotiate, Wildcar
     end,
     update_network_sender(Db, NetworkSenderPid, Destinations).
 
-get_destinations(_Db, busy, _Wildcard) ->
+get_destinations(_Db, busy, _WildcardActivated) ->
     [];
-get_destinations(Db, _Status, Wildcard) ->
+get_destinations(Db, _Status, WildcardActivated) ->
     db_foldl(
       fun(#gaia_peer{name = <<"*">>}, Acc) ->
               Acc;
-         (#gaia_peer{id = PeerId} = Peer, Acc) ->
-              case use_destination_peer(Wildcard, Peer) of
-                  true ->
+         (#gaia_peer{id = PeerId,
+                     ephemeral = Ephemeral,
+                     talks_to = TalksTo,
+                     nodis_address = NodisAddress}, Acc) ->
+              if
+                  NodisAddress == undefined ->
+                      Acc;
+                  TalksTo orelse (WildcardActivated andalso Ephemeral) ->
                       [{peer, PeerId}|Acc];
-                  false ->
-                      Acc
-              end;
-         (#gaia_group{id = GroupId, port = GroupPort} = Group, Acc) ->
-              case use_destination_group(Group) of
                   true ->
-                      [{group, GroupId, GroupPort}|Acc];
-                  false ->
-                      Acc
-              end
-      end, [], Db).
-
-use_destination_peer({UsesWildcard, _WildcardPeer},
-                     #gaia_peer{ephemeral = Ephemeral,
-                                talks_to = TalksTo,
-                                nodis_address = NodisAddress}) ->
-    if
-        NodisAddress == undefined ->
-            false;
-        UsesWildcard andalso Ephemeral ->
-            true;
-        TalksTo ->
-            true;
-        true ->
-            false
-    end.
-
-use_destination_group(#gaia_group{talks_to = TalksTo}) ->
-    TalksTo.
-
-get_sources(Db, Status, Wildcard) ->
-    db_foldl(
-      fun(#gaia_peer{name = <<"*">>}, Acc) ->
-              Acc;
-         (#gaia_peer{id = PeerId} = Peer, Acc) ->
-
-              ?LOG_INFO(#{bajjjjjjjjjjjjjjjjjjjs => Peer}),
-
-              case use_source_peer(Wildcard, Peer) of
-                  {true, Options} when Status == busy ->
-                      case lists:member(override_busy, Options) of
-                          true ->
-                              [{peer, PeerId}|Acc];
-                          false ->
-                              Acc
-                      end;
-                  {true, _Options} ->
-                      ?LOG_INFO(#{bajjjjjjjjjjjjjjjjjjjs2 => yesysysysy}),
-                      [{peer, PeerId}|Acc];
-                  {false, _Options} ->
-                      ?LOG_INFO(#{bajjjjjjjjjjjjjjjjjjjs2 => nooooo}),
                       Acc
               end;
          (#gaia_group{id = GroupId,
-                      options = Options,
-                      port = GroupPort} = Group, Acc) ->
-              case use_source_group(Group) of
-                  true when Status == busy ->
-                      case lists:member(override_busy, Options) of
-                          true ->
-                              [{group, GroupId, GroupPort}|Acc];
-                          false ->
-                              Acc
-                      end;
-                  true ->
+                      talks_to = TalksTo,
+                      port = GroupPort}, Acc) ->
+              if
+                  TalksTo ->
                       [{group, GroupId, GroupPort}|Acc];
-                  false ->
+                  true ->
                       Acc
               end
       end, [], Db).
 
-use_source_peer({UsesWildcard, WildcardPeer},
-                #gaia_peer{mode = Mode,
-                           ephemeral = Ephemeral,
-                           options = Options,
-                           talks_to = TalksTo,
-                           nodis_address = NodisAddress,
-                           local_port = LocalPort,
-                           remote_port = RemotePort}) ->
-    if
-        LocalPort == undefined andalso RemotePort /= undefined ->
-            {true, Options};
-        NodisAddress == undefined ->
-            {false, undefined};
-        UsesWildcard andalso Ephemeral ->
-            {true, WildcardPeer#gaia_peer.options};
-        TalksTo ->
-            {true, Options};
-        not TalksTo andalso (Mode == direct orelse Mode == ask) ->
-            {true, Options};
-        true ->
-            {false, undefined}
-    end.
-
-use_source_group(#gaia_group{talks_to = TalksTo}) ->
-    TalksTo.
+get_sources(_Db, busy, _WildcardActivated) ->
+    [];
+get_sources(Db, _Status, WildcardActivated) ->
+    db_foldl(
+      fun(#gaia_peer{name = <<"*">>}, Acc) ->
+              Acc;
+         (#gaia_peer{id = PeerId,
+                     ephemeral = Ephemeral,
+                     talks_to = TalksTo,
+                     nodis_address = NodisAddress,
+                     local_port = LocalPort,
+                     remote_port = RemotePort}, Acc) ->
+              if
+                  NodisAddress == undefined ->
+                      Acc;
+                  %% NOTE: This is very important for the half call peer
+                  %%       negotation
+                  LocalPort == undefined andalso RemotePort /= undefined ->
+                      [{peer, PeerId}|Acc];
+                  TalksTo orelse (WildcardActivated andalso Ephemeral) ->
+                      [{peer, PeerId}|Acc];
+                  true ->
+                      Acc
+              end;
+         (#gaia_group{id = GroupId,
+                      talks_to = TalksTo,
+                      port = GroupPort}, Acc) ->
+              if
+                  TalksTo ->
+                      [{group, GroupId, GroupPort}|Acc];
+                  true ->
+                      Acc
+              end
+      end, [], Db).
 
 update_network_receiver(Db, Sources) ->
     ?LOG_INFO(#{module => ?MODULE, sources => Sources}),
@@ -575,8 +566,8 @@ negotiate_with_peers(MyPeerId, Db, [{peer, PeerId}|Rest]) ->
                 rest_port = RestPort,
                 local_port = LocalPort} = Peer] =
         db_get_peer_by_id(Db, PeerId),
-    case gaia_rest_service:negotiate_with_peer(MyPeerId, {IpAddress, RestPort},
-                                               LocalPort) of
+    case gaia_rest_service:peer_negotiation(MyPeerId, {IpAddress, RestPort},
+                                            LocalPort) of
         {ok, NewRemotePort} ->
             true = db_insert(Db, Peer#gaia_peer{remote_port = NewRemotePort}),
             negotiate_with_peers(MyPeerId, Db, Rest);
@@ -585,6 +576,7 @@ negotiate_with_peers(MyPeerId, Db, [{peer, PeerId}|Rest]) ->
                          {rest_service_client, negotiate} => Reason}),
             negotiate_with_peers(MyPeerId, Db, Rest)
     end.
+
 update_network_sender(Db, NetworkSenderPid, Destinations) ->
     DestinationAddresses =
         lists:foldl(
@@ -610,6 +602,75 @@ update_network_sender(Db, NetworkSenderPid, Destinations) ->
     gaia_network_sender_serv:set_destination_addresses(
       NetworkSenderPid, DestinationAddresses).
 
+%%
+%% Peer negotiation
+%%
+
+accept_peer(MyPeerName, _Status, #gaia_peer{name = PeerName}, _Mode = ignore,
+            _Options, _TalksTo) ->
+    ?LOG_INFO(#{accept_peer => MyPeerName,
+                do_not_accept => {ignore, PeerName}}),
+    no;
+accept_peer(MyPeerName, _Status,
+            #gaia_peer{name = PeerName,  nodis_address = undefined}, _Mode,
+            _Options, _TalksTo) ->
+    ?LOG_INFO(#{accept_peer => MyPeerName,
+                do_not_accept => {no_nodis_address, PeerName}}),
+    no;
+accept_peer(MyPeerName, _Status = busy, #gaia_peer{name = PeerName} = Peer,
+            Mode, Options, _TalksTo = false) ->
+    case Mode of
+        ask ->
+            case lists:member(Options, override_busy) of
+                true ->
+                    ?LOG_INFO(#{accept_peer => MyPeerName,
+                                do_not_accept => {ask, busy, PeerName}}),
+                    ok = gaia_command_serv:ask(Peer),
+                    no;
+                false ->
+                    ?LOG_INFO(#{accept_peer => MyPeerName,
+                                do_not_accept => {ask, busy, PeerName}}),
+                    no
+            end;
+        direct ->
+            case lists:member(Options, override_busy) of
+                true ->
+                    ?LOG_INFO(
+                       #{accept_peer => MyPeerName,
+                         accept_direct =>
+                             {direct, busy, now_talks_to, PeerName}}),
+                    {yes, Peer#gaia_peer{talks_to = true}};
+                false ->
+                    ?LOG_INFO(#{accept_peer => MyPeerName,
+                                do_not_accept => {direct, busy, PeerName}}),
+                    no
+            end
+    end;
+accept_peer(MyPeerName, _Status = available,
+            #gaia_peer{name = PeerName}  = Peer, Mode, _Options,
+            _TalksTo = true) ->
+    case Mode of
+        ask ->
+            ?LOG_INFO(#{accept_peer => MyPeerName,
+                        do_not_accept => {ask, available, PeerName}}),
+            ok = gaia_command_serv:ask(Peer),
+            no;
+        direct ->
+            ?LOG_INFO(
+               #{accept_peer => MyPeerName,
+                 accept_direct => {direct, available, PeerName}}),
+            {yes, Peer}
+    end;
+accept_peer(MyPeerName, Status, Peer, Mode, Options, TalksTo) ->
+    ?LOG_INFO(#{accept_peer => MyPeerName,
+                do_not_accept =>
+                    {catch_all, Status, Peer, Mode, Options, TalksTo}}),
+    no.
+
+%%
+%% Nodis event management
+%%
+
 change_peer(Db, NewNodisAddress, Info) ->
     MaxPeerId = math:pow(2, 32) - 1,
     case lists:keysearch(gaia, 1, Info) of
@@ -628,7 +689,7 @@ change_peer(Db, NewNodisAddress, Info) ->
                        RestPort /= NewRestPort ->
                     UpdatedPeer =
                         Peer#gaia_peer{nodis_address = NewNodisAddress,
-                                               rest_port = NewRestPort},
+                                       rest_port = NewRestPort},
                     true = db_insert(Db, UpdatedPeer),
                     ok;
                 [_] ->
@@ -664,7 +725,7 @@ down_peer(Db, NodisAddress) ->
     end.
 
 %%
-%% Peer and group database API
+%% Peer and group management
 %%
 
 new_db(GaiaDir) ->

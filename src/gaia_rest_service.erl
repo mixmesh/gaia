@@ -1,7 +1,7 @@
 -module(gaia_rest_service).
 -export([start_link/2]).
 -export([handle_http_request/4]).
--export([negotiate_with_peer/3]).
+-export([peer_negotiation/3]).
 
 -include_lib("kernel/include/logger.hrl").
 -include_lib("rester/include/rester.hrl").
@@ -30,12 +30,12 @@ start_link(PeerId, RestPort) ->
     rester_http_server:start_link(RestPort, ResterHttpArgs).
 
 %%
-%% Exported: negotiate_with_peer
+%% Exported: peer_negotiation
 %%
 
--spec negotiate_with_peer(gaia_serv:peer_id(),
-                          {inet:ip_address(), inet:port_number()},
-                          inet:port_number()) ->
+-spec peer_negotiation(gaia_serv:peer_id(),
+                       {inet:ip_address(), inet:port_number()},
+                       inet:port_number()) ->
           {ok, inet:port_number()} |
           {error,
            {invalid_response_body, jsone:json_value()} |
@@ -43,8 +43,8 @@ start_link(PeerId, RestPort) ->
            {bad_response, Result :: term()} |
            {http_error, Reason :: term()}}.
 
-negotiate_with_peer(MyPeerId, {IpAddress, RestPort}, LocalPort) ->
-    Url = lists:flatten(io_lib:format("http://~s:~w/negotiate",
+peer_negotiation(MyPeerId, {IpAddress, RestPort}, LocalPort) ->
+    Url = lists:flatten(io_lib:format("http://~s:~w/peer-negotiation",
                                       [inet:ntoa(IpAddress), RestPort])),
     RequestBody = encode_json([{<<"port">>, LocalPort}]),
     Nonce = ?b2l(keydir_service:bin_to_hexstr(<<"FIXME">>)),
@@ -117,7 +117,7 @@ handle_http_post(Socket, Request, Body, _Options) ->
         %%   gaia-peer-id: ...\r\n
         %%   gaia-nonce: ...\r\n
         %%   gaia-hmac: ...\r\n\r\n
-	["negotiate"] ->
+	["peer-negotiation"] ->
             case rest_util:parse_body(
                    Request, Body,
                    [{jsone_options, [{object_format, proplist}]}]) of
@@ -127,7 +127,7 @@ handle_http_post(Socket, Request, Body, _Options) ->
                       {error, bad_request, "Invalid JSON format"});
                 [{<<"port">>, Port}] when is_integer(Port) ->
                     rest_util:response(
-                      Socket, Request, negotiate(Request, Port));
+                      Socket, Request, peer_negotiation(Request, Port));
                 _ ->
                     ?LOG_ERROR(#{module => ?MODULE,
                                  invalid_request_body => Body}),
@@ -140,15 +140,14 @@ handle_http_post(Socket, Request, Body, _Options) ->
 	    rest_util:response(Socket, Request, {error, not_found})
     end.
 
-negotiate(#http_request{headers = #http_chdr{other = Headers}}, RemotePort) ->
+peer_negotiation(#http_request{headers = #http_chdr{other = Headers}}, RemotePort) ->
     case get_gaia_headers(Headers) of
         {PeerId, _Nonce, _HMAC} when PeerId /= not_set ->
-            case gaia_serv:peer_wants_to_negotiate(PeerId, RemotePort) of
+            case gaia_serv:handle_peer_negotiation(PeerId, RemotePort) of
                 {ok, LocalPort} ->
                     {ok, {format, [{<<"port">>, LocalPort}]}};
                 {error, Reason} ->
-                    ?LOG_ERROR(#{module => ?MODULE,
-                                 peer_wants_to_negotiate => Reason}),
+                    ?LOG_ERROR(#{module => ?MODULE, peer_negotiation => Reason}),
                     {error, no_access}
             end;
         _ ->
