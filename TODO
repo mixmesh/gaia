@@ -1,47 +1,17 @@
-* update gaia_schema + fix
-
-* fix rest service and start to exchange ports beore talking (do not use star first)
-* rewrite set_dest_adresses
-
-* make peer-id into a binary (look everywhere) remove gaia_id everywhere
-
-
-
-* Test
-    a
-      group-a: with a, b and c
-    b
-    c
-
-  * test direct for a
-    * toggle set_status
-
-  * test ask for a
-  * test start talking, stop talking
-  * test that it works to toggle status
-
-  * test * peer
-  * test * group
-
-* add gaia_nif:set_src_address/1
-
-* remove gaiaid ->peerid
-
-* add rest server
-* Extended heder with group id (and let peer id be a 8 bytes binary as well) + C code
-
-  * test start taling, stop talking group
-
-
-
-== STOP! THINK!
-
-* add a gaia_nif:set_src_addresses/1
-
-* Make sure REST serice work and use it
-  * Add a gaia_nif:set_src_addresses()
+* remove all gaia_id
+* implement config:insert/1 (kolla att mount points är lite mera lättviktiga)
 
 * write gaia_command_serv.erl
+
+  * start talking to peer or wildcard peer (ask or direct)
+  * stop talking to peer or wildcard peer
+  * toggle status, i.e. busy or available.
+  * toggle between modes, direct, ask and ignore
+  * mute mic
+  * start talking to group (ask or direct)
+  * stop talking to group
+
+* make peer-id into a binary
 
 == STOP! THINK!
 
