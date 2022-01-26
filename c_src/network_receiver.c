@@ -122,7 +122,7 @@ void *network_receiver(void *arg) {
                 return;
             }
 
-            INFOF("Read from source with peer id %d", source->id);
+            DEBUGF("Read from source with peer id %d", source->id);
 
             // Peek into socket and extract buffer header
             uint8_t header_buf[HEADER_SIZE];
