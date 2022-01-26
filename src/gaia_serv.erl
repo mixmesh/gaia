@@ -345,8 +345,7 @@ message_handler(#{parent := Parent,
                 [#gaia_peer{name = PeerName,
                             mode = Mode,
                             options = Options,
-                            talks_to = TalksTo,
-                            local_port = LocalPort} = Peer] ->
+                            talks_to = TalksTo} = Peer] ->
                     AcceptPeer =
                         case accept_peer(MyPeerName, Status, Peer, Mode,
                                          Options, TalksTo) of
