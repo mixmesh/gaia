@@ -353,6 +353,7 @@ message_handler(#{parent := Parent,
                                     [#gaia_peer{mode = WildcardMode,
                                                 options = WildcardOptions,
                                                 talks_to = true}] ->
+                                        ?LOG_DEBUG(#{wildcard_enabled => PeerId}),
                                         accept_peer(
                                           MyPeerName, Status, Peer,
                                           WildcardMode, WildcardOptions, true);
@@ -478,16 +479,20 @@ get_destinations(Db, _Status, WildcardActivated) ->
       fun(#gaia_peer{name = <<"*">>}, Acc) ->
               Acc;
          (#gaia_peer{id = PeerId,
-                     ephemeral = Ephemeral,
                      talks_to = TalksTo,
                      nodis_address = NodisAddress}, Acc) ->
               if
                   NodisAddress == undefined ->
                       Acc;
-                  TalksTo orelse (WildcardActivated andalso Ephemeral) ->
+                  TalksTo ->
                       [{peer, PeerId}|Acc];
                   true ->
-                      Acc
+                      case WildcardActivated of
+                          true ->
+                              [{peer, PeerId}|Acc];
+                          false ->
+                              Acc
+                      end
               end;
          (#gaia_group{id = GroupId,
                       talks_to = TalksTo,
@@ -505,7 +510,6 @@ get_sources(Db, _Status, WildcardActivated) ->
       fun(#gaia_peer{name = <<"*">>}, Acc) ->
               Acc;
          (#gaia_peer{id = PeerId,
-                     ephemeral = Ephemeral,
                      talks_to = TalksTo,
                      nodis_address = NodisAddress,
                      local_port = LocalPort,
@@ -517,10 +521,15 @@ get_sources(Db, _Status, WildcardActivated) ->
                   %%       negotation
                   LocalPort == undefined andalso RemotePort /= undefined ->
                       [{peer, PeerId}|Acc];
-                  TalksTo orelse (WildcardActivated andalso Ephemeral) ->
+                  TalksTo ->
                       [{peer, PeerId}|Acc];
                   true ->
-                      Acc
+                      case WildcardActivated of
+                          true ->
+                              [{peer, PeerId}|Acc];
+                          false ->
+                              Acc
+                      end
               end;
          (#gaia_group{id = GroupId,
                       talks_to = TalksTo,
