@@ -623,7 +623,7 @@ accept_peer(MyPeerName, _Status = busy, #gaia_peer{name = PeerName} = Peer,
             Mode, Options, _TalksTo = false) ->
     case Mode of
         ask ->
-            case lists:member(Options, override_busy) of
+            case lists:member(override_busy, Options) of
                 true ->
                     ?LOG_INFO(#{accept_peer => MyPeerName,
                                 do_not_accept => {ask, busy, PeerName}}),
@@ -635,7 +635,7 @@ accept_peer(MyPeerName, _Status = busy, #gaia_peer{name = PeerName} = Peer,
                     no
             end;
         direct ->
-            case lists:member(Options, override_busy) of
+            case lists:member(override_busy, Options) of
                 true ->
                     ?LOG_INFO(
                        #{accept_peer => MyPeerName,
