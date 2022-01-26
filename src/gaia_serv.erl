@@ -583,7 +583,12 @@ update_network_sender(Db, NetworkSenderPid, Destinations) ->
                   [#gaia_peer{nodis_address = {IpAddress, _SyncPort},
                               remote_port = RemotePort}] =
                       db_get_peer_by_id(Db, PeerId),
-                  [{IpAddress, RemotePort}|Acc];
+                  if
+                      RemotePort /= undefined ->
+                          [{IpAddress, RemotePort}|Acc];
+                      true ->
+                          Acc
+                  end;
              ({group, GroupId}, Acc) ->
                   [#gaia_group{port = GroupPort,
                                members = Members}] =
