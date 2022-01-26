@@ -346,8 +346,7 @@ message_handler(#{parent := Parent,
                             mode = Mode,
                             options = Options,
                             talks_to = TalksTo,
-                            local_port = LocalPort,
-                            remote_port = RemotePort} = Peer] ->
+                            local_port = LocalPort} = Peer] ->
                     AcceptPeer =
                         case accept_peer(MyPeerName, Status, Peer, Mode,
                                          Options, TalksTo) of
