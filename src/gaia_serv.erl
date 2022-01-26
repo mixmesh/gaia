@@ -230,7 +230,7 @@ message_handler(#{parent := Parent,
             ?LOG_DEBUG(#{module => ?MODULE, call => get_status}),
             {reply, From, Status};
         {call, From, {set_status, NewStatus}} ->
-            ?LOG_DEBUG(#{module => ?MODULE, call => {set_status, Status}}),
+            ?LOG_DEBUG(#{module => ?MODULE, call => {set_status, NewStatus}}),
             ok = update_network(MyPeerId, Db, NewStatus, Muted,
                                 NetworkSenderPid),
             {reply, From, ok, State#{status => NewStatus}};
