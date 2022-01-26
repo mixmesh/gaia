@@ -72,6 +72,7 @@ void *network_receiver(void *arg) {
         } else if (nfds == 0) {
             continue;
         }
+        INFOF("Incoming audio!");
 
         // Drain socket receive buffers
         void drain_socket_receive_buffer(source_t *source) {
@@ -101,13 +102,15 @@ void *network_receiver(void *arg) {
                 }
             }
         };
+        INFOF("Drain socket receive buffers...");
         source_table_take_mutex(source_table);
         source_table_foreach(source_table, drain_socket_receive_buffer);
         source_table_release_mutex(source_table);
         INFOF("Socket receive buffer has been drained");
 
-        INFOF("Erase all stale jitter buffers");
+        INFOF("Erase all stale jitter buffers...");
         jb_table_free(jb_table, true);
+        INFOF("Stale jitter buffers have been erased");
 
         uint32_t peer_id = 0;
         jb_t *jb = NULL;
@@ -118,6 +121,8 @@ void *network_receiver(void *arg) {
             if (!FD_ISSET(source->sockfd, &readfds)) {
                 return;
             }
+
+            INFOF("Read from source with peer id %d", source->id);
 
             // Peek into socket and extract buffer header
             uint8_t header_buf[HEADER_SIZE];

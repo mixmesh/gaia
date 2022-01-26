@@ -301,10 +301,14 @@ static ERL_NIF_TERM _set_sources(ErlNifEnv* env, int argc,
                     }
                     // Add the source to the source table
                     source_t *new_source = source_new();
+                    new_source->id = id;
                     new_source->sockfd = sockfd;
                     new_source->port = local_port;
                     new_source->used = true;
                     source_table_add(source_table, new_source);
+                    INFOF("Set source: %d (%d)", new_source->id,
+                          new_source->port);
+
                     // Add local port to return value list
                     ERL_NIF_TERM id_tuple;
                     if (arity == 2) {
@@ -327,13 +331,13 @@ static ERL_NIF_TERM _set_sources(ErlNifEnv* env, int argc,
 
         // Delete unused sources
         void delete_unused_source(source_t *source) {
-            if (source->used) {
+            if (!source->used) {
                 source_table_delete(source_table, source);
             }
         }
         source_table_foreach(source_table, delete_unused_source);
-
         source_table_release_mutex(source_table);
+
         return return_value;
     } else {
         source_table_release_mutex(source_table);

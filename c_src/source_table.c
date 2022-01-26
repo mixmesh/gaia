@@ -33,6 +33,10 @@ void source_table_delete(source_table_t *source_table, source_t *source) {
     source_free(source);
 }
 
+uint16_t source_table_count(source_table_t *source_table) {
+    return HASH_COUNT(source_table->source);
+}
+
 void source_table_foreach(source_table_t *source_table,
                           void (*callback)(source_t *)) {
     source_t *source, *tmp;

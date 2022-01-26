@@ -174,7 +174,7 @@ entry %u but got %u (%u will be reused as %u!)",
             holding_playback_packet_mutex = false;
             silence_cycles = 0;
         } else {
-            DEBUGF("No data available in jitter buffers");
+            //DEBUGF("No data available in jitter buffers");
             // Exponential fallback
             if (silence_cycles > MAX_SILENCE_CYCLES) {
                 if (params->playback_audio && audio_info != NULL) {
@@ -183,11 +183,11 @@ entry %u but got %u (%u will be reused as %u!)",
                     INFOF("Audio device has been closed for playback");
                 }
                 uint32_t sleep_time = (PERIOD_SIZE_IN_MS * 2) * pow(2, MAX_SILENCE_CYCLES);
-                DEBUGF("Audio sink sleeps for %ums", sleep_time);
+                //DEBUGF("Audio sink sleeps for %ums", sleep_time);
                 msleep(sleep_time);
             } else {
                 uint32_t sleep_time = (PERIOD_SIZE_IN_MS * 2) * pow(2, silence_cycles++);
-                DEBUGF("Audio sink sleeps for %ums", sleep_time);
+                //DEBUGF("Audio sink sleeps for %ums", sleep_time);
                 msleep(sleep_time);
                 if (params->playback_audio && audio_info != NULL) {
                     snd_pcm_recover(audio_info->pcm, 0, 1);

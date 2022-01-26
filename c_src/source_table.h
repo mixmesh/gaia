@@ -20,6 +20,7 @@ void source_table_free(source_table_t *source_table);
 void source_table_add(source_table_t *source_table, source_t *source);
 source_t *source_table_find(source_table_t *source_table, uint32_t id);
 void source_table_delete(source_table_t *source_table, source_t *source);
+uint16_t source_table_count(source_table_t *source_table);
 void source_table_foreach(source_table_t *source_table,
                           void (*callback)(source_t *source));
 void source_table_take_mutex(source_table_t *source_table);
