@@ -473,8 +473,6 @@ update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid, Negotiate,
     end,
     update_network_sender(Db, NetworkSenderPid, Destinations).
 
-get_destinations(_Db, busy, _WildcardActivated) ->
-    [];
 get_destinations(Db, _Status, WildcardActivated) ->
     db_foldl(
       fun(#gaia_peer{name = <<"*">>}, Acc) ->
@@ -502,8 +500,6 @@ get_destinations(Db, _Status, WildcardActivated) ->
               end
       end, [], Db).
 
-get_sources(_Db, busy, _WildcardActivated) ->
-    [];
 get_sources(Db, _Status, WildcardActivated) ->
     db_foldl(
       fun(#gaia_peer{name = <<"*">>}, Acc) ->
