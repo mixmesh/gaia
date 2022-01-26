@@ -27,7 +27,6 @@
 -type id() :: non_neg_integer().
 -type peer_id() :: id().
 -type group_id() :: id().
-%% FIXME: ask has not been implemented fully
 -type mode() :: direct | ask | ignore.
 -type options() :: [override_busy].
 -type group_type() :: open | closed.
@@ -423,7 +422,7 @@ message_handler(#{parent := Parent,
                                         NetworkSenderPid),
                     noreply;
                 {error, Reason} ->
-                    ?LOG_ERROR(#{module => ?MODULE, change_peer => Reason}),
+                    ?LOG_ERROR(#{module => ?MODULE, down_peer => Reason}),
                     noreply
             end;
         {system, From, Request} ->
@@ -691,6 +690,7 @@ change_peer(Db, NewNodisAddress, Info) ->
                        RestPort /= NewRestPort ->
                     UpdatedPeer =
                         Peer#gaia_peer{nodis_address = NewNodisAddress,
+                                       remote_port = undefined,
                                        rest_port = NewRestPort},
                     true = db_insert(Db, UpdatedPeer),
                     ok;
