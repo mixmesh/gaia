@@ -237,11 +237,11 @@ message_handler(#{parent := Parent,
             {reply, From, ok, State#{status => NewStatus}};
         {call, From, mute} ->
             ?LOG_DEBUG(#{module => ?MODULE, call => mute}),
-            ok = update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid),
+            ok = update_network(MyPeerId, Db, Status, true, NetworkSenderPid),
             {reply, From, ok, State#{muted => true}};
         {call, From, unmute} ->
             ?LOG_DEBUG(#{module => ?MODULE, call => unmute}),
-            ok = update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid),
+            ok = update_network(MyPeerId, Db, Status, false, NetworkSenderPid),
             {reply, From, ok, State#{muted => false}};
         {call, From, {get_by_id, Id}} ->
             ?LOG_DEBUG(#{module => ?MODULE, call => {get_by_id, Id}}),
