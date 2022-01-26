@@ -567,6 +567,9 @@ negotiate_with_peers(MyPeerId, Db, [{peer, PeerId}|Rest]) ->
         {error, Reason} ->
             ?LOG_ERROR(#{module => ?MODULE,
                          {rest_service_client, negotiate} => Reason}),
+            %% FIXME: Implement gaia_command_serv:not_available/1
+            %%ok = gaia_command_serv:not_available(PeerId),
+            true = db_insert(Db, Peer#gaia_peer{talks_to = false}),
             negotiate_with_peers(MyPeerId, Db, Rest)
     end.
 
@@ -623,7 +626,8 @@ accept_peer(MyPeerName, _Status = busy, #gaia_peer{name = PeerName} = Peer,
                 true ->
                     ?LOG_INFO(#{accept_peer => MyPeerName,
                                 do_not_accept => {ask, busy, PeerName}}),
-                    ok = gaia_command_serv:ask(Peer),
+                    %% FIXME: Implement gaia_command_serv:ask/1
+                    %%ok = gaia_command_serv:ask(Peer),
                     no;
                 false ->
                     ?LOG_INFO(#{accept_peer => MyPeerName,
@@ -650,7 +654,8 @@ accept_peer(MyPeerName, _Status = available,
         ask ->
             ?LOG_INFO(#{accept_peer => MyPeerName,
                         do_not_accept => {ask, available, PeerName}}),
-            ok = gaia_command_serv:ask(Peer),
+            %% FIXME: Implement gaia_command_serv:ask/1
+            %%ok = gaia_command_serv:ask(Peer),
             no;
         direct ->
             ?LOG_INFO(
