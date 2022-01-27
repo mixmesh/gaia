@@ -299,7 +299,7 @@ static ERL_NIF_TERM _set_sources(ErlNifEnv* env, int argc,
                         }
                         local_port = (int)ntohs(local_addr.sin_port);
                     }
-                    // Add the source to the source table
+                    // Add the new source to the source table
                     source_t *new_source = source_new();
                     new_source->id = id;
                     new_source->sockfd = sockfd;
@@ -336,6 +336,7 @@ static ERL_NIF_TERM _set_sources(ErlNifEnv* env, int argc,
             }
         }
         source_table_foreach(source_table, delete_unused_source);
+
         source_table_release_mutex(source_table);
 
         return return_value;

@@ -55,7 +55,7 @@ void *network_receiver(void *arg) {
           PERIODS_IN_JITTER_BUFFER,
           JITTER_BUFFER_SIZE_IN_BYTES);
 
-    // Read from socket and write to jitter buffer
+    // Read from sockets and write to jitter buffers
     while (!kill_network_receiver) {
         // Waiting for incoming audio
         DEBUGF("Waiting for incoming audio...");
@@ -106,7 +106,7 @@ void *network_receiver(void *arg) {
         source_table_take_mutex(source_table);
         source_table_foreach(source_table, drain_socket_receive_buffer);
         source_table_release_mutex(source_table);
-        INFOF("Socket receive buffer has been drained");
+        INFOF("Socket receive buffers have been drained");
 
         INFOF("Erase all stale jitter buffers...");
         jb_table_free(jb_table, true);
@@ -235,7 +235,7 @@ gaia-id");
             jb_release_wrlock(jb);
         };
 
-        // Read from socket and write to jitter buffer
+        // Read from sockets and write to jitter buffer
         INFOF("Receiving audio...");
         while (!kill_network_receiver) {
             // Wait for incoming socket data (or timeout)

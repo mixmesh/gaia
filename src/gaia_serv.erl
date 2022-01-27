@@ -28,7 +28,7 @@
 -type peer_id() :: id().
 -type group_id() :: id().
 -type mode() :: direct | ask | ignore.
--type options() :: [override_busy].
+-type options() :: [override_busy | known_peers_only].
 -type group_type() :: open | closed.
 -type session_key() :: binary().
 -type status() :: available | busy.
@@ -446,9 +446,18 @@ update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid) ->
 
 update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid, Negotiate) ->
     case db_get_peer_by_name(Db, <<"*">>) of
-        [#gaia_peer{talks_to = true}] ->
+        [#gaia_peer{talks_to = true,
+                    ephemeral = Ephemeral,
+                    options = Options}] ->
+            WildcardActivated =
+                case Ephemeral of
+                    true ->
+                        not lists:member(known_peers_only, Options);
+                    false ->
+                        true
+                end,
             update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid,
-                           Negotiate, _WildcardActivated = true);
+                           Negotiate, WildcardActivated);
         _ ->
             update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid,
                            Negotiate, _WildcardActivated = false)

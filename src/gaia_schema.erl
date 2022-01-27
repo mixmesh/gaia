@@ -66,11 +66,17 @@ get() ->
                name = atom,
                transform =
                    fun('override-busy') -> override_busy;
-                      (_) -> throw({failed, "Must be override-busy"})
+                      ('known-peers-only') -> known_peers_only;
+                      (_) ->
+                           throw({failed,
+                                  "Must be override-busy or known-peers-only \
+(for a wildcard peer only)"})
                    end,
                untransform =
                    fun(override_busy) ->
-                           'override-busy'
+                           'override-busy';
+                      (known_peers_only) ->
+                           'known-peers-only'
                    end,
                reloadable = true}]}]]},
        {groups,

@@ -101,6 +101,7 @@ entry %u but got %u (%u will be reused as %u!)",
         }
         jb_release_wrlock(jb);
     };
+
     struct timespec period_size_as_tsp =
         {
          .tv_sec = 0,
