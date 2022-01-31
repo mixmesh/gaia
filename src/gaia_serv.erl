@@ -167,7 +167,9 @@ generate_artificial_id(PeerName) ->
 %%
 
 -spec handle_peer_negotiation(peer_id(), inet:port_number()) ->
-          {ok, inet:port_number()} | {error, no_such_peer | not_available}.
+          {ok, inet:port_number()} |
+          {error, ignore | no_nodis_address | ask | busy | not_available |
+           no_such_peer}.
 
 handle_peer_negotiation(PeerId, RemotePort) ->
     serv:call(?MODULE, {handle_peer_negotiation, PeerId, RemotePort}).
@@ -330,9 +332,10 @@ message_handler(#{parent := Parent,
             ?LOG_DEBUG(#{module => ?MODULE, call => Call}),
             case db_lookup_peer_by_id(Db, PeerId) of
                 [#gaia_peer{name = PeerName} = Peer] ->
-                    case accept_peer(MyPeerName, Busy, Peer) of
-                        no ->
-                            {reply, From, {error, not_available}};
+                    case accept_peer(Busy, Peer) of
+                        {no, Reason} ->
+                            {reply, From, {error, Reason}};
+
                         {yes, UpdatedPeer} ->
                             true = db_insert(Db, UpdatedPeer#gaia_peer{
                                                    remote_port = RemotePort}),
@@ -559,77 +562,42 @@ update_network_sender(Db, NetworkSenderPid, Conversations) ->
 %% Peer negotiation
 %%
 
-accept_peer(MyPeerName, _Busy,
-            #gaia_peer{name = PeerName,
-                       conversation = {true, _ConversationStatus}} = Peer) ->
-    ?LOG_INFO(#{accept_peer => MyPeerName,
-                accept => {ongoing_conversation, PeerName}}),
+accept_peer(_Busy,
+            #gaia_peer{conversation = {true, _ConversationStatus}} = Peer) ->
     {yes, Peer};
-accept_peer(MyPeerName, _Busy,
-            #gaia_peer{name = PeerName,
-                       mode = ignore}) ->
-    ?LOG_INFO(#{accept_peer => MyPeerName,
-                do_not_accept => {ignore, PeerName}}),
-    no;
-accept_peer(MyPeerName, _Busy,
-            #gaia_peer{name = PeerName,
-                       nodis_address = undefined}) ->
-    ?LOG_INFO(#{accept_peer => MyPeerName,
-                do_not_accept => {no_nodis_address, PeerName}}),
-    no;
-accept_peer(MyPeerName, _Busy = true,
-            #gaia_peer{name = PeerName,
-                       mode = ask,
-                       options = Options,
-                       conversation = false} = _Peer) ->
+accept_peer(_Busy, #gaia_peer{mode = ignore}) ->
+    {no, ignore};
+accept_peer(_Busy, #gaia_peer{nodis_address = undefined}) ->
+    {no, no_nodis_address};
+accept_peer(_Busy = true, #gaia_peer{mode = ask,
+                                     options = Options,
+                                     conversation = false} = _Peer) ->
     case lists:member(override_busy, Options) of
         true ->
-            ?LOG_INFO(#{accept_peer => MyPeerName,
-                        do_not_accept => {busy, ask, override_busy, PeerName}}),
             %% FIXME: Implement gaia_command_serv:ask/1
             %%ok = gaia_command_serv:ask(Peer),
-            no;
+            {no, ask};
         false ->
-            ?LOG_INFO(#{accept_peer => MyPeerName,
-                        do_not_accept =>
-                            {busy, ask, do_not_override_busy, PeerName}}),
-            no
+            {no, busy}
     end;
-accept_peer(MyPeerName, _Busy = true,
-            #gaia_peer{name = PeerName,
-                       mode = direct,
-                       options = Options,
-                       conversation = false} = Peer) ->
+accept_peer(_Busy = true, #gaia_peer{
+                             mode = direct,
+                             options = Options,
+                             conversation = false} = Peer) ->
     case lists:member(override_busy, Options) of
         true ->
-            ?LOG_INFO(
-               #{accept_peer => MyPeerName,
-                 accept_direct => {busy, direct, override_busy, PeerName}}),
             {yes, Peer#gaia_peer{conversation = {true, read_write}}};
         false ->
-            ?LOG_INFO(#{accept_peer => MyPeerName,
-                        do_not_accept =>
-                            {busy, direct, do_not_override_busy, PeerName}}),
-            no
+            {no, busy}
     end;
-accept_peer(MyPeerName, _Busy = false,
-            #gaia_peer{name = PeerName,
-                       mode = ask}) ->
-    ?LOG_INFO(#{accept_peer => MyPeerName,
-                do_not_accept => {not_busy, ask, PeerName}}),
+accept_peer(_Busy = false, #gaia_peer{mode = ask}) ->
     %% FIXME: Implement gaia_command_serv:ask/1
     %%ok = gaia_command_serv:ask(Peer),
-    no;
-accept_peer(MyPeerName, _Busy = false,
-            #gaia_peer{name = PeerName,
-                       mode = direct} = Peer) ->
-    ?LOG_INFO(#{accept_peer => MyPeerName,
-                accept_direct => {direct, not_busy, PeerName}}),
+    {no, ask};
+accept_peer(_Busy = false, #gaia_peer{mode = direct} = Peer) ->
     {yes, Peer#gaia_peer{conversation = {true, read_write}}};
-accept_peer(MyPeerName, Busy, Peer) ->
-    ?LOG_INFO(#{accept_peer => MyPeerName,
-                do_not_accept => {catch_all, Busy, Peer}}),
-    no.
+accept_peer(_Busy, _Peer) ->
+    {no, not_available}.
 
 %%
 %% Nodis handling

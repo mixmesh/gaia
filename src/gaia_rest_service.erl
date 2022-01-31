@@ -146,9 +146,18 @@ peer_negotiation(#http_request{headers = #http_chdr{other = Headers}},
                 {ok, LocalPort} ->
                     {ok, {format, [{<<"port">>, LocalPort}]}};
                 {error, Reason} ->
-                    ?LOG_ERROR(#{module => ?MODULE,
-                                 peer_negotiation => Reason}),
-                    {error, no_access}
+                    ?LOG_INFO(#{module => ?MODULE,
+                                peer_negotiation_rejected => Reason}),
+                    NoAccessBody =
+                        case Reason of
+                            ask ->
+                                "Asking";
+                            busy ->
+                                "Busy";
+                            _ ->
+                                "Not Available"
+                        end,
+                    {error, {no_access, NoAccessBody}}
             end;
         _ ->
             {error, {bad_request, "Missing GAIA HTTP headers"}}
