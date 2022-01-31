@@ -31,3 +31,56 @@ testa med tre
 * m.conf
 
 testa en grupp
+
+
+
+
+gaia_command_serv UI:
+
+
+
+Talk to <name>
+  Do you want to talk to <name>?
+    Yes
+      You now talk to <name>
+      <name> is not available
+      <name> has been asked to talk...
+    No
+
+Stop talking to <name> | all
+  Do you want to stop talking to <name>?
+    Yes
+      You no longer talk to <name>
+      You do not talk to <name>
+    No
+
+
+Start listen to <name> | all
+Stop listen to <name> | all
+
+
+I am busy
+
+I am available
+
+Mute
+  You are now muted
+
+Unmute
+  You are no longer muted
+
+<name> can talk directly [with me]
+  <name> now can talk directly with you
+
+<name> must ask [before calling]
+  <name> now must ask before talking to you
+
+Ignore <name>
+  You now ignore <name>
+
+Let <name> interrupt me
+   <name> can now interrupt you
+
+not intterupt
+
+

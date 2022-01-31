@@ -8,7 +8,7 @@
 #include "timing.h"
 #include "globals.h"
 #include "gaia_utils.h"
-#include "source_table.h"
+#include "conversation_table.h"
 
 #define MAX_NETWORK_SENDER_ADDR_PORTS 256
 #define MAX_SRC_ADDRS 256
@@ -20,7 +20,7 @@ bool kill_network_receiver = false;
 bool kill_audio_sink = false;
 uint8_t *playback_packet;
 thread_mutex_t *playback_packet_mutex;
-source_table_t *source_table;
+conversation_table_t *conversation_table;
 
 void usage(char *argv[]) {
     fprintf(stderr,
@@ -156,8 +156,8 @@ int main (int argc, char *argv[]) {
     // Create jitter buffer table
     jb_table = jb_table_new();
 
-    // Create source table
-    source_table = source_table_new();
+    // Create conversation table
+    conversation_table = conversation_table_new();
 
     // Create playback packet data and mutex
     playback_packet = malloc(PERIOD_SIZE_IN_BYTES);
@@ -220,8 +220,8 @@ int main (int argc, char *argv[]) {
     // Remove jitter buffer table
     jb_table_free(jb_table, false);
 
-    // Remove source table
-    source_table_free(source_table);
+    // Remove conversation table
+    conversation_table_free(conversation_table);
 
     // Remove playback packet data and mutex
     assert(thread_mutex_lock(playback_packet_mutex) == 0);

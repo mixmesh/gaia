@@ -1,5 +1,5 @@
 -module(gaia_network_sender_serv).
--export([start_link/3, stop/1, set_destination_addresses/2]).
+-export([start_link/3, stop/1, set_conversation_addresses/2]).
 -export([message_handler/1]).
 -include_lib("apptools/include/serv.hrl").
 -include_lib("apptools/include/bits.hrl").
@@ -30,7 +30,7 @@ stop(Pid) ->
 %% Exported: set_destination_addresses
 %%
 
-set_destination_addresses(Pid, DestinationAddresses) ->
+set_conversation_addresses(Pid, DestinationAddresses) ->
     serv:cast(Pid, {set_destination_addresses, DestinationAddresses}).
 
 %%

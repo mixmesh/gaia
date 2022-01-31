@@ -9,7 +9,7 @@
 #include "network_receiver.h"
 #include "globals.h"
 #include "gaia_utils.h"
-#include "source_table.h"
+#include "conversation_table.h"
 
 #define WAIT_FOR_INCOMING_AUDIO_TIMEOUT 2000
 #define FOUR_SECONDS_IN_US (4 * 1000000)
@@ -17,18 +17,18 @@
 
 extern jb_table_t *jb_table;
 extern bool kill_network_receiver;
-extern source_table_t *source_table;
+extern conversation_table_t *conversation_table;
 
 int set_fds(fd_set *fds) {
     FD_ZERO(fds);
     int sockfd = -1;
-    void set_fd(source_t *source) {
-        FD_SET(source->sockfd, fds);
-        sockfd = source->sockfd > sockfd ? source->sockfd : sockfd;
+    void set_fd(conversation_t *conversation) {
+        FD_SET(conversation->sockfd, fds);
+        sockfd = conversation->sockfd > sockfd ? conversation->sockfd : sockfd;
     }
-    source_table_take_mutex(source_table);
-    source_table_foreach(source_table, set_fd);
-    source_table_release_mutex(source_table);
+    conversation_table_take_mutex(conversation_table);
+    conversation_table_foreach(conversation_table, set_fd);
+    conversation_table_release_mutex(conversation_table);
     return sockfd;
 }
 
@@ -75,18 +75,18 @@ void *network_receiver(void *arg) {
         INFOF("Incoming audio!");
 
         // Drain socket receive buffers
-        void drain_socket_receive_buffer(source_t *source) {
-            if (!FD_ISSET(source->sockfd, &readfds)) {
+        void drain_socket_receive_buffer(conversation_t *conversation) {
+            if (!FD_ISSET(conversation->sockfd, &readfds)) {
                 return;
             }
 
-            fd_set sourcefds;
+            fd_set conversationfds;
             while (true) {
-                FD_ZERO(&sourcefds);
-                FD_SET(source->sockfd, &sourcefds);
+                FD_ZERO(&conversationfds);
+                FD_SET(conversation->sockfd, &conversationfds);
                 struct timeval timeout = zero_timeout;
-                int nfds = select(source->sockfd + 1, &sourcefds, 0, 0,
-                                  &timeout);
+                int nfds = select(conversation->sockfd + 1, &conversationfds,
+                                  0, 0, &timeout);
                 if (nfds < 0) {
                     perror("select: Failed to drain socket receive buffer\n");
                     return;
@@ -95,17 +95,18 @@ void *network_receiver(void *arg) {
                     return;
                 }
                 uint8_t drain_buf[DRAIN_BUF_SIZE];
-                if (recvfrom(source->sockfd, drain_buf, DRAIN_BUF_SIZE, 0, NULL,
-                             NULL) < 0) {
+                if (recvfrom(conversation->sockfd, drain_buf, DRAIN_BUF_SIZE,
+                             0, NULL, NULL) < 0) {
                     perror("recvfrom: Failed to drain socket receive buffer\n");
                     return;
                 }
             }
         };
         INFOF("Drain socket receive buffers...");
-        source_table_take_mutex(source_table);
-        source_table_foreach(source_table, drain_socket_receive_buffer);
-        source_table_release_mutex(source_table);
+        conversation_table_take_mutex(conversation_table);
+        conversation_table_foreach(conversation_table,
+                                   drain_socket_receive_buffer);
+        conversation_table_release_mutex(conversation_table);
         INFOF("Socket receive buffers have been drained");
 
         INFOF("Erase all stale jitter buffers...");
@@ -117,20 +118,20 @@ void *network_receiver(void *arg) {
         double latency = 0;
         uint64_t last_latency_printout = 0;
 
-        void read_from_source(source_t *source) {
-            if (!FD_ISSET(source->sockfd, &readfds)) {
+        void read_from_conversation(conversation_t *conversation) {
+            if (!FD_ISSET(conversation->sockfd, &readfds)) {
                 return;
             }
 
-            DEBUGF("Read from source with peer id %d", source->id);
+            DEBUGF("Read from conversation with peer id %d", conversation->id);
 
             // Peek into socket and extract buffer header
             uint8_t header_buf[HEADER_SIZE];
             struct sockaddr src_addr;
             socklen_t addrlen = sizeof(src_addr);
             int n;
-            if ((n = recvfrom(source->sockfd, header_buf, HEADER_SIZE, MSG_PEEK,
-                              &src_addr, &addrlen)) < 0) {
+            if ((n = recvfrom(conversation->sockfd, header_buf, HEADER_SIZE,
+                              MSG_PEEK, &src_addr, &addrlen)) < 0) {
                 perror("recvfrom: Failed to peek into socket and extract \
 gaia-id");
                 return;
@@ -172,8 +173,8 @@ gaia-id");
 
             // Read from socket
             ssize_t udp_buf_size = HEADER_SIZE + packet_len;
-            if ((n = recvfrom(source->sockfd, jb_entry->udp_buf, udp_buf_size,
-                              0, NULL, NULL)) < 0) {
+            if ((n = recvfrom(conversation->sockfd, jb_entry->udp_buf,
+                              udp_buf_size, 0, NULL, NULL)) < 0) {
                 perror("recvfrom: Failed to read from socket");
                 return;
             } else if (n != udp_buf_size) {
@@ -252,14 +253,15 @@ gaia-id");
                 break;
             }
 
-            source_table_take_mutex(source_table);
-            source_table_foreach(source_table, read_from_source);
-            source_table_release_mutex(source_table);
+            conversation_table_take_mutex(conversation_table);
+            conversation_table_foreach(conversation_table,
+                                       read_from_conversation);
+            conversation_table_release_mutex(conversation_table);
         }
     }
 
     INFOF("network_receiver is shutting down!!!");
-    source_table_free(source_table);
+    conversation_table_free(conversation_table);
     int retval = NETWORK_RECEIVER_DIED;
     thread_exit(&retval);
     return NULL;

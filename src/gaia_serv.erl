@@ -1,19 +1,20 @@
 -module(gaia_serv).
 -export([start_link/5, stop/0]).
--export([get_status/0, set_status/1,
-         mute/0, unmute/0,
-         all_peers/0, all_groups/0,
-         currently_talking_to/0, start_talking_to/1, stop_talking_to/1,
-         get_by_id/1, get_by_name/1,
+-export([busy/0, busy/1,
+         start_peer_conversation/2, stop_peer_conversation/1,
+         set_peer_conversation_status/2,
+         start_group_conversation/1, stop_group_conversation/1,
+         lookup/1, fold/2,
          generate_artificial_id/1,
          handle_peer_negotiation/2]).
 -export([message_handler/1]).
 -export_type([name/0, peer_name/0, group_name/0,
               id/0, peer_id/0, group_id/0,
               mode/0, options/0,
+              conversation_status/0,
               group_type/0,
               session_key/0,
-              status/0]).
+              conversations/0]).
 
 -include_lib("apptools/include/serv.hrl").
 -include_lib("apptools/include/shorthand.hrl").
@@ -29,9 +30,13 @@
 -type group_id() :: id().
 -type mode() :: direct | ask | ignore.
 -type options() :: [override_busy | known_peers_only].
+-type conversation_status() :: read | write | read_write.
 -type group_type() :: open | closed.
 -type session_key() :: binary().
--type status() :: available | busy.
+-type conversations() ::
+        [{peer, gaia_serv:peer_id()}|
+         {group, gaia_serv:group_id(), inet:ip_address() | undefined,
+          inet:port_number()}].
 
 %%
 %% Exported: start_link
@@ -60,105 +65,91 @@ stop() ->
     serv:call(?MODULE, stop).
 
 %%
-%% Exported: get_status
+%% Exported: busy
 %%
 
--spec get_status() -> status().
+-spec busy() -> boolean().
 
-get_status() ->
-    serv:call(?MODULE, get_status).
+busy() ->
+    serv:call(?MODULE, busy).
 
-%%
-%% Exported: set_status
-%%
+-spec busy(boolean()) -> ok.
 
--spec set_status(status()) -> ok.
-
-set_status(Status) ->
-    serv:call(?MODULE, {set_status, Status}).
+busy(Busy) ->
+    serv:call(?MODULE, {busy, Busy}).
 
 %%
-%% Exported: mute
+%% Exported: start_peer_conversation
 %%
 
--spec mute() -> ok.
+-spec start_peer_conversation(
+        peer_id() | {name, peer_name()}, conversation_status()) ->
+          ok | {error, no_such_peer | already_started}.
 
-mute() ->
-    serv:call(?MODULE, mute).
-
-%%
-%% Exported: unmute
-%%
-
--spec unmute() -> ok.
-
-unmute() ->
-    serv:call(?MODULE, unmute).
+start_peer_conversation(PeerIdOrName, ConversationStatus) ->
+    serv:call(?MODULE, {start_peer_conversation, PeerIdOrName,
+                        ConversationStatus}).
 
 %%
-%% Exported: all_peers
+%% Exported: stop_peer_conversation
 %%
 
--spec all_peers() -> [#gaia_peer{}].
+-spec stop_peer_conversation(peer_id() | {name, peer_name} | all) ->
+          ok | {error, no_such_peer | already_stopped}.
 
-all_peers() ->
-    serv:call(?MODULE, all_peers).
-
-%%
-%% Exported: all_groups
-%%
-
--spec all_groups() -> [#gaia_group{}].
-
-all_groups() ->
-    serv:call(?MODULE, all_groups).
+stop_peer_conversation(PeerIdOrName) ->
+    serv:call(?MODULE, {stop_peer_conversation, PeerIdOrName}).
 
 %%
-%% Exported: currently_talking_to
+%% Exported: set_peer_conversation_status
 %%
 
--spec currently_talking_to() -> [#gaia_peer{}|#gaia_group{}].
+-spec set_peer_conversation_status(
+        peer_id() | {name, peer_name()}, conversation_status()) ->
+          ok | {error, no_such_peer | conversation_not_started}.
 
-currently_talking_to() ->
-    serv:call(?MODULE, currently_talking_to).
-
-%%
-%% Exported: start_talking_to
-%%
-
--spec start_talking_to(id() | {name, name()}) ->
-          ok | {error, no_such_id | no_such_name | already_talking_to}.
-
-start_talking_to(IdOrName) ->
-    serv:call(?MODULE, {start_talking_to, IdOrName}).
+set_peer_conversation_status(PeerIdOrName, ConversationStatus) ->
+    serv:call(?MODULE, {set_peer_conversation_status, PeerIdOrName,
+                        ConversationStatus}).
 
 %%
-%% Exported: stop_talking_to
+%% Exported: start_group_conversation
 %%
 
--spec stop_talking_to(id() | {name, name()} | all) ->
-          ok | {error, no_such_id | no_such_name | not_talking_to}.
+-spec start_group_conversation(group_id() | {name, group_name()}) ->
+          ok | {error, no_such_group | already_started}.
 
-stop_talking_to(IdOrName) ->
-    serv:call(?MODULE, {stop_talking_to, IdOrName}).
-
-%%
-%% Exported: get_by_id
-%%
-
--spec get_by_id(id()) -> [#gaia_peer{}|#gaia_group{}].
-
-get_by_id(Id) ->
-    serv:call(?MODULE, {get_by_id, Id}).
+start_group_conversation(GroupIdOrName) ->
+    serv:call(?MODULE, {start_group_conversation, GroupIdOrName}).
 
 %%
-%% Exported: get_by_name
+%% Exported: stop_group_conversation
 %%
 
--spec get_by_name(name()) -> [#gaia_peer{}|#gaia_group{}].
+-spec stop_group_conversation(group_id() | {name, group_name()} | all) ->
+          ok | {error, no_such_group | already_stopped}.
 
-get_by_name(Name) ->
-    serv:call(?MODULE, {get_by_name, Name}).
+stop_group_conversation(GroupIdOrName) ->
+    serv:call(?MODULE, {stop_group_conversation, GroupIdOrName}).
+
+%%
+%% Exported: lookup
+%%
+
+-spec lookup(id() | {name, name()}) -> [#gaia_peer{}|#gaia_group{}].
+
+lookup(IdOrName) ->
+    serv:call(?MODULE, {lookup, IdOrName}).
+
+%%
+%% Exported: fold
+%%
+
+-spec fold(fun((#gaia_peer{} | #gaia_group{}, AccIn :: term()) ->
+                      AccOut :: term()), Acc0 :: term()) -> Acc1 :: term().
+
+fold(Fun, Acc0) ->
+    serv:call(?MODULE, {fold, Fun, Acc0}).
 
 %%
 %% generate_artificial_id
@@ -176,7 +167,7 @@ generate_artificial_id(PeerName) ->
 %%
 
 -spec handle_peer_negotiation(peer_id(), inet:port_number()) ->
-          {ok, inet:port_number()} | {error, no_such_peer_id | not_available}.
+          {ok, inet:port_number()} | {error, no_such_peer | not_available}.
 
 handle_peer_negotiation(PeerId, RemotePort) ->
     serv:call(?MODULE, {handle_peer_negotiation, PeerId, RemotePort}).
@@ -198,8 +189,7 @@ init(Parent, GaiaDir, PeerName, PeerId, RestPort, PlaybackPcmName) ->
     {ok, #{parent => Parent,
            peer_id => PeerId,
            peer_name => PeerName,
-           status => available,
-           muted => false,
+           busy => false,
            db => new_db(GaiaDir),
            nodis_subscription => NodisSubscription}}.
 
@@ -217,162 +207,137 @@ message_handler(#{parent := Parent,
                   peer_id := MyPeerId,
                   peer_name := MyPeerName,
                   db := Db,
-                  status := Status,
-                  muted := Muted,
+                  busy := Busy,
                   nodis_subscription := NodisSubscription,
                   network_sender_pid := NetworkSenderPid} = State) ->
     receive
-        {call, From, stop} ->
-            ?LOG_DEBUG(#{module => ?MODULE, call => stop}),
+        {call, From, stop = Call} ->
+            ?LOG_DEBUG(#{module => ?MODULE, call => Call}),
             ok = gaia_nif:stop(),
             {stop, From, ok};
-        {call, From, get_status} ->
-            ?LOG_DEBUG(#{module => ?MODULE, call => get_status}),
-            {reply, From, Status};
-        {call, From, {set_status, NewStatus}} ->
-            ?LOG_DEBUG(#{module => ?MODULE, call => {set_status, NewStatus}}),
-            ok = update_network(MyPeerId, Db, NewStatus, Muted,
-                                NetworkSenderPid),
-            {reply, From, ok, State#{status => NewStatus}};
-        {call, From, mute} ->
-            ?LOG_DEBUG(#{module => ?MODULE, call => mute}),
-            ok = update_network(MyPeerId, Db, Status, true, NetworkSenderPid),
-            {reply, From, ok, State#{muted => true}};
-        {call, From, unmute} ->
-            ?LOG_DEBUG(#{module => ?MODULE, call => unmute}),
-            ok = update_network(MyPeerId, Db, Status, false, NetworkSenderPid),
-            {reply, From, ok, State#{muted => false}};
-        {call, From, {get_by_id, Id}} ->
-            ?LOG_DEBUG(#{module => ?MODULE, call => {get_by_id, Id}}),
-            {reply, From, db_get_by_id(Db, Id)};
-        {call, From, {get_by_name, Name}} ->
-            ?LOG_DEBUG(#{module => ?MODULE, call => {get_by_name, Name}}),
-            {reply, From, db_get_by_name(Db, Name)};
-        {call, From, all_peers} ->
-            ?LOG_DEBUG(#{module => ?MODULE, call => all_peers}),
-            {reply, From, db_all_peers(Db)};
-        {call, From, all_groups} ->
-            ?LOG_DEBUG(#{module => ?MODULE, call => all_groups}),
-            {reply, From, db_all_groups(Db)};
-        {call, From, currently_talking_to} ->
-            ?LOG_DEBUG(#{module => ?MODULE, call => currently_talking_to}),
-            PeersAndGroups =
-                db_foldl(
-                  fun(#gaia_peer{talks_to = true} = Peer, Acc) ->
-                          [Peer|Acc];
-                     (#gaia_group{talks_to = true} = Group, Acc) ->
-                          [Group|Acc];
-                     (_, Acc) ->
-                          Acc
-                  end, [], Db),
-            {reply, From, PeersAndGroups};
-        {call, From, {start_talking_to, IdOrName}} ->
-            ?LOG_DEBUG(#{module => ?MODULE,
-                         call => {start_talking_to, IdOrName}}),
-            case db_get_by(Db, IdOrName) of
-                [#gaia_peer{talks_to = true}] ->
-                    {reply, From, {error, already_talking_to}};
-                [#gaia_group{talks_to = true}] ->
-                    {reply, From, {error, already_talking_to}};
-                [Peer] when is_record(Peer, gaia_peer) ->
-                    UpdatedPeer = Peer#gaia_peer{talks_to = true},
+        {call, From, busy = Call} ->
+            ?LOG_DEBUG(#{module => ?MODULE, call => Call}),
+            {reply, From, Busy};
+        {call, From, {busy, Busy} = Call} ->
+            ?LOG_DEBUG(#{module => ?MODULE, call => Call}),
+            {reply, From, ok, State#{busy => Busy}};
+        {call, From, {start_peer_conversation, PeerIdOrName,
+                      ConversationStatus} = Call} ->
+            ?LOG_DEBUG(#{module => ?MODULE, call => Call}),
+            case db_lookup_peer(Db, PeerIdOrName) of
+                [#gaia_peer{conversation = {true, _ConversationStatus}}] ->
+                    {reply, From, {error, already_started}};
+                [Peer] ->
+                    UpdatedPeer =
+                        Peer#gaia_peer{conversation =
+                                           {true, ConversationStatus}},
                     true = db_insert(Db, UpdatedPeer),
-                    ok = update_network(MyPeerId, Db, Status, Muted,
-                                        NetworkSenderPid),
-                    {reply, From, ok};
-                [Group] when is_record(Group, gaia_group) ->
-                    UpdatedGroup = Group#gaia_group{talks_to = true},
-                    true = db_insert(Db, UpdatedGroup),
-                    ok = update_network(MyPeerId, Db, Status, Muted,
-                                        NetworkSenderPid),
+                    ok = update_network(MyPeerId, Db, Busy, NetworkSenderPid),
                     {reply, From, ok};
                 [] ->
-                    case IdOrName of
-                        {name, _} ->
-                            {reply, From, {error, no_such_name}};
-                        _ ->
-                            {reply, From, {error, no_such_id}}
-                    end
+                    {reply, From, {error, no_such_peer}}
             end;
-        {call, From, {stop_talking_to, all}} ->
-            ?LOG_DEBUG(#{module => ?MODULE, call => {stop_talking_to, all}}),
-            db_foldl(
-              fun(#gaia_peer{talks_to = true} = Peer, Acc) ->
-                      true = db_insert(Db, Peer#gaia_peer{talks_to = false}),
-                      Acc;
-                 (#gaia_group{talks_to = true} = Group, Acc) ->
-                      true = db_insert(Db, Group#gaia_group{talks_to = false}),
-                      Acc;
-                 (_, Acc) ->
-                      Acc
-              end, undefined, Db),
-            ok = update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid),
+        {call, From, {stop_peer_conversation, all} = Call} ->
+            ?LOG_DEBUG(#{module => ?MODULE, call => Call}),
+            ok = db_fold(
+                   fun(#gaia_peer{
+                          conversation = {true, _ConversationStatus}} = Peer,
+                       Acc) ->
+                           true = db_insert(Db, Peer#gaia_peer{
+                                                  conversation = false}),
+                           Acc;
+                      (_, Acc) ->
+                           Acc
+                   end, ok, Db),
+            ok = update_network(MyPeerId, Db, Busy, NetworkSenderPid),
             {reply, From, ok};
-        {call, From, {stop_talking_to, IdOrName}} ->
-            ?LOG_DEBUG(#{module => ?MODULE,
-                         call => {stop_talking_to, IdOrName}}),
-            case db_get_by(Db, IdOrName) of
-                [#gaia_peer{talks_to = false}] ->
-                    {reply, From, {error, not_talking_to}};
-                [#gaia_group{talks_to = false}] ->
-                    {reply, From, {error, not_talking_to}};
-                [Peer] when is_record(Peer, gaia_peer) ->
-                    UpdatedPeer = Peer#gaia_peer{talks_to = false},
+        {call, From, {stop_peer_conversation, PeerIdOrName} = Call} ->
+            ?LOG_DEBUG(#{module => ?MODULE, call => Call}),
+            case db_lookup_peer(Db, PeerIdOrName) of
+                [#gaia_peer{conversation = false}] ->
+                    {reply, From, {error, already_stopped}};
+                [Peer] ->
+                    UpdatedPeer = Peer#gaia_peer{conversation = false},
                     true = db_insert(Db, UpdatedPeer),
-                    ok = update_network(MyPeerId, Db, Status, Muted,
-                                        NetworkSenderPid),
-                    {reply, From, ok};
-                [Group] when is_record(Group, gaia_group) ->
-                    UpdatedGroup = Group#gaia_group{talks_to = false},
-                    true = db_insert(Db, UpdatedGroup),
-                    ok = update_network(MyPeerId, Db, Status, Muted,
-                                        NetworkSenderPid),
+                    ok = update_network(MyPeerId, Db, Busy, NetworkSenderPid),
                     {reply, From, ok};
                 [] ->
-                    case IdOrName of
-                        {name, _} ->
-                            {reply, From, {error, no_such_name}};
-                        _ ->
-                            {reply, From, {error, no_such_id}}
-                    end
+                    {reply, From, {error, no_such_peer}}
             end;
-        {call, From, {handle_peer_negotiation, PeerId, RemotePort}} ->
-            ?LOG_DEBUG(
-               #{module => ?MODULE,
-                 call => {handle_peer_negotiation, PeerId, RemotePort}}),
-            case db_get_peer_by_id(Db, PeerId) of
-                [#gaia_peer{name = PeerName,
-                            mode = Mode,
-                            options = Options,
-                            talks_to = TalksTo} = Peer] ->
-                    AcceptPeer =
-                        case accept_peer(MyPeerName, Status, Peer, Mode,
-                                         Options, TalksTo) of
-                            no ->
-                                case db_get_peer_by_name(Db, <<"*">>) of
-                                    [#gaia_peer{mode = WildcardMode,
-                                                options = WildcardOptions,
-                                                talks_to = true}] ->
-                                        ?LOG_DEBUG(#{wildcard_enabled => PeerId}),
-                                        accept_peer(
-                                          MyPeerName, Status, Peer,
-                                          WildcardMode, WildcardOptions, true);
-                                    _ ->
-                                        no
-                                end;
-                            Yes ->
-                                Yes
-                        end,
-                    case AcceptPeer of
+        {call, From, {set_peer_conversation_status, PeerIdOrName,
+                      ConversationStatus} = Call} ->
+            ?LOG_DEBUG(#{module => ?MODULE, call => Call}),
+            case db_lookup_peer(Db, PeerIdOrName) of
+                [#gaia_peer{conversation =
+                                {true, _ConversationStatus}} = Peer] ->
+                    UpdatedPeer =
+                        Peer#gaia_peer{conversation =
+                                           {true, ConversationStatus}},
+                    true = db_insert(Db, UpdatedPeer),
+                    ok = update_network(MyPeerId, Db, Busy, NetworkSenderPid),
+                    {reply, From, ok};
+                [_] ->
+                    {reply, From, {error, conversation_not_started}};
+                [] ->
+                    {reply, From, {error, no_such_peer}}
+            end;
+        {call, From, {start_group_conversation, GroupIdOrName} = Call} ->
+            ?LOG_DEBUG(#{module => ?MODULE, call => Call}),
+            case db_lookup_group(Db, GroupIdOrName) of
+                [#gaia_group{conversation = true}] ->
+                    {reply, From, already_started};
+                [Group] ->
+                    UpdatedGroup = Group#gaia_group{conversation = true},
+                    true = db_insert(Db, UpdatedGroup),
+                    ok = update_network(MyPeerId, Db, Busy, NetworkSenderPid),
+                    {reply, From, ok};
+                [] ->
+                    {reply, From, {error, no_such_group}}
+            end;
+        {call, From, {stop_group_conversation, all} = Call} ->
+            ?LOG_DEBUG(#{module => ?MODULE, call => Call}),
+            ok = db_fold(
+                   fun(#gaia_group{conversation = true} = Group, Acc) ->
+                           true = db_insert(
+                                    Db, Group#gaia_group{conversation = false}),
+                           Acc;
+                      (_, Acc) ->
+                           Acc
+                   end, ok, Db),
+            ok = update_network(MyPeerId, Db, Busy, NetworkSenderPid),
+            {reply, From, ok};
+        {call, From, {stop_group_conversation, GroupIdOrName}= Call} ->
+            ?LOG_DEBUG(#{module => ?MODULE, call => Call}),
+            case db_lookup_group(Db, GroupIdOrName) of
+                [#gaia_group{conversation = false}] ->
+                    {reply, From, {error, already_stopped}};
+                [Group] ->
+                    UpdatedGroup = Group#gaia_group{conversation = false},
+                    true = db_insert(Db, UpdatedGroup),
+                    ok = update_network(MyPeerId, Db, Busy, NetworkSenderPid),
+                    {reply, From, ok};
+                [] ->
+                    {reply, From, {error, no_such_group}}
+            end;
+        {call, From, {lookup, IdOrName} = Call} ->
+            ?LOG_DEBUG(#{module => ?MODULE, call => Call}),
+            {reply, From, db_lookup(Db, IdOrName)};
+        {call, From, {fold, Fun, Acc0} = Call} ->
+            ?LOG_DEBUG(#{module => ?MODULE, call => Call}),
+            {reply, From, db_fold(Fun, Acc0, Db)};
+        {call, From, {handle_peer_negotiation, PeerId, RemotePort} = Call} ->
+            ?LOG_DEBUG(#{module => ?MODULE, call => Call}),
+            case db_lookup_peer_by_id(Db, PeerId) of
+                [#gaia_peer{name = PeerName} = Peer] ->
+                    case accept_peer(MyPeerName, Busy, Peer) of
                         no ->
                             {reply, From, {error, not_available}};
                         {yes, UpdatedPeer} ->
                             true = db_insert(Db, UpdatedPeer#gaia_peer{
                                                    remote_port = RemotePort}),
                             ok = update_network(
-                                   MyPeerId, Db, Status, Muted,
-                                   NetworkSenderPid, false),
-                            case db_get_peer_by_id(Db, PeerId) of
+                                   MyPeerId, Db, Busy, NetworkSenderPid, false),
+                            case db_lookup_peer_by_id(Db, PeerId) of
                                 [#gaia_peer{local_port = undefined}] ->
                                     ?LOG_INFO(
                                        #{peer_negotiation_failed =>
@@ -387,40 +352,37 @@ message_handler(#{parent := Parent,
                             end
                     end;
                 [] ->
-                    {reply, From, {error, no_such_peer_id}}
+                    {reply, From, {error, no_such_peer}}
             end;
-        config_update ->
-            ?LOG_DEBUG(#{module => ?MODULE, message => config_update}),
+        config_update = Message ->
+            ?LOG_DEBUG(#{module => ?MODULE, message => Message}),
             true = sync_db(Db),
-            ok = update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid),
+            ok = update_network(MyPeerId, Db, Busy, NetworkSenderPid),
             noreply;
-        {nodis, NodisSubscription, {pending, NodisAddress}} ->
-            ?LOG_DEBUG(#{module => ?MODULE, nodis => {pending, NodisAddress}}),
+        {nodis, NodisSubscription, {pending, _NodisAddress} = NodisEvent} ->
+            ?LOG_DEBUG(#{module => ?MODULE, nodis_event => NodisEvent}),
             noreply;
-        {nodis, NodisSubscription, {up, NodisAddress}} ->
-            ?LOG_DEBUG(#{module => ?MODULE, nodis => {up, NodisAddress}}),
+        {nodis, NodisSubscription, {up, _NodisAddress} = NodisEvent} ->
+            ?LOG_DEBUG(#{module => ?MODULE, nodis_event => NodisEvent}),
             noreply;
-        {nodis, NodisSubscription, {change, NodisAddress, Info}} ->
-            ?LOG_DEBUG(#{module => ?MODULE,
-                         nodis => {change, NodisAddress, Info}}),
+        {nodis, NodisSubscription, {change, NodisAddress, Info} = NodisEvent} ->
+            ?LOG_DEBUG(#{module => ?MODULE, nodis_event => NodisEvent}),
             case change_peer(Db, NodisAddress, Info) of
                 ok ->
-                    ok = update_network(MyPeerId, Db, Status, Muted,
-                                        NetworkSenderPid),
+                    ok = update_network(MyPeerId, Db, Busy, NetworkSenderPid),
                     noreply;
                 {error, Reason} ->
                     ?LOG_ERROR(#{module => ?MODULE, change_peer => Reason}),
                     noreply
             end;
-        {nodis, NodisSubscription, {wait, NodisAddress}} ->
-            ?LOG_DEBUG(#{module => ?MODULE, nodis => {wait, NodisAddress}}),
+        {nodis, NodisSubscription, {wait, _NodisAddress} = NodisEvent} ->
+            ?LOG_DEBUG(#{module => ?MODULE, nodis_event => NodisEvent}),
             noreply;
-        {nodis, NodisSubscription, {down, NodisAddress}} ->
-            ?LOG_DEBUG(#{module => ?MODULE, nodis => {down, NodisAddress}}),
+        {nodis, NodisSubscription, {down, NodisAddress} = NodisEvent} ->
+            ?LOG_DEBUG(#{module => ?MODULE, nodis_event => NodisEvent}),
             case down_peer(Db, NodisAddress) of
                 ok ->
-                    ok = update_network(MyPeerId, Db, Status, Muted,
-                                        NetworkSenderPid),
+                    ok = update_network(MyPeerId, Db, Busy, NetworkSenderPid),
                     noreply;
                 {error, Reason} ->
                     ?LOG_ERROR(#{module => ?MODULE, down_peer => Reason}),
@@ -440,145 +402,87 @@ message_handler(#{parent := Parent,
 %% Update network
 %%
 
-update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid) ->
-    update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid,
-                   _Negotiate = true).
+update_network(MyPeerId, Db, Busy, NetworkSenderPid) ->
+    update_network(MyPeerId, Db, Busy, NetworkSenderPid, _Negotiate = true).
 
-update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid, Negotiate) ->
-    case db_get_peer_by_name(Db, <<"*">>) of
-        [#gaia_peer{talks_to = true,
-                    ephemeral = Ephemeral,
-                    options = Options}] ->
-            WildcardActivated =
-                case Ephemeral of
-                    true ->
-                        not lists:member(known_peers_only, Options);
-                    false ->
-                        true
-                end,
-            update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid,
-                           Negotiate, WildcardActivated);
-        _ ->
-            update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid,
-                           Negotiate, _WildcardActivated = false)
-    end.
-
-update_network(MyPeerId, Db, Status, Muted, NetworkSenderPid, Negotiate,
-               WildcardActivated) ->
-    Destinations =
-        case Muted of
-            true ->
-                [];
-            false ->
-                get_destinations(Db, Status, WildcardActivated)
-        end,
-    Sources = get_sources(Db, Status, WildcardActivated),
-    ok = update_network_receiver(Db, Sources),
-    case Negotiate of
+update_network(MyPeerId, Db, Busy, NetworkSenderPid, Negotiate) ->
+    Conversations = extract_conversations(Db, Busy),
+    ?LOG_INFO(#{module => ?MODULE, conversations => Conversations}),
+    ok = update_network_receiver(Db, Conversations),
+    if
+        Negotiate ->
+            ok = negotiate_with_peers(MyPeerId, Db, Conversations);
         true ->
-            ok = negotiate_with_peers(MyPeerId, Db,
-                                      lists:usort(Destinations ++ Sources));
-        false ->
             skip_negotation
     end,
-    update_network_sender(Db, NetworkSenderPid, Destinations).
+    update_network_sender(Db, NetworkSenderPid, Conversations).
 
-get_destinations(Db, _Status, WildcardActivated) ->
-    db_foldl(
+extract_conversations(_Db, _Busy = true) ->
+    [];
+extract_conversations(Db, _Busy = false) ->
+    db_fold(
       fun(#gaia_peer{name = <<"*">>}, Acc) ->
               Acc;
-         (#gaia_peer{id = PeerId,
-                     talks_to = TalksTo,
-                     nodis_address = NodisAddress}, Acc) ->
-              if
-                  NodisAddress == undefined ->
-                      Acc;
-                  TalksTo ->
-                      [{peer, PeerId}|Acc];
-                  true ->
-                      case WildcardActivated of
-                          true ->
-                              [{peer, PeerId}|Acc];
-                          false ->
-                              Acc
-                      end
-              end;
-         (#gaia_group{id = GroupId,
-                      talks_to = TalksTo,
-                      port = GroupPort}, Acc) ->
-              if
-                  TalksTo ->
-                      [{group, GroupId, GroupPort}|Acc];
-                  true ->
-                      Acc
-              end
-      end, [], Db).
-
-get_sources(Db, _Status, WildcardActivated) ->
-    db_foldl(
-      fun(#gaia_peer{name = <<"*">>}, Acc) ->
+         (#gaia_peer{nodis_address = undefined}, Acc) ->
               Acc;
+         %% NOTE: This is very important for the peer port negotiation!
          (#gaia_peer{id = PeerId,
-                     talks_to = TalksTo,
-                     nodis_address = NodisAddress,
-                     local_port = LocalPort,
-                     remote_port = RemotePort}, Acc) ->
-              if
-                  NodisAddress == undefined ->
-                      Acc;
-                  %% NOTE: This is very important for the half call peer
-                  %%       negotation
-                  LocalPort == undefined andalso RemotePort /= undefined ->
-                      [{peer, PeerId}|Acc];
-                  TalksTo ->
-                      [{peer, PeerId}|Acc];
-                  true ->
-                      case WildcardActivated of
-                          true ->
-                              [{peer, PeerId}|Acc];
-                          false ->
-                              Acc
-                      end
-              end;
+                     local_port = undefined,
+                     remote_port = RemotePort}, Acc)
+            when RemotePort /= undefined ->
+              [{peer, PeerId}|Acc];
+         (#gaia_peer{id = PeerId,
+                     conversation = {true, read}}, Acc) ->
+              [{peer, PeerId}|Acc];
+         (#gaia_peer{id = PeerId,
+                     conversation = {true, read_write}}, Acc) ->
+              [{peer, PeerId}|Acc];
          (#gaia_group{id = GroupId,
-                      talks_to = TalksTo,
+                      conversation = true,
+                      multicast_ip_address = MulticastIpAddress,
                       port = GroupPort}, Acc) ->
-              if
-                  TalksTo ->
-                      [{group, GroupId, GroupPort}|Acc];
-                  true ->
-                      Acc
-              end
+              [{group, GroupId, MulticastIpAddress, GroupPort}|Acc];
+         (_, Acc) ->
+              Acc
       end, [], Db).
 
-update_network_receiver(Db, Sources) ->
-    ?LOG_INFO(#{module => ?MODULE, sources => Sources}),
-    LocalPorts = gaia_nif:set_sources(Sources),
+update_network_receiver(Db, Conversations) ->
+    %% Update network receiver
+    LocalPorts =
+        gaia_nif:update_conversations(
+          lists:map(
+            fun({group, GroupId, MulticastIpAddress, GroupPort})
+                  when MulticastIpAddress /= undefined ->
+                    {group, GroupId, inet:ntoa(MulticastIpAddress), GroupPort};
+               (Conversation) ->
+                    Conversation
+            end, Conversations)),
     ?LOG_INFO(#{module => ?MODULE, local_ports => LocalPorts}),
+    %% Update peer with new local port
     lists:foreach(
       fun({{peer, PeerId}, NewLocalPort}) ->
-              case db_get_peer_by_id(Db, PeerId) of
+              case db_lookup_peer_by_id(Db, PeerId) of
                   [#gaia_peer{local_port = NewLocalPort}] ->
                       ok;
                   [Peer] ->
                       db_insert(Db, Peer#gaia_peer{local_port = NewLocalPort})
               end;
-         ({{group, GroupId}, NewGroupPort}) ->
-              [#gaia_group{port = NewGroupPort}] =
-                  db_get_group_by_id(Db, GroupId)
+         (_) ->
+              ok
       end, LocalPorts).
 
 negotiate_with_peers(_MyPeerId, _Db, []) ->
     ok;
-negotiate_with_peers(MyPeerId, Db, [{group, _GroupId, _GroupPort}|Rest]) ->
+negotiate_with_peers(
+  MyPeerId, Db, [{group, _GroupId, _MulticastIpAddress, _GroupPort}|Rest]) ->
     negotiate_with_peers(MyPeerId, Db, Rest);
 negotiate_with_peers(MyPeerId, Db, [{peer, PeerId}|Rest]) ->
     [#gaia_peer{nodis_address = {IpAddress, _SyncPort},
                 rest_port = RestPort,
                 local_port = LocalPort} = Peer] =
-        db_get_peer_by_id(Db, PeerId),
-    case gaia_rest_service:peer_negotiation(MyPeerId, {IpAddress, RestPort},
-                                            LocalPort) of
+        db_lookup_peer_by_id(Db, PeerId),
+    case gaia_rest_service:start_peer_negotiation(
+           MyPeerId, {IpAddress, RestPort}, LocalPort) of
         {ok, NewRemotePort} ->
             true = db_insert(Db, Peer#gaia_peer{remote_port = NewRemotePort}),
             negotiate_with_peers(MyPeerId, Db, Rest);
@@ -587,104 +491,143 @@ negotiate_with_peers(MyPeerId, Db, [{peer, PeerId}|Rest]) ->
                          {rest_service_client, negotiate} => Reason}),
             %% FIXME: Implement gaia_command_serv:not_available/1
             %%ok = gaia_command_serv:not_available(PeerId),
-            true = db_insert(Db, Peer#gaia_peer{talks_to = false}),
+            true = db_insert(Db, Peer#gaia_peer{conversation = false}),
             negotiate_with_peers(MyPeerId, Db, Rest)
     end.
 
-update_network_sender(Db, NetworkSenderPid, Destinations) ->
-    DestinationAddresses =
+update_network_sender(Db, NetworkSenderPid, Conversations) ->
+    ConversationAddresses =
         lists:foldl(
           fun({peer, PeerId}, Acc) ->
                   [#gaia_peer{nodis_address = {IpAddress, _SyncPort},
                               remote_port = RemotePort}] =
-                      db_get_peer_by_id(Db, PeerId),
+                      db_lookup_peer_by_id(Db, PeerId),
                   if
                       RemotePort /= undefined ->
                           [{IpAddress, RemotePort}|Acc];
                       true ->
                           Acc
                   end;
-             ({group, GroupId}, Acc) ->
-                  [#gaia_group{port = GroupPort,
-                               members = Members}] =
-                      db_get_group_by_id(Db, GroupId),
-                  lists:foldl(
-                    fun({PeerId, _PeerName}, MemberAddresses) ->
-                            [#gaia_peer{
-                                nodis_address = {IpAddress, _SyncPort}}] =
-                                db_get_peer_by_id(Db, PeerId),
-                            [{IpAddress, GroupPort}|MemberAddresses]
-                    end, [], Members) ++ Acc
-          end, [], Destinations),
+             ({group, GroupId, undefined, GroupPort}, Acc) ->
+                  case db_lookup_group_by_id(Db, GroupId) of
+                      [#gaia_group{members = [{_PeerId, <<"*">>}]}] ->
+                          [#gaia_peer{options = GroupOptions}] =
+                              db_lookup_peer_by_name(Db, <<"*">>),
+                          db_fold(
+                            fun(#gaia_peer{
+                                   ephemeral = Ephemeral,
+                                   nodis_address = {IpAddress, _SyncPort}},
+                                MemberAddresses) ->
+                                    if
+                                        Ephemeral ->
+                                            case lists:member(
+                                                   known_peer_only,
+                                                   GroupOptions) of
+                                                true ->
+                                                    MemberAddresses;
+                                                false ->
+                                                    [{IpAddress, GroupPort}|
+                                                     MemberAddresses]
+                                            end;
+                                        true ->
+                                            [{IpAddress, GroupPort}|
+                                             MemberAddresses]
+                                    end;
+                               (_, MemberAddresses) ->
+                                    MemberAddresses
+                            end, [], Db) ++ Acc;
+                      [#gaia_group{members = Members}] ->
+                          lists:foldl(
+                            fun({PeerId, _PeerName}, MemberAddresses) ->
+                                    [#gaia_peer{
+                                        nodis_address =
+                                            {IpAddress, _SyncPort}}] =
+                                        db_lookup_peer_by_id(Db, PeerId),
+                                    [{IpAddress, GroupPort}|MemberAddresses]
+                            end, [], Members) ++ Acc
+                  end;
+             ({group, _GroupId, MulticastIpAddress, GroupPort}, Acc) ->
+                  [{MulticastIpAddress, GroupPort}|Acc]
+          end, [], Conversations),
     ?LOG_INFO(#{module => ?MODULE,
-                destination_addresses => DestinationAddresses}),
-    gaia_network_sender_serv:set_destination_addresses(
-      NetworkSenderPid, DestinationAddresses).
+                conversation_addresses => ConversationAddresses}),
+    gaia_network_sender_serv:set_conversation_addresses(
+      NetworkSenderPid, lists:usort(ConversationAddresses)).
 
 %%
 %% Peer negotiation
 %%
 
-accept_peer(MyPeerName, _Status, #gaia_peer{name = PeerName}, _Mode = ignore,
-            _Options, _TalksTo) ->
+accept_peer(MyPeerName, _Busy,
+            #gaia_peer{name = PeerName,
+                       conversation = {true, _ConversationStatus}} = Peer) ->
+    ?LOG_INFO(#{accept_peer => MyPeerName,
+                accept => {ongoing_conversation, PeerName}}),
+    {yes, Peer};
+accept_peer(MyPeerName, _Busy,
+            #gaia_peer{name = PeerName,
+                       mode = ignore}) ->
     ?LOG_INFO(#{accept_peer => MyPeerName,
                 do_not_accept => {ignore, PeerName}}),
     no;
-accept_peer(MyPeerName, _Status,
-            #gaia_peer{name = PeerName,  nodis_address = undefined}, _Mode,
-            _Options, _TalksTo) ->
+accept_peer(MyPeerName, _Busy,
+            #gaia_peer{name = PeerName,
+                       nodis_address = undefined}) ->
     ?LOG_INFO(#{accept_peer => MyPeerName,
                 do_not_accept => {no_nodis_address, PeerName}}),
     no;
-accept_peer(MyPeerName, _Status = busy, #gaia_peer{name = PeerName} = Peer,
-            Mode, Options, _TalksTo = false) ->
-    case Mode of
-        ask ->
-            case lists:member(override_busy, Options) of
-                true ->
-                    ?LOG_INFO(#{accept_peer => MyPeerName,
-                                do_not_accept => {ask, busy, PeerName}}),
-                    %% FIXME: Implement gaia_command_serv:ask/1
-                    %%ok = gaia_command_serv:ask(Peer),
-                    no;
-                false ->
-                    ?LOG_INFO(#{accept_peer => MyPeerName,
-                                do_not_accept => {ask, busy, PeerName}}),
-                    no
-            end;
-        direct ->
-            case lists:member(override_busy, Options) of
-                true ->
-                    ?LOG_INFO(
-                       #{accept_peer => MyPeerName,
-                         accept_direct =>
-                             {direct, busy, now_talks_to, PeerName}}),
-                    {yes, Peer#gaia_peer{talks_to = true}};
-                false ->
-                    ?LOG_INFO(#{accept_peer => MyPeerName,
-                                do_not_accept => {direct, busy, PeerName}}),
-                    no
-            end
-    end;
-accept_peer(MyPeerName, _Status = available,
-            #gaia_peer{name = PeerName}  = Peer, Mode, _Options, _TalksTo) ->
-    case Mode of
-        ask ->
+accept_peer(MyPeerName, _Busy = true,
+            #gaia_peer{name = PeerName,
+                       mode = ask,
+                       options = Options,
+                       conversation = false} = _Peer) ->
+    case lists:member(override_busy, Options) of
+        true ->
             ?LOG_INFO(#{accept_peer => MyPeerName,
-                        do_not_accept => {ask, available, PeerName}}),
+                        do_not_accept => {busy, ask, override_busy, PeerName}}),
             %% FIXME: Implement gaia_command_serv:ask/1
             %%ok = gaia_command_serv:ask(Peer),
             no;
-        direct ->
+        false ->
+            ?LOG_INFO(#{accept_peer => MyPeerName,
+                        do_not_accept =>
+                            {busy, ask, do_not_override_busy, PeerName}}),
+            no
+    end;
+accept_peer(MyPeerName, _Busy = true,
+            #gaia_peer{name = PeerName,
+                       mode = direct,
+                       options = Options,
+                       conversation = false} = Peer) ->
+    case lists:member(override_busy, Options) of
+        true ->
             ?LOG_INFO(
                #{accept_peer => MyPeerName,
-                 accept_direct => {direct, available, PeerName}}),
-            {yes, Peer#gaia_peer{talks_to = true}}
+                 accept_direct => {busy, direct, override_busy, PeerName}}),
+            {yes, Peer#gaia_peer{conversation = {true, read_write}}};
+        false ->
+            ?LOG_INFO(#{accept_peer => MyPeerName,
+                        do_not_accept =>
+                            {busy, direct, do_not_override_busy, PeerName}}),
+            no
     end;
-accept_peer(MyPeerName, Status, Peer, Mode, Options, TalksTo) ->
+accept_peer(MyPeerName, _Busy = false,
+            #gaia_peer{name = PeerName,
+                       mode = ask}) ->
     ?LOG_INFO(#{accept_peer => MyPeerName,
-                do_not_accept =>
-                    {catch_all, Status, Peer, Mode, Options, TalksTo}}),
+                do_not_accept => {not_busy, ask, PeerName}}),
+    %% FIXME: Implement gaia_command_serv:ask/1
+    %%ok = gaia_command_serv:ask(Peer),
+    no;
+accept_peer(MyPeerName, _Busy = false,
+            #gaia_peer{name = PeerName,
+                       mode = direct} = Peer) ->
+    ?LOG_INFO(#{accept_peer => MyPeerName,
+                accept_direct => {direct, not_busy, PeerName}}),
+    {yes, Peer#gaia_peer{conversation = {true, read_write}}};
+accept_peer(MyPeerName, Busy, Peer) ->
+    ?LOG_INFO(#{accept_peer => MyPeerName,
+                do_not_accept => {catch_all, Busy, Peer}}),
     no.
 
 %%
@@ -702,7 +645,7 @@ change_peer(Db, NewNodisAddress, Info) ->
                is_integer(NewRestPort) andalso
                NewRestPort >= 1024 andalso
                NewRestPort =< 65535 ->
-            case db_get_peer_by_id(Db, NewPeerId) of
+            case db_lookup_peer_by_id(Db, NewPeerId) of
                 [#gaia_peer{nodis_address = NodisAddress,
                             rest_port = RestPort} = Peer]
                   when NodisAddress /= NewNodisAddress andalso
@@ -732,7 +675,7 @@ change_peer(Db, NewNodisAddress, Info) ->
     end.
 
 down_peer(Db, NodisAddress) ->
-    case db_get_peer_by_nodis_address(Db, NodisAddress) of
+    case db_lookup_peer_by_nodis_address(Db, NodisAddress) of
         [#gaia_peer{id = PeerId, ephemeral = true}] ->
             true = db_delete(Db, PeerId),
             ok;
@@ -775,8 +718,8 @@ sync_with_config(Db, _DeleteEphemeralPeers = true) ->
 sync_with_config(Db, _DeleteEphemeralPeers = false) ->
     %% Update existing peers and groups
     {NewConfigPeers, NewConfigGroups} =
-        db_foldl(
-          fun(#gaia_peer{id = Id} = Peer, {ConfigPeers, ConfigGroups}) ->
+        db_fold(
+          fun(#gaia_peer{id = PeerId} = Peer, {ConfigPeers, ConfigGroups}) ->
                   case lists:keytake(id, 1, ConfigPeers) of
                       {value, ConfigPeer, RemainingConfigPeers} ->
                           [Mode, Options] =
@@ -788,25 +731,29 @@ sync_with_config(Db, _DeleteEphemeralPeers = false) ->
                           true = db_insert(Db, UpdatedPeer),
                           {RemainingConfigPeers, ConfigGroups};
                       false ->
-                          true = db_delete(Db, Id),
+                          true = db_delete(Db, PeerId),
                           {ConfigPeers, ConfigGroups}
                   end;
-             (#gaia_group{id = Id} = Group, {ConfigPeers, ConfigGroups}) ->
+             (#gaia_group{id = GroupId} = Group, {ConfigPeers, ConfigGroups}) ->
                   case lists:keytake(id, 1, ConfigGroups) of
                       {value, ConfigGroup, RemainingConfigGroups} ->
-                          [Mode, Options, Members, Admin] =
+                          [Public, MulticastIpAddress, GroupPort, Type,
+                           Members, Admin] =
                               config:lookup_children(
-                                [mode, options, members, admin], ConfigGroup),
+                                [public, 'multicast-ip-address', port, type,
+                                 members, admin], ConfigGroup),
                           UpdatedGroup =
                               Group#gaia_group{
-                                mode = Mode,
-                                options = Options,
+                                public = Public,
+                                multicast_ip_address = MulticastIpAddress,
+                                port = GroupPort,
+                                type = Type,
                                 members = Members,
                                 admin = Admin},
                           true = db_insert(Db, UpdatedGroup),
                           {ConfigPeers, RemainingConfigGroups};
                       false ->
-                          true = db_delete(Db, Id),
+                          true = db_delete(Db, GroupId),
                           {ConfigPeers, ConfigGroups}
                   end
           end, {config:lookup([gaia, peers]),
@@ -814,11 +761,11 @@ sync_with_config(Db, _DeleteEphemeralPeers = false) ->
     %% Create new peers
     lists:foreach(
       fun(ConfigPeer) ->
-              [Name, Id, Mode, Options] =
-                  config:lookup_children([name, id, mode, options], ConfigPeer),
+              [PeerId, PeerName, Mode, Options] =
+                  config:lookup_children([id, name, mode, options], ConfigPeer),
               Peer = #gaia_peer{
-                        name = Name,
-                        id = generate_id_if_needed(Id, Name),
+                        id = generate_id_if_needed(PeerId, PeerName),
+                        name = PeerName,
                         mode = Mode,
                         options = Options},
               true = db_insert(Db, Peer)
@@ -826,22 +773,24 @@ sync_with_config(Db, _DeleteEphemeralPeers = false) ->
     %% Create new groups
     lists:foreach(
       fun(ConfigGroup) ->
-              [Name, Id, Mode, Options, Port, Type, Members, Admin] =
-                  config:lookup_children([name, id, mode, options, port, type,
-                                          members, admin], ConfigGroup),
+              [GroupId, GroupName, Public, MulticastIpAddress, GroupPort, Type,
+               Members, Admin] =
+                  config:lookup_children(
+                    [id, name, public, 'multicast-ip-address', port, type,
+                     members, admin], ConfigGroup),
               Peer = #gaia_group{
-                        name = Name,
-                        id = generate_id_if_needed(Id, Name),
-                        mode = Mode,
-                        options = Options,
-                        port = Port,
+                        id = generate_id_if_needed(GroupId, GroupName),
+                        name = GroupName,
+                        public = Public,
+                        multicast_ip_address = MulticastIpAddress,
+                        port = GroupPort,
                         type = Type,
                         members = Members,
                         admin = Admin},
               true = db_insert(Db, Peer)
       end, NewConfigGroups),
     %% Resolve peer ids
-    db_foldl(
+    db_fold(
       fun(#gaia_group{members = Members, admin = Admin} = Group, Acc) ->
               UpdatedGroup =
                   Group#gaia_group{
@@ -859,7 +808,7 @@ generate_id_if_needed(Id, _Name) ->
     Id.
 
 get_peer_id(Db, PeerName) ->
-    case db_get_peer_by_name(Db, PeerName) of
+    case db_lookup_peer_by_name(Db, PeerName) of
         [#gaia_peer{id = PeerId}] ->
             PeerId;
         [] ->
@@ -871,19 +820,13 @@ add_peer_id(_Db, []) ->
 add_peer_id(Db, [<<"*">>|Rest]) ->
     [{-1, <<"*">>}|add_peer_id(Db, Rest)];
 add_peer_id(Db, [PeerName|Rest]) ->
-    case db_get_peer_by_name(Db, PeerName) of
+    case db_lookup_peer_by_name(Db, PeerName) of
         [#gaia_peer{id = PeerId}] ->
             [{PeerId, PeerName}|add_peer_id(Db, Rest)];
         [] ->
             PeerName = config:lookup([gaia, 'peer-name']),
             [{generate_artificial_id(PeerName), PeerName}|add_peer_id(Db, Rest)]
     end.
-
-db_all_peers({Tab, _DetsTab}) ->
-    ets:match_object(Tab, #gaia_peer{_ = '_'}).
-
-db_all_groups({Tab, _DetsTab}) ->
-    ets:match_object(Tab, #gaia_group{_ = '_'}).
 
 db_insert({Tab, DetsTab}, PeerOrGroup) ->
     ok = dets:insert(DetsTab, PeerOrGroup),
@@ -893,40 +836,50 @@ db_delete({Tab, DetsTab}, Id) ->
     ok = dets:delete(DetsTab, Id),
     ets:delete(Tab, Id).
 
-db_get_by(Db, {name, Name}) ->
-    db_get_by_name(Db, Name);
-db_get_by(Db, Id) ->
-    db_get_by_id(Db, Id).
+db_lookup(Db, {name, Name}) ->
+    db_lookup_by_name(Db, Name);
+db_lookup(Db, Id) ->
+    db_lookup_by_id(Db, Id).
 
-db_get_by_id({Tab, _DetsTab}, Id) ->
+db_lookup_by_id({Tab, _DetsTab}, Id) ->
     ets:lookup(Tab, Id).
 
-db_get_by_name({Tab, _DetsTab}, Name) ->
-    case ets:match_object(Tab, #gaia_peer{name = Name, _ = '_'}) of
-	[] ->
-            ets:match_object(Tab, #gaia_group{name = Name, _ = '_'});
+db_lookup_by_name(Db, Name) ->
+    case db_lookup_peer_by_name(Db, Name) of
+        [] ->
+            db_lookup_group_by_name(Db, Name);
         Peers ->
             Peers
     end.
 
-db_get_peer_by_id({Tab, _DetsTab}, PeerId) ->
+db_lookup_peer(Db, {name, Name}) ->
+    db_lookup_peer_by_name(Db, Name);
+db_lookup_peer(Db, PeerId) ->
+    db_lookup_peer_by_id(Db, PeerId).
+
+db_lookup_group(Db, {name, Name}) ->
+    db_lookup_group_by_name(Db, Name);
+db_lookup_group(Db, GroupId) ->
+    db_lookup_group_by_id(Db, GroupId).
+
+db_lookup_peer_by_id({Tab, _DetsTab}, PeerId) ->
     ets:match_object(Tab, #gaia_peer{id = PeerId, _ = '_'}).
 
-db_get_group_by_id({Tab, _DetsTab}, GroupId) ->
-    ets:match_object(Tab, #gaia_group{id = GroupId, _ = '_'}).
-
-db_get_peer_by_name({Tab, _DetsTab}, Name) ->
+db_lookup_peer_by_name({Tab, _DetsTab}, Name) ->
     ets:match_object(Tab, #gaia_peer{name = Name, _ = '_'}).
 
-db_get_peer_by_nodis_address({Tab, _DetsTab}, NodisAddress) ->
+db_lookup_group_by_id({Tab, _DetsTab}, PeerId) ->
+    ets:match_object(Tab, #gaia_group{id = PeerId, _ = '_'}).
+
+db_lookup_group_by_name({Tab, _DetsTab}, Name) ->
+    ets:match_object(Tab, #gaia_group{name = Name, _ = '_'}).
+
+db_lookup_peer_by_nodis_address({Tab, _DetsTab}, NodisAddress) ->
     ets:match_object(Tab, #gaia_peer{nodis_address = NodisAddress, _ = '_'}).
 
-db_foldl(Fun, Acc, {Tab, _DetsTab}) ->
+db_fold(Fun, Acc, {Tab, _DetsTab}) ->
     ets:foldl(Fun, Acc, Tab).
 
 db_delete_ephemeral_peers({Tab, DetsTab}) ->
-    ok = dets:match_delete(DetsTab, #gaia_peer{ephemeral = true}),
-    ets:match_delete(Tab, #gaia_peer{ephemeral = true}).
-
-%db_dump({Tab, _DetsTab}) ->
-%    ets:tab2list(Tab).
+    ok = dets:match_delete(DetsTab, #gaia_peer{ephemeral = true, _ = '_'}),
+    ets:match_delete(Tab, #gaia_peer{ephemeral = true, _ = '_'}).

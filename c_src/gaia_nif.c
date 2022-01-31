@@ -8,7 +8,7 @@
 #include "timing.h"
 #include "globals.h"
 #include "gaia_utils.h"
-#include "source_table.h"
+#include "conversation_table.h"
 
 #define ATOM(name) atm_##name
 #define DECL_ATOM(name) ERL_NIF_TERM atm_##name = 0
@@ -30,6 +30,7 @@ DECL_ATOM(playback_audio);
 DECL_ATOM(pcm_name);
 DECL_ATOM(peer);
 DECL_ATOM(group);
+DECL_ATOM(undefined);
 
 #define MAX_ADDR_LEN 64
 #define MAX_PCM_NAME_LEN 64
@@ -49,7 +50,7 @@ bool kill_network_receiver = false;
 bool kill_audio_sink = false;
 uint8_t *playback_packet;
 thread_mutex_t *playback_packet_mutex;
-source_table_t *source_table;
+conversation_table_t *conversation_table;
 
 void take_params_rdlock(void) {
     assert(pthread_rwlock_rdlock(params_rwlock) == 0);
@@ -128,8 +129,8 @@ static ERL_NIF_TERM _start(ErlNifEnv* env, int argc,
     // Create jitter buffer table
     jb_table = jb_table_new();
 
-    // Create source table
-    source_table = source_table_new();
+    // Create conversation table
+    conversation_table = conversation_table_new();
 
     // Create playback packet data and mutex
     playback_packet = malloc(PERIOD_SIZE_IN_BYTES);
@@ -180,8 +181,8 @@ static ERL_NIF_TERM _stop(ErlNifEnv* env, int argc,
     // Remove jitter buffer table
     jb_table_free(jb_table, false);
 
-    // Remove source table
-    source_table_free(source_table);
+    // Remove conversation table
+    conversation_table_free(conversation_table);
 
     // Remove playback packet data and mutex
     assert(thread_mutex_lock(playback_packet_mutex) == 0);
@@ -225,19 +226,20 @@ static ERL_NIF_TERM _read_packet(ErlNifEnv* env, int argc,
 }
 
 /*
- * set_sources
+ * update_conversations
  */
 
-static ERL_NIF_TERM _set_sources(ErlNifEnv* env, int argc,
-                                 const ERL_NIF_TERM argv[]) {
+static ERL_NIF_TERM _update_conversations(ErlNifEnv* env, int argc,
+                                          const ERL_NIF_TERM argv[]) {
     if (enif_is_list(env, argv[0])) {
-        source_table_take_mutex(source_table);
+        conversation_table_take_mutex(conversation_table);
 
-        // Mark all sources as not used
-        void mark_source_as_unused(source_t *source) {
-            source->used = false;
+        // Mark all conversations as not used
+        void mark_conversation_as_unused(conversation_t *conversation) {
+            conversation->used = false;
         }
-        source_table_foreach(source_table, mark_source_as_unused);
+        conversation_table_foreach(conversation_table,
+                                   mark_conversation_as_unused);
 
         // Generate [{{peer | group, gaia_serv:id()}, LocalPort :: integer()}]
         ERL_NIF_TERM item, items = argv[0];
@@ -247,23 +249,33 @@ static ERL_NIF_TERM _set_sources(ErlNifEnv* env, int argc,
             int arity;
             if (enif_get_tuple(env, item, &arity, &tuple)) {
                 if (!((arity == 2 && tuple[0] == ATOM(peer)) ||
-                      (arity == 3 && tuple[0] == ATOM(group)))) {
-                    source_table_release_mutex(source_table);
+                      (arity == 4 && tuple[0] == ATOM(group)))) {
+                    conversation_table_release_mutex(conversation_table);
                     return enif_make_badarg(env);
                 }
                 unsigned int id;
                 if (!enif_get_uint(env, tuple[1], &id)) {
-                    source_table_release_mutex(source_table);
+                    conversation_table_release_mutex(conversation_table);
                     return enif_make_badarg(env);
                 }
-                source_t *source = source_table_find(source_table, id);
-                if (source == NULL) {
+                conversation_t *conversation =
+                    conversation_table_find(conversation_table, id);
+                if (conversation == NULL) {
+                    in_addr_t ip_address = htonl(INADDR_ANY);
                     unsigned int local_port;
                     if (arity == 2) { // peer
                         local_port = 0;
                     } else { // group
-                        if (!enif_get_uint(env, tuple[2], &local_port)) {
-                            source_table_release_mutex(source_table);
+                        if (tuple[2] != ATOM(undefined)) {
+                            if (!enif_get_uint(env, tuple[2], &ip_address)) {
+                                conversation_table_release_mutex(
+                                  conversation_table);
+                                return enif_make_badarg(env);
+                            }
+                        }
+                        if (!enif_get_uint(env, tuple[3], &local_port)) {
+                            conversation_table_release_mutex(
+                                conversation_table);
                             return enif_make_badarg(env);
                         }
                     }
@@ -271,19 +283,19 @@ static ERL_NIF_TERM _set_sources(ErlNifEnv* env, int argc,
                     int sockfd;
                     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
                         perror("socket: Socket creation failed");
-                        source_table_release_mutex(source_table);
+                        conversation_table_release_mutex(conversation_table);
                         return enif_make_badarg(env);
                     }
                     struct sockaddr_in addr;
                     memset(&addr, 0, sizeof(addr));
                     addr.sin_family = AF_INET;
-                    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+                    addr.sin_addr.s_addr = ip_address;
                     addr.sin_port = local_port;
                     if (bind(sockfd, (struct sockaddr *)&addr,
                              sizeof(addr)) < 0) {
                         perror("bind: Binding of socket failed");
                         close(sockfd);
-                        source_table_release_mutex(source_table);
+                        conversation_table_release_mutex(conversation_table);
                         return enif_make_badarg(env);
                     }
                     if (arity == 2) { // peer
@@ -294,20 +306,23 @@ static ERL_NIF_TERM _set_sources(ErlNifEnv* env, int argc,
                                         &local_addrlen) == -1) {
                             perror("getsockname: No port allocated for socket");
                             close(sockfd);
-                            source_table_release_mutex(source_table);
+                            conversation_table_release_mutex(
+                                conversation_table);
                             return enif_make_badarg(env);
                         }
                         local_port = (int)ntohs(local_addr.sin_port);
                     }
-                    // Add the new source to the source table
-                    source_t *new_source = source_new();
-                    new_source->id = id;
-                    new_source->sockfd = sockfd;
-                    new_source->port = local_port;
-                    new_source->used = true;
-                    source_table_add(source_table, new_source);
-                    INFOF("Set source: %d (%d)", new_source->id,
-                          new_source->port);
+                    // Add the new conversation to the conversation table
+                    conversation_t *new_conversation = conversation_new();
+                    new_conversation->id = id;
+                    new_conversation->sockfd = sockfd;
+                    new_conversation->ip_address = ip_address;
+                    new_conversation->port = local_port;
+                    new_conversation->used = true;
+                    conversation_table_add(conversation_table,
+                                           new_conversation);
+                    INFOF("Set conversation: %d (%d)", new_conversation->id,
+                          new_conversation->port);
 
                     // Add local port to return value list
                     ERL_NIF_TERM id_tuple;
@@ -318,30 +333,32 @@ static ERL_NIF_TERM _set_sources(ErlNifEnv* env, int argc,
                         id_tuple = enif_make_tuple2(env, ATOM(group),
                                                     enif_make_int(env, id));
                     }
-                    ERL_NIF_TERM source_tuple =
+                    ERL_NIF_TERM conversation_tuple =
                         enif_make_tuple2(env, id_tuple,
                                          enif_make_int(env, local_port));
                     return_value =
-                        enif_make_list_cell(env, source_tuple, return_value);
+                        enif_make_list_cell(env, conversation_tuple,
+                                            return_value);
                 } else {
-                    source->used = true;
+                    conversation->used = true;
                 }
             }
         }
 
-        // Delete unused sources
-        void delete_unused_source(source_t *source) {
-            if (!source->used) {
-                source_table_delete(source_table, source);
+        // Delete unused conversations
+        void delete_unused_conversation(conversation_t *conversation) {
+            if (!conversation->used) {
+                conversation_table_delete(conversation_table, conversation);
             }
         }
-        source_table_foreach(source_table, delete_unused_source);
+        conversation_table_foreach(conversation_table,
+                                   delete_unused_conversation);
 
-        source_table_release_mutex(source_table);
+        conversation_table_release_mutex(conversation_table);
 
         return return_value;
     } else {
-        source_table_release_mutex(source_table);
+        conversation_table_release_mutex(conversation_table);
         return enif_make_badarg(env);
     }
 }
@@ -363,6 +380,7 @@ static int load(ErlNifEnv *env, void **priv_data, ERL_NIF_TERM load_info) {
     LOAD_ATOM(pcm_name);
     LOAD_ATOM(peer);
     LOAD_ATOM(group);
+    LOAD_ATOM(undefined);
     return 0;
 }
 
@@ -383,7 +401,7 @@ static ErlNifFunc nif_funcs[] =
      {"stop", 0, _stop, ERL_NIF_DIRTY_JOB_IO_BOUND},
      {"set_params", 1, _set_params, 0},
      {"read_packet", 0, _read_packet, ERL_NIF_DIRTY_JOB_IO_BOUND},
-     {"set_sources", 1, _set_sources, 0}
+     {"update_conversations", 1, _update_conversations, 0}
     };
 
 ERL_NIF_INIT(gaia_nif, nif_funcs, load, NULL, NULL, unload);

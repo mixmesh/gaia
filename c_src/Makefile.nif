@@ -9,7 +9,7 @@ LDFLAGS=-shared
 
 all: ../priv/gaia_nif.so ../priv/opus_nif.so
 
-../priv/gaia_nif.so: audio.o audio_sink.o gaia_nif.o gaia_utils.o jb.o jb_table.o network_receiver.o source.o source_table.o threadlib.o timing.o
+../priv/gaia_nif.so: audio.o audio_sink.o gaia_nif.o gaia_utils.o jb.o jb_table.o network_receiver.o conversation.o conversation_table.o threadlib.o timing.o
 	$(CC) $^ $(LDFLAGS) $(GAIA_LDLIBS) -o ../priv/gaia_nif.so
 
 ../priv/opus_nif.so: opus_nif.o

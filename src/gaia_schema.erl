@@ -38,28 +38,28 @@ get() ->
            typical = <<"default">>,
            reloadable = false}},
        {peers,
-        [[{name,
-           #json_type{
-              name = string,
-              reloadable = false}},
-          {id,
+        [[{id,
            #json_type{
               name = {integer, -1, trunc(math:pow(2, 32) - 1)},
+              reloadable = false}},
+          {name,
+           #json_type{
+              name = string,
               reloadable = false}},
           {mode,
            #json_type{
               name = atom,
-               transform =
-                   fun(Mode) ->
-                       case lists:member(Mode, [direct, ask, ignore]) of
-                           true ->
-                               Mode;
-                           false ->
-                               throw(
-                                 {failed,
-                                  "Must be one of direct, ask or ignore"})
+              transform =
+                  fun(Mode) ->
+                          case lists:member(Mode, [direct, ask, ignore]) of
+                              true ->
+                                  Mode;
+                              false ->
+                                  throw(
+                                    {failed,
+                                     "Must be one of direct, ask or ignore"})
                        end
-                   end,
+                  end,
               reloadable = true}},
           {options,
            [#json_type{
@@ -70,7 +70,7 @@ get() ->
                       (_) ->
                            throw({failed,
                                   "Must be override-busy or known-peers-only \
-(for a wildcard peer only)"})
+(can only be used by the wildcard peer)"})
                    end,
                untransform =
                    fun(override_busy) ->
@@ -80,45 +80,32 @@ get() ->
                    end,
                reloadable = true}]}]]},
        {groups,
-        [[{name,
-           #json_type{
-              name = string,
-              reloadable = false}},
-          {id,
+        [[{id,
            #json_type{
               name = {integer, -1, trunc(math:pow(2, 32) - 1)},
               reloadable = false}},
-          {mode,
+          {name,
            #json_type{
-              name = atom,
-               transform =
-                   fun(Mode) ->
-                       case lists:member(Mode, [direct, ask, ignore]) of
-                           true ->
-                               Mode;
-                           false ->
-                               throw(
-                                 {failed,
-                                  "Must be one of direct, ask or ignore"})
-                       end
-                   end,
+              name = string,
+              reloadable = false}},
+          {public,
+           #json_type{
+              name = bool,
               reloadable = true}},
-          {options,
-           [#json_type{
-               name = atom,
-               transform =
-                   fun('override-busy') -> override_busy;
-                      (_) -> throw({failed, "Must be override-busy"})
-                   end,
-               untransform =
-                   fun(override_busy) ->
-                           'override-busy'
-                   end,
-               reloadable = true}]},
+          {'multicast-ip-address',
+           #json_type{
+              name = ip_address,
+              transform = fun({0, 0, 0, 0}) -> undefined;
+                             (IpAddress) -> IpAddress
+                          end,
+              untransform = fun(undefined) -> {0, 0, 0, 0};
+                               (IpAddress) -> IpAddress
+                            end,
+              reloadable = true}},
           {port,
            #json_type{
               name = {integer, 1024, 65535},
-              reloadable = false}},
+              reloadable = true}},
           {type,
            #json_type{
               name = atom,
@@ -140,4 +127,4 @@ get() ->
           {admin,
            #json_type{
               name = string,
-              reloadable = false}}]]}]}].
+              reloadable = true}}]]}]}].

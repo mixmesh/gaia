@@ -1,7 +1,7 @@
 -module(gaia_rest_service).
 -export([start_link/2]).
 -export([handle_http_request/4]).
--export([peer_negotiation/3]).
+-export([start_peer_negotiation/3]).
 
 -include_lib("kernel/include/logger.hrl").
 -include_lib("rester/include/rester.hrl").
@@ -30,10 +30,10 @@ start_link(PeerId, RestPort) ->
     rester_http_server:start_link(RestPort, ResterHttpArgs).
 
 %%
-%% Exported: peer_negotiation
+%% Exported: start_peer_negotiation
 %%
 
--spec peer_negotiation(gaia_serv:peer_id(),
+-spec start_peer_negotiation(gaia_serv:peer_id(),
                        {inet:ip_address(), inet:port_number()},
                        inet:port_number()) ->
           {ok, inet:port_number()} |
@@ -43,7 +43,7 @@ start_link(PeerId, RestPort) ->
            {bad_response, Result :: term()} |
            {http_error, Reason :: term()}}.
 
-peer_negotiation(MyPeerId, {IpAddress, RestPort}, LocalPort) ->
+start_peer_negotiation(MyPeerId, {IpAddress, RestPort}, LocalPort) ->
     Url = lists:flatten(io_lib:format("http://~s:~w/peer-negotiation",
                                       [inet:ntoa(IpAddress), RestPort])),
     RequestBody = encode_json([{<<"port">>, LocalPort}]),
@@ -113,7 +113,7 @@ handle_http_request(Socket, Request, Body, Options) ->
 handle_http_post(Socket, Request, Body, _Options) ->
     Url = Request#http_request.uri,
     case string:tokens(Url#url.path, "/") of
-        %% POST http://192.167.7.8/negotiate\r\n
+        %% POST http://192.167.7.8:8787/peer-negotiation\r\n
         %%   gaia-peer-id: ...\r\n
         %%   gaia-nonce: ...\r\n
         %%   gaia-hmac: ...\r\n\r\n
@@ -140,14 +140,16 @@ handle_http_post(Socket, Request, Body, _Options) ->
 	    rest_util:response(Socket, Request, {error, not_found})
     end.
 
-peer_negotiation(#http_request{headers = #http_chdr{other = Headers}}, RemotePort) ->
+peer_negotiation(#http_request{headers = #http_chdr{other = Headers}},
+                 RemotePort) ->
     case get_gaia_headers(Headers) of
         {PeerId, _Nonce, _HMAC} when PeerId /= not_set ->
             case gaia_serv:handle_peer_negotiation(PeerId, RemotePort) of
                 {ok, LocalPort} ->
                     {ok, {format, [{<<"port">>, LocalPort}]}};
                 {error, Reason} ->
-                    ?LOG_ERROR(#{module => ?MODULE, peer_negotiation => Reason}),
+                    ?LOG_ERROR(#{module => ?MODULE,
+                                 peer_negotiation => Reason}),
                     {error, no_access}
             end;
         _ ->
