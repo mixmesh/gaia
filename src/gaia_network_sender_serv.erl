@@ -27,11 +27,11 @@ stop(Pid) ->
     serv:call(Pid, stop).
 
 %%
-%% Exported: set_destination_addresses
+%% Exported: set_conversation_addresses
 %%
 
-set_conversation_addresses(Pid, DestinationAddresses) ->
-    serv:cast(Pid, {set_destination_addresses, DestinationAddresses}).
+set_conversation_addresses(Pid, ConversationAddresses) ->
+    serv:cast(Pid, {set_conversation_addresses, ConversationAddresses}).
 
 %%
 %% Server
@@ -48,7 +48,7 @@ init(Parent, PeerId, UseCallback, OpusEnabled) ->
                    socket => Socket,
                    seqnum => 1,
                    flags => set_flags([{opus_enabled, OpusEnabled}]),
-                   destination_addresses => [],
+                   conversation_addresses => [],
                    subscription => false}};
         {error, Reason} ->
             {error, Reason}
@@ -79,38 +79,38 @@ message_handler(#{parent := Parent,
                   socket := Socket,
                   seqnum := Seqnum,
                   flags := Flags,
-                  destination_addresses := DestinationAddresses} = State) ->
+                  conversation_addresses := ConversationAddresses} = State) ->
     receive
         {call, From, stop} ->
             ?LOG_DEBUG(#{module => ?MODULE, call => stop}),
             {stop, From, ok};
-        {cast, {set_destination_addresses, NewDestinationAddresses}} ->
+        {cast, {set_conversation_addresses, NewConversationAddresses}} ->
             ?LOG_DEBUG(#{module => ?MODULE,
-                         call => {set_destination_addresses,
-                                  NewDestinationAddresses}}),
-            case {DestinationAddresses, lists:sort(NewDestinationAddresses)} of
-                {_, DestinationAddresses} ->
+                         call => {set_conversation_addresses,
+                                  NewConversationAddresses}}),
+            case {ConversationAddresses, lists:sort(NewConversationAddresses)} of
+                {_, ConversationAddresses} ->
                     noreply;
                 {_, []} ->
                     _ = gaia_audio_source_serv:unsubscribe(AudioSourcePid),
-                    {noreply, State#{destination_addresses => [],
+                    {noreply, State#{conversation_addresses => [],
                                      subscription => false}};
-                {_, SortedDestinationAddresses} when UseCallback ->
+                {_, SortedConversationAddresses} when UseCallback ->
                     Callback = create_callback(
                                  PeerId, OpusEncoder, Socket, Seqnum, Flags,
-                                 SortedDestinationAddresses),
+                                 SortedConversationAddresses),
                     ok = gaia_audio_source_serv:subscribe(
                            AudioSourcePid, Callback),
-                    {noreply, State#{destination_addresses =>
-                                         SortedDestinationAddresses}};
-                {_, SortedDestinationAddresses}  ->
+                    {noreply, State#{conversation_addresses =>
+                                         SortedConversationAddresses}};
+                {_, SortedConversationAddresses}  ->
                     ok = gaia_audio_source_serv:subscribe(AudioSourcePid),
-                    {noreply, State#{destination_addresses =>
-                                         SortedDestinationAddresses}}
+                    {noreply, State#{conversation_addresses =>
+                                         SortedConversationAddresses}}
             end;
         {subscription_packet, Packet} ->
             ok = send_packet(PeerId, OpusEncoder, Socket, Seqnum, Flags,
-                             DestinationAddresses, Packet),
+                             ConversationAddresses, Packet),
             {noreply, State#{seqnum => Seqnum + 1}};
         {system, From, Request} ->
             ?LOG_DEBUG(#{module => ?MODULE, system => Request}),
@@ -133,28 +133,28 @@ set_flags([_|Rest], Flags) ->
     set_flags(Rest, Flags).
 
 create_callback(PeerId, OpusEncoder, Socket, Seqnum, Flags,
-                DestinationAddresses) ->
+                ConversationAddresses) ->
     fun(Packet) when is_binary(Packet) ->
             ok = send_packet(PeerId, OpusEncoder, Socket, Seqnum, Flags,
-                             DestinationAddresses, Packet),
+                             ConversationAddresses, Packet),
             create_callback(PeerId, OpusEncoder, Socket, Seqnum + 1, Flags,
-                            DestinationAddresses);
+                            ConversationAddresses);
        (OldCallback) when is_function(OldCallback) ->
             OldSeqnum = OldCallback(seqnum),
             create_callback(PeerId, OpusEncoder, Socket, OldSeqnum, Flags,
-                            DestinationAddresses);
+                            ConversationAddresses);
        (seqnum) ->
             Seqnum
     end.
 
 send_packet(PeerId, {opus_encoder, OpusEncoder}, Socket, Seqnum, Flags,
-            DestinationAddresses, Packet) ->
+            ConversationAddresses, Packet) ->
     {ok, EncodedPacket} =
         opus:encode(OpusEncoder, ?OPUS_MAX_PACKET_LEN_IN_BYTES, ?CHANNELS,
                     ?SAMPLE_SIZE_IN_BYTES, Packet),
     send_packet(PeerId, opus_encoded, Socket, Seqnum, Flags,
-                DestinationAddresses, EncodedPacket);
-send_packet(PeerId, _OpusEncoder, Socket, Seqnum, Flags, DestinationAddresses,
+                ConversationAddresses, EncodedPacket);
+send_packet(PeerId, _OpusEncoder, Socket, Seqnum, Flags, ConversationAddresses,
             Packet) ->
     Timestamp = erlang:system_time(microsecond) -
         ?SECONDS_BETWEEN_1970_and_2021 * 1000000,
@@ -176,4 +176,4 @@ send_packet(PeerId, _OpusEncoder, Socket, Seqnum, Flags, DestinationAddresses,
 %                                   reason => file:format_error(Reason)}),
                       ok
               end
-      end, DestinationAddresses).
+      end, ConversationAddresses).
