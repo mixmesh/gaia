@@ -183,8 +183,7 @@ init(Parent, GaiaDir, PeerName, PeerId, RestPort, PlaybackPcmName) ->
     ?LOG_INFO("Gaia NIF has been initialized"),
     Db = new_db(GaiaDir),
     NodeInfo = prepare_node_info(PeerId, RestPort, Db),
-    ok = nodis:set_node_info(
-           #{gaia => #{peer_id => PeerId, rest_port => RestPort}}),
+    ok = nodis:set_node_info(NodeInfo),
     ok = config_serv:subscribe(),
     {ok, NodisSubscription} = nodis_serv:subscribe(),
     ?LOG_INFO("Gaia server has been started"),
@@ -637,7 +636,7 @@ accept_peer(MyPeerName, Busy, Peer) ->
 %%
 
 prepare_node_info(MyPeerId, RestPort, Db) ->
-    PublicGroups =
+    _PublicGroups =
         db_fold(
           fun(#gaia_group{id = GroupId,
                           public = true,
@@ -647,9 +646,7 @@ prepare_node_info(MyPeerId, RestPort, Db) ->
              (_, Acc) ->
                   Acc
           end, [], Db),
-    #{'gaia.peer-id' => MyPeerId,
-      'gaia.rest-port' => RestPort,
-      'gaia.public-groups' => PublicGroups}.
+    #{gaia => #{peer_id => MyPeerId, rest_port => RestPort}}.
 
 change_peer(Db, NewNodisAddress, Info) ->
     MaxPeerId = math:pow(2, 32) - 1,

@@ -61,8 +61,8 @@ start_peer_negotiation(MyPeerId, {IpAddress, RestPort}, LocalPort) ->
            [{body_format, binary}]) of
         {ok, {{_Version, 200, _ReasonPhrase}, _Headers, ResponseBody}} ->
             try
-                case jsone:try_decode(ResponseBody, [{object_format, proplist}]) of
-                    {ok, [{<<"port">>, Port}], _} when is_integer(Port) ->
+                case jsone:try_decode(ResponseBody) of
+                    {ok, #{<<"port">> := Port}, _} when is_integer(Port) ->
                         {ok, Port};
                     {ok, JsonValue, _} ->
                         {error, {invalid_response_body, JsonValue}}
@@ -118,14 +118,12 @@ handle_http_post(Socket, Request, Body, _Options) ->
         %%   gaia-nonce: ...\r\n
         %%   gaia-hmac: ...\r\n\r\n
 	["peer-negotiation"] ->
-            case rest_util:parse_body(
-                   Request, Body,
-                   [{jsone_options, [{object_format, proplist}]}]) of
+            case rest_util:parse_body(Request, Body) of
                 {error, _Reason} ->
                     rest_util:response(
                       Socket, Request,
                       {error, bad_request, "Invalid JSON format"});
-                [{<<"port">>, Port}] when is_integer(Port) ->
+                #{<<"port">> := Port} when is_integer(Port) ->
                     rest_util:response(
                       Socket, Request, peer_negotiation(Request, Port));
                 _ ->
