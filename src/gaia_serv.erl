@@ -181,6 +181,8 @@ init(Parent, GaiaDir, PeerName, PeerId, RestPort, PlaybackPcmName) ->
     ok = gaia_nif:start(#{pcm_name => PlaybackPcmName,
                           playback_audio => ?PLAYBACK_AUDIO}),
     ?LOG_INFO("Gaia NIF has been initialized"),
+    Db = new_db(GaiaDir),
+    NodeInfo = prepare_node_info(PeerId, RestPort, Db),
     ok = nodis:set_node_info(
            #{gaia => #{peer_id => PeerId, rest_port => RestPort}}),
     ok = config_serv:subscribe(),
@@ -190,7 +192,7 @@ init(Parent, GaiaDir, PeerName, PeerId, RestPort, PlaybackPcmName) ->
            peer_id => PeerId,
            peer_name => PeerName,
            busy => false,
-           db => new_db(GaiaDir),
+           db => Db,
            nodis_subscription => NodisSubscription}}.
 
 initial_message_handler(State) ->
@@ -399,7 +401,7 @@ message_handler(#{parent := Parent,
     end.
 
 %%
-%% Update network
+%% Network management
 %%
 
 update_network(MyPeerId, Db, Busy, NetworkSenderPid) ->
@@ -631,8 +633,23 @@ accept_peer(MyPeerName, Busy, Peer) ->
     no.
 
 %%
-%% Nodis event management
+%% Nodis handling
 %%
+
+prepare_node_info(MyPeerId, RestPort, Db) ->
+    PublicGroups =
+        db_fold(
+          fun(#gaia_group{id = GroupId,
+                          public = true,
+                          admin = PeerId}, Acc)
+                when PeerId == MyPeerId ->
+                  [GroupId|Acc];
+             (_, Acc) ->
+                  Acc
+          end, [], Db),
+    #{'gaia.peer-id' => MyPeerId,
+      'gaia.rest-port' => RestPort,
+      'gaia.public-groups' => PublicGroups}.
 
 change_peer(Db, NewNodisAddress, Info) ->
     MaxPeerId = math:pow(2, 32) - 1,
@@ -689,7 +706,7 @@ down_peer(Db, NodisAddress) ->
     end.
 
 %%
-%% Peer and group management
+%% Peer and group database management
 %%
 
 new_db(GaiaDir) ->
