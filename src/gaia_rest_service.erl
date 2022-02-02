@@ -1,15 +1,10 @@
 -module(gaia_rest_service).
 -export([start_link/2]).
 -export([handle_http_request/4]).
--export([start_peer_negotiation/3]).
 
 -include_lib("kernel/include/logger.hrl").
--include_lib("rester/include/rester.hrl").
 -include_lib("rester/include/rester_http.hrl").
 -include_lib("apptools/include/shorthand.hrl").
--include("globals.hrl").
-
--define(HTTPC_TIMEOUT, 2000).
 
 %%
 %% Exported: start_link
@@ -28,61 +23,6 @@ start_link(PeerId, RestPort) ->
     ?LOG_INFO("Gaia REST service has been started on port 0.0.0.0:~w",
               [RestPort]),
     rester_http_server:start_link(RestPort, ResterHttpArgs).
-
-%%
-%% Exported: start_peer_negotiation
-%%
-
--spec start_peer_negotiation(gaia_serv:peer_id(),
-                       {inet:ip_address(), inet:port_number()},
-                       inet:port_number()) ->
-          {ok, inet:port_number()} |
-          {error,
-           {invalid_response_body, jsone:json_value()} |
-           {json_decode, Reason :: term()} |
-           {bad_response, Result :: term()} |
-           {http_error, Reason :: term()}}.
-
-start_peer_negotiation(MyPeerId, {IpAddress, RestPort}, LocalPort) ->
-    Url = lists:flatten(io_lib:format("http://~s:~w/peer-negotiation",
-                                      [inet:ntoa(IpAddress), RestPort])),
-    RequestBody = encode_json([{<<"port">>, LocalPort}]),
-    Nonce = ?b2l(keydir_service:bin_to_hexstr(<<"FIXME">>)),
-    HMAC = ?b2l(keydir_service:bin_to_hexstr(<<"FIXME">>)),
-    case httpc:request(
-           post,
-           {Url, [{"connection", "close"},
-                  {"gaia-peer-id", ?i2l(MyPeerId)},
-                  {"gaia-nonce", Nonce},
-                  {"gaia-hmac", HMAC}],
-            "application/json",
-            RequestBody},
-           [{timeout, ?HTTPC_TIMEOUT}],
-           [{body_format, binary}]) of
-        {ok, {{_Version, 200, _ReasonPhrase}, _Headers, ResponseBody}} ->
-            try
-                case jsone:try_decode(ResponseBody) of
-                    {ok, #{<<"port">> := Port}, _} when is_integer(Port) ->
-                        {ok, Port};
-                    {ok, JsonValue, _} ->
-                        {error, {invalid_response_body, JsonValue}}
-                end
-            catch
-                error:Reason ->
-                    {error, {json_decode, Reason}}
-            end;
-        {ok, Result} ->
-            {error, {bad_response, Result}};
-        {error, Reason} ->
-            {error, {http_error, Reason}}
-    end.
-
-encode_json(JsonTerm) ->
-    jsone:encode(JsonTerm, [{float_format, [{decimals, 4}, compact]},
-                            {indent, 2},
-                            {object_key_type, value},
-                            {space, 1},
-                            native_forward_slash]).
 
 %%
 %% Exported: handle_http_request
@@ -118,7 +58,8 @@ handle_http_post(Socket, Request, Body, _Options) ->
         %%   gaia-nonce: ...\r\n
         %%   gaia-hmac: ...\r\n\r\n
 	["peer-negotiation"] ->
-            case rest_util:parse_body(Request, Body) of
+            case rest_util:parse_body(Request, Body,
+                                      [{jsone_options, [undefined_as_null]}]) of
                 {error, _Reason} ->
                     rest_util:response(
                       Socket, Request,

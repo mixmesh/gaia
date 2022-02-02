@@ -26,9 +26,7 @@
          multicast_ip_address :: inet:ip_address() | undefined | '_',
          port :: inet:port_number() | '_',
          type :: gaia_serv:group_type() | '_',
-         members :: [{gaia_serv:peer_id(), gaia_serv:peer_name()}] |
-                    wildcard |
-                    '_',
+         members :: [gaia_serv:peer_id()] | '*' | '_',
          admin :: gaia_serv:peer_id() | '_',
          conversation = false :: boolean() | '_',
          session_key = undefined :: gaia_serv:session_key() | undefined | '_'

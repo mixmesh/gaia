@@ -16,8 +16,7 @@ get() ->
            reloadable = false}},
        {'peer-id',
         #json_type{
-           name = {integer, -1, trunc(math:pow(2, 32) - 1)},
-           typical = -1,
+           name = {integer, 0, trunc(math:pow(2, 32) - 1)},
            reloadable = false}},
        {'rest-port',
         #json_type{
@@ -40,7 +39,7 @@ get() ->
        {peers,
         [[{id,
            #json_type{
-              name = {integer, -1, trunc(math:pow(2, 32) - 1)},
+              name = {integer, 0, trunc(math:pow(2, 32) - 1)},
               reloadable = false}},
           {name,
            #json_type{
@@ -82,7 +81,7 @@ get() ->
        {groups,
         [[{id,
            #json_type{
-              name = {integer, -1, trunc(math:pow(2, 32) - 1)},
+              name = {integer, 0, trunc(math:pow(2, 32) - 1)},
               reloadable = false}},
           {name,
            #json_type{
@@ -94,12 +93,19 @@ get() ->
               reloadable = true}},
           {'multicast-ip-address',
            #json_type{
-              name = ip_address,
-              transform = fun({0, 0, 0, 0}) -> undefined;
-                             (IpAddress) -> IpAddress
-                          end,
-              untransform = fun(undefined) -> {0, 0, 0, 0};
-                               (IpAddress) -> IpAddress
+              name = string,
+              transform =
+                  fun(<<"<not-set>">>) -> undefined;
+                     (IpAddressString) ->
+                          case inet:parse_address(?b2l(IpAddressString)) of
+                              {ok, IpAddress} ->
+                                  IpAddress;
+                              {error, _} ->
+                                  throw({failed, "Invalid multicast ip-address"})
+                          end
+                  end,
+              untransform = fun(undefined) -> <<"<not-set>">>;
+                               (IpAddress) -> ?l2b(inet:ntoa(IpAddress))
                             end,
               reloadable = true}},
           {port,

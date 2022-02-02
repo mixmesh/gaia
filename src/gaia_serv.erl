@@ -185,6 +185,15 @@ init(Parent, GaiaDir, PeerName, PeerId, RestPort, PlaybackPcmName) ->
     ?LOG_INFO("Gaia NIF has been initialized"),
     Db = new_db(GaiaDir),
     NodeInfo = prepare_node_info(PeerId, RestPort, Db),
+
+
+
+
+    ?LOG_INFO(#{prepare_node_info => NodeInfo}),
+
+
+
+
     ok = nodis:set_node_info(NodeInfo),
     ok = config_serv:subscribe(),
     {ok, NodisSubscription} = nodis_serv:subscribe(),
@@ -371,7 +380,7 @@ message_handler(#{parent := Parent,
             noreply;
         {nodis, NodisSubscription, {change, NodisAddress, Info} = NodisEvent} ->
             ?LOG_DEBUG(#{module => ?MODULE, nodis_event => NodisEvent}),
-            case change_peer(Db, NodisAddress, Info) of
+            case change_peer(MyPeerId, Db, NodisAddress, Info) of
                 ok ->
                     ok = update_network(MyPeerId, Db, Busy, NetworkSenderPid),
                     noreply;
@@ -485,7 +494,7 @@ negotiate_with_peers(MyPeerId, Db, [{peer, PeerId}|Rest]) ->
                 rest_port = RestPort,
                 local_port = LocalPort} = Peer] =
         db_lookup_peer_by_id(Db, PeerId),
-    case gaia_rest_service:start_peer_negotiation(
+    case gaia_rest_client:start_peer_negotiation(
            MyPeerId, {IpAddress, RestPort}, LocalPort) of
         {ok, NewRemotePort} ->
             true = db_insert(Db, Peer#gaia_peer{remote_port = NewRemotePort}),
@@ -514,7 +523,7 @@ update_network_sender(Db, NetworkSenderPid, Conversations) ->
                   end;
              ({group, GroupId, undefined, GroupPort}, Acc) ->
                   case db_lookup_group_by_id(Db, GroupId) of
-                      [#gaia_group{members = [{_PeerId, <<"*">>}]}] ->
+                      [#gaia_group{members = '*'}] ->
                           [#gaia_peer{options = GroupOptions}] =
                               db_lookup_peer_by_name(Db, <<"*">>),
                           db_fold(
@@ -542,7 +551,7 @@ update_network_sender(Db, NetworkSenderPid, Conversations) ->
                             end, [], Db) ++ Acc;
                       [#gaia_group{members = Members}] ->
                           lists:foldl(
-                            fun({PeerId, _PeerName}, MemberAddresses) ->
+                            fun(PeerId, MemberAddresses) ->
                                     [#gaia_peer{
                                         nodis_address =
                                             {IpAddress, _SyncPort}}] =
@@ -604,7 +613,7 @@ accept_peer(_Busy, _Peer) ->
 %%
 
 prepare_node_info(MyPeerId, RestPort, Db) ->
-    _PublicGroups =
+    PublicGroups =
         db_fold(
           fun(#gaia_group{id = GroupId,
                           public = true,
@@ -614,19 +623,50 @@ prepare_node_info(MyPeerId, RestPort, Db) ->
              (_, Acc) ->
                   Acc
           end, [], Db),
-    #{gaia => #{peer_id => MyPeerId, rest_port => RestPort}}.
+    #{gaia => #{peer_id => MyPeerId,
+                rest_port => RestPort,
+                public_groups => PublicGroups}}.
 
-change_peer(Db, NewNodisAddress, Info) ->
+change_peer(MyPeerId, Db, {IpAddress, _SyncPort} = NewNodisAddress, Info) ->
     MaxPeerId = math:pow(2, 32) - 1,
     case lists:keysearch(gaia, 1, Info) of
-        {value, {gaia, #{peer_id := NewPeerId, rest_port := NewRestPort},
+        {value, {gaia, #{peer_id := NewPeerId,
+                         rest_port := NewRestPort,
+                         public_groups := PublicGroups},
                  _PreviousGaiaInfo}}
           when is_integer(NewPeerId) andalso
                NewPeerId > 0 andalso
                NewPeerId =< MaxPeerId andalso
                is_integer(NewRestPort) andalso
                NewRestPort >= 1024 andalso
-               NewRestPort =< 65535 ->
+               NewRestPort =< 65535 andalso
+               is_list(PublicGroups) ->
+            %% Get public groups of interest
+            lists:foreach(
+              fun(GroupId) when is_integer(GroupId) ->
+
+
+
+
+
+
+
+
+                      %% FIXME: Check if we are interested in the group
+                      case gaia_rest_client:get_group(
+                             MyPeerId, {IpAddress, NewRestPort}, GroupId) of
+                          {ok, Group} ->
+                              true = db_insert(Db, Group);
+                          {error, Reason} ->
+                              ?LOG_ERROR(
+                                 #{module => ?MODULE,
+                                   {gaia_rest_client, get_group} => Reason})
+                      end;
+                 (InvalidGroupId) ->
+                      ?LOG_ERROR(#{module => ?MODULE,
+                                   invalid_group_id => InvalidGroupId})
+              end, PublicGroups),
+            %% Update peer if needed or create ephemeral peer
             case db_lookup_peer_by_id(Db, NewPeerId) of
                 [#gaia_peer{nodis_address = NodisAddress,
                             rest_port = RestPort} = Peer]
@@ -776,7 +816,7 @@ sync_with_config(Db, _DeleteEphemeralPeers = false) ->
       fun(#gaia_group{members = Members, admin = Admin} = Group, Acc) ->
               UpdatedGroup =
                   Group#gaia_group{
-                    members = add_peer_id(Db, Members),
+                    members = replace_with_peer_id(Db, Members),
                     admin = get_peer_id(Db, Admin)},
               true = db_insert(Db, UpdatedGroup),
               Acc;
@@ -784,7 +824,7 @@ sync_with_config(Db, _DeleteEphemeralPeers = false) ->
               Acc
       end, ok, Db).
 
-generate_id_if_needed(-1, Name) ->
+generate_id_if_needed(0, Name) ->
     generate_artificial_id(Name);
 generate_id_if_needed(Id, _Name) ->
     Id.
@@ -797,17 +837,20 @@ get_peer_id(Db, PeerName) ->
             generate_artificial_id(config:lookup([gaia, 'peer-name']))
     end.
 
-add_peer_id(_Db, []) ->
+
+replace_with_peer_id(Db, [<<"*">>]) ->
+    '*';
+replace_with_peer_id(_Db, []) ->
     [];
-add_peer_id(Db, [<<"*">>|Rest]) ->
-    [{-1, <<"*">>}|add_peer_id(Db, Rest)];
-add_peer_id(Db, [PeerName|Rest]) ->
+replace_with_peer_id(Db, [PeerName|Rest]) ->
     case db_lookup_peer_by_name(Db, PeerName) of
         [#gaia_peer{id = PeerId}] ->
-            [{PeerId, PeerName}|add_peer_id(Db, Rest)];
+            [PeerId|replace_with_peer_id(Db, Rest)];
         [] ->
+            %% In this case it must be [gaia, 'peer-name'].
+            %% This is verfied by mixmesh_config_serv:post_process/3
             PeerName = config:lookup([gaia, 'peer-name']),
-            [{generate_artificial_id(PeerName), PeerName}|add_peer_id(Db, Rest)]
+            [generate_artificial_id(PeerName)|replace_with_peer_id(Db, Rest)]
     end.
 
 db_insert({Tab, DetsTab}, PeerOrGroup) ->
