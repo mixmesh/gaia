@@ -65,7 +65,9 @@ get_group(MyPeerId, Address, GroupId) ->
                             ?LOG_INFO(#{module => ?MODULE, group => Group}),
                             {ok, Group}
                     catch
-                        _:_ ->
+                        Class:Error ->
+                            ?LOG_ERROR(#{module => ?MODULE,
+                                         catched => {Class, Error}}),
                             {error, {json_decode, JsonValue}}
                     end
             catch
