@@ -1,6 +1,7 @@
 -module(gaia_rest_client).
 -export([start_peer_negotiation/3, get_group/3]).
 
+-include_lib("kernel/include/logger.hrl").
 -include_lib("apptools/include/shorthand.hrl").
 -include("../include/gaia_serv.hrl").
 
@@ -24,16 +25,14 @@ start_peer_negotiation(MyPeerId, Address, LocalPort) ->
     RequestBody = encode_json(#{<<"port">> => LocalPort}),
     case request(MyPeerId, Address, "peer-negotiation", RequestBody, post) of
         {ok, {{_Version, 200, _ReasonPhrase}, _Headers, ResponseBody}} ->
-            try
-                case jsone:try_decode(ResponseBody) of
-                    {ok, #{<<"port">> := Port}, _} when is_integer(Port) ->
-                        {ok, Port};
-                    {ok, JsonValue, _} ->
-                        {error, {invalid_response_body, JsonValue}}
-                end
+            try jsone:decode(ResponseBody) of
+                {ok, #{<<"port">> := Port}, _} when is_integer(Port) ->
+                    {ok, Port};
+                {ok, JsonValue, _} ->
+                    {error, {invalid_response_body, JsonValue}}
             catch
-                error:Reason ->
-                    {error, {json_decode, Reason}}
+                _:_ ->
+                    {error, {json_decode, invalid_json}}
             end;
         {ok, Result} ->
             {error, {bad_response, Result}};
@@ -59,19 +58,18 @@ get_group(MyPeerId, Address, GroupId) ->
     RequestPath = "group/" ++ ?i2l(GroupId),
     case request(MyPeerId, Address, RequestPath, no_request_body, get) of
         {ok, {{_Version, 200, _ReasonPhrase}, _Headers, ResponseBody}} ->
-            try
-                case jsone:try_decode(ResponseBody, [undefined_as_null]) of
-                    {ok, JsonValue, _} ->
-                        try
-                            {ok, create_group(JsonValue)}
-                        catch
-                            _Class:_Reason ->
-                                {error, {invalid_response_body, JsonValue}}
-                        end
-                end
+            try jsone:decode(ResponseBody, [undefined_as_null]) of
+                JsonValue ->
+                    try create_group(JsonValue) of
+                        Group ->
+                            {ok, Group}
+                    catch
+                        _:_ ->
+                            {error, {json_decode, JsonValue}}
+                    end
             catch
-                error:Reason ->
-                    {error, {json_decode, Reason}}
+                _:_ ->
+                    {error, {json_decode, invalid_json}}
             end;
         {ok, Result} ->
             {error, {bad_response, Result}};

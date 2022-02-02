@@ -64,7 +64,7 @@ handle_http_get(Socket, Request, _Body, _Options) ->
             Response =
                 try ?l2i(GroupIdString) of
                     GroupId ->
-                        rest_util:response(Socket, Request, group_get(GroupId))
+                        group_get(GroupId)
                 catch
                     _:_ ->
                         {error, bad_request, "Invalid Group ID"}
@@ -99,7 +99,7 @@ group_get(GroupId) ->
                   admin => Admin,
                   session_key => SessionKey},
             {ok, {format, ResponseBody}};
-        [] ->
+        _ ->
             {error, not_found}
     end.
 
