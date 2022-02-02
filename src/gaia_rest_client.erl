@@ -78,9 +78,6 @@ get_group(MyPeerId, Address, GroupId) ->
             {error, {http_error, Reason}}
     end.
 
-#{<<"admin">> => 1634429293,<<"id">> => 7233910,<<"members">> => <<"*">>,<<"multicast_ip_address">> => undefined,<<"name">> => <<"nav">>,<<"port">> => 4711,<<"public">> => true,<<"session_key">> => undefined,<<"type">> => <<"open">>}}}, module: gaia_rest_client
-
-
 create_group(#{<<"id">> := Id,
                <<"name">> := Name,
                <<"public">> := Public,
@@ -109,8 +106,8 @@ create_group(#{<<"id">> := Id,
        members = decode_members(Members),
        admin = Admin,
        session_key = SessionKey};
-create_group(ResponseBody) ->
-    throw(invalid_group}).
+create_group(_ResponseBody) ->
+    throw(invalid_group).
 
 decode_multicast_ip_address(undefined) ->
     undefined;
