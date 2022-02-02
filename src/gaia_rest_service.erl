@@ -71,7 +71,7 @@ handle_http_get(Socket, Request, _Body, _Options) ->
                 end,
             rest_util:response(Socket, Request, Response);
         Tokens ->
-	    ?LOG_INFO(#{module => ?MODULE, unknown_get_path => Tokens}),
+	    ?LOG_ERROR(#{module => ?MODULE, unknown_get_path => Tokens}),
 	    rest_util:response(Socket, Request, {error, not_found})
     end.
 
@@ -135,7 +135,7 @@ handle_http_post(Socket, Request, Body, _Options) ->
                 end,
             rest_util:response(Socket, Request, Response);
 	Tokens ->
-	    ?LOG_INFO(#{module => ?MODULE, unknown_post_path => Tokens}),
+	    ?LOG_ERROR(#{module => ?MODULE, unknown_post_path => Tokens}),
 	    rest_util:response(Socket, Request, {error, not_found})
     end.
 

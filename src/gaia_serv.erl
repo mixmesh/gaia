@@ -656,6 +656,8 @@ change_peer(MyPeerId, Db, {IpAddress, _SyncPort} = NewNodisAddress, Info) ->
                       case gaia_rest_client:get_group(
                              MyPeerId, {IpAddress, NewRestPort}, GroupId) of
                           {ok, Group} ->
+                              ?LOG_INFO(#{module => ?MODULE,
+                                          insert_group => Group}),
                               true = db_insert(Db, Group);
                           {error, Reason} ->
                               ?LOG_ERROR(
@@ -838,7 +840,7 @@ get_peer_id(Db, PeerName) ->
     end.
 
 
-replace_with_peer_id(Db, [<<"*">>]) ->
+replace_with_peer_id(_Db, [<<"*">>]) ->
     '*';
 replace_with_peer_id(_Db, []) ->
     [];
