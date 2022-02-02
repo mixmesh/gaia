@@ -62,7 +62,7 @@ handle_http_get(Socket, Request, _Body, _Options) ->
     case string:tokens(Url#url.path, "/") of
 	["group", GroupIdString] ->
             Response =
-                try ?b2i(GroupIdString) of
+                try ?l2i(GroupIdString) of
                     GroupId ->
                         rest_util:response(Socket, Request, group_get(GroupId))
                 catch
@@ -76,7 +76,7 @@ handle_http_get(Socket, Request, _Body, _Options) ->
     end.
 
 group_get(GroupId) ->
-    case gaia_serv:lookup(?b2i(GroupId)) of
+    case gaia_serv:lookup(GroupId) of
         [#gaia_group{
             id = Id,
             name = Name,
@@ -106,7 +106,7 @@ group_get(GroupId) ->
 encode_multicast_ip_address(undefined) ->
     undefined;
 encode_multicast_ip_address(IpAddress) ->
-    inet:aton(IpAddress).
+    inet:ntoa(IpAddress).
 
 encode_members('*') ->
     <<"*">>;
