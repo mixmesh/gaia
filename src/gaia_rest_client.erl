@@ -108,8 +108,8 @@ create_group(#{id := Id,
        members = decode_members(Members),
        admin = Admin,
        session_key = SessionKey};
-create_group(_ResponsBody) ->
-    throw(invalid_group).
+create_group(ResponseBody) ->
+    throw({invalid_group, ResponseBody}).
 
 decode_multicast_ip_address(undefined) ->
     undefined;
