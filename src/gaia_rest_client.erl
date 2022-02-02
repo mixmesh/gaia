@@ -65,9 +65,7 @@ get_group(MyPeerId, Address, GroupId) ->
                             ?LOG_INFO(#{module => ?MODULE, group => Group}),
                             {ok, Group}
                     catch
-                        Class:Error ->
-                            ?LOG_ERROR(#{module => ?MODULE,
-                                         catched => {Class, Error}}),
+                        _ ->
                             {error, {json_decode, JsonValue}}
                     end
             catch
@@ -80,15 +78,18 @@ get_group(MyPeerId, Address, GroupId) ->
             {error, {http_error, Reason}}
     end.
 
-create_group(#{id := Id,
-               name := Name,
-               public := Public,
-               multicast_ip_address := MulticastIpAddress,
-               port := Port,
-               type := Type,
-               members := Members,
-               admin := Admin,
-               session_key := SessionKey})
+#{<<"admin">> => 1634429293,<<"id">> => 7233910,<<"members">> => <<"*">>,<<"multicast_ip_address">> => undefined,<<"name">> => <<"nav">>,<<"port">> => 4711,<<"public">> => true,<<"session_key">> => undefined,<<"type">> => <<"open">>}}}, module: gaia_rest_client
+
+
+create_group(#{<<"id">> := Id,
+               <<"name">> := Name,
+               <<"public">> := Public,
+               <<"multicast_ip_address">> := MulticastIpAddress,
+               <<"port">> := Port,
+               <<"type">> := Type,
+               <<"members">> := Members,
+               <<"admin">> := Admin,
+               <<"session_key">> := SessionKey})
   when is_integer(Id) andalso
        is_binary(Name) andalso
        is_boolean(Public) andalso
@@ -109,7 +110,7 @@ create_group(#{id := Id,
        admin = Admin,
        session_key = SessionKey};
 create_group(ResponseBody) ->
-    throw({invalid_group, ResponseBody}).
+    throw(invalid_group}).
 
 decode_multicast_ip_address(undefined) ->
     undefined;
