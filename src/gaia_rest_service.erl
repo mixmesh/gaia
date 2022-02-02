@@ -36,15 +36,13 @@ handle_http_request(Socket, Request, Body, Options) ->
          headers => rester_http:format_hdr(Request#http_request.headers),
          body => Body,
          options => Options}),
-    try
-        case Request#http_request.method of
-            'GET' ->
-                handle_http_get(Socket, Request, Body, Options);
-            'POST' ->
-                handle_http_post(Socket, Request, Body, Options);
-            _ ->
-                rest_util:response(Socket, Request, {error, not_allowed})
-        end
+    try Request#http_request.method of
+        'GET' ->
+            handle_http_get(Socket, Request, Body, Options);
+        'POST' ->
+            handle_http_post(Socket, Request, Body, Options);
+        _ ->
+            rest_util:response(Socket, Request, {error, not_allowed})
     catch
 	_Class:Reason:StackTrace ->
 	    ?LOG_ERROR(#{module => ?MODULE,
@@ -64,7 +62,9 @@ handle_http_get(Socket, Request, _Body, _Options) ->
             Response =
                 try ?l2i(GroupIdString) of
                     GroupId ->
-                        group_get(GroupId)
+                        Group = group_get(GroupId),
+                        ?LOG_INFO(#{module => ?MODULE, group => Group}),
+                        Group
                 catch
                     _:_ ->
                         {error, bad_request, "Invalid Group ID"}
@@ -174,8 +174,9 @@ get_gaia_headers(Headers) ->
 get_gaia_headers([], Acc) ->
     Acc;
 get_gaia_headers([{"Gaia-Peer-Id", PeerId}|Rest], {_, Nonce, HMAC}) ->
-    try
-        get_gaia_headers(Rest, {?l2i(PeerId), Nonce, HMAC})
+    try ?l2i(PeerId) of
+        DecodedPeerId ->
+            get_gaia_headers(Rest, {DecodedPeerId, Nonce, HMAC})
     catch
         error:badarg ->
             invalid_peer_id

@@ -62,6 +62,7 @@ get_group(MyPeerId, Address, GroupId) ->
                 JsonValue ->
                     try create_group(JsonValue) of
                         Group ->
+                            ?LOG_INFO(#{module => ?MODULE, group => Group}),
                             {ok, Group}
                     catch
                         _:_ ->
