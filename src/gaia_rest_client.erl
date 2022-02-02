@@ -104,7 +104,7 @@ create_group(#{id := Id,
        multicast_ip_address = decode_multicast_ip_address(MulticastIpAddress),
        port = Port,
        type = ?b2a(Type),
-       members = Members,
+       members = decode_members(Members),
        admin = Admin,
        session_key = SessionKey};
 create_group(_ResponsBody) ->
@@ -115,6 +115,12 @@ decode_multicast_ip_address(undefined) ->
 decode_multicast_ip_address(IpAddressString) ->
     {ok, IpAddress} = inet:parse_address(?b2l(IpAddressString)),
     IpAddress.
+
+decode_members(<<"*">>) ->
+    '*';
+decode_members(Members) ->
+    true = lists:all(fun(Member) -> is_integer(Member) end, Members),
+    Members.
 
 %%
 %% Request tools

@@ -5,6 +5,7 @@
 -include_lib("kernel/include/logger.hrl").
 -include_lib("rester/include/rester_http.hrl").
 -include_lib("apptools/include/shorthand.hrl").
+-include("../include/gaia_serv.hrl").
 
 %%
 %% Exported: start_link
@@ -37,6 +38,8 @@ handle_http_request(Socket, Request, Body, Options) ->
          options => Options}),
     try
         case Request#http_request.method of
+            'GET' ->
+                handle_http_get(Socket, Request, Body, Options);
             'POST' ->
                 handle_http_post(Socket, Request, Body, Options);
             _ ->
@@ -50,42 +53,99 @@ handle_http_request(Socket, Request, Body, Options) ->
 	    erlang:error(Reason)
     end.
 
+%%
+%% GET
+%%
+
+handle_http_get(Socket, Request, _Body, _Options) ->
+    Url = Request#http_request.uri,
+    case string:tokens(Url#url.path, "/") of
+	["group", GroupIdString] ->
+            Response =
+                try ?b2i(GroupIdString) of
+                    GroupId ->
+                        rest_util:response(Socket, Request, group_get(GroupId))
+                catch
+                    _:_ ->
+                        {error, bad_request, "Invalid Group ID"}
+                end,
+            rest_util:response(Socket, Request, Response);
+        Tokens ->
+	    ?LOG_INFO(#{module => ?MODULE, unknown_get_path => Tokens}),
+	    rest_util:response(Socket, Request, {error, not_found})
+    end.
+
+group_get(GroupId) ->
+    case gaia_serv:lookup(?b2i(GroupId)) of
+        [#gaia_group{
+            id = Id,
+            name = Name,
+            public = Public,
+            multicast_ip_address = MulticastIpAddress,
+            port = Port,
+            type = Type,
+            members = Members,
+            admin = Admin,
+            session_key = SessionKey}] ->
+            ResponseBody =
+                #{id => Id,
+                  name => Name,
+                  public => Public,
+                  multicast_ip_address =>
+                      encode_multicast_ip_address(MulticastIpAddress),
+                  port => Port,
+                  type => ?a2b(Type),
+                  members => encode_members(Members),
+                  admin => Admin,
+                  session_key => SessionKey},
+            {ok, {format, ResponseBody}};
+        [] ->
+            {error, not_found}
+    end.
+
+encode_multicast_ip_address(undefined) ->
+    undefined;
+encode_multicast_ip_address(IpAddress) ->
+    inet:aton(IpAddress).
+
+encode_members('*') ->
+    <<"*">>;
+encode_members(Members) ->
+    Members.
+
+%%
+%% POST
+%%
+
 handle_http_post(Socket, Request, Body, _Options) ->
     Url = Request#http_request.uri,
     case string:tokens(Url#url.path, "/") of
-        %% POST http://192.167.7.8:8787/peer-negotiation\r\n
-        %%   gaia-peer-id: ...\r\n
-        %%   gaia-nonce: ...\r\n
-        %%   gaia-hmac: ...\r\n\r\n
 	["peer-negotiation"] ->
-            case rest_util:parse_body(Request, Body,
-                                      [{jsone_options, [undefined_as_null]}]) of
-                {error, _Reason} ->
-                    rest_util:response(
-                      Socket, Request,
-                      {error, bad_request, "Invalid JSON format"});
-                #{<<"port">> := Port} when is_integer(Port) ->
-                    rest_util:response(
-                      Socket, Request, peer_negotiation(Request, Port));
-                _ ->
-                    ?LOG_ERROR(#{module => ?MODULE,
-                                 invalid_request_body => Body}),
-                    rest_util:response(
-                      Socket, Request,
-                      {error, bad_request, "Invalid request body"})
-            end;
+            Response =
+                case rest_util:parse_body(Request, Body,
+                                          [{jsone_options, [undefined_as_null]}]) of
+                    {error, _Reason} ->
+                        {error, bad_request, "Invalid JSON format"};
+                    #{<<"port">> := Port} when is_integer(Port) ->
+                        peer_negotiation_post(Request, Port);
+                    _ ->
+                        ?LOG_ERROR(#{module => ?MODULE,
+                                     invalid_request_body => Body}),
+                        {error, bad_request, "Invalid request body"}
+                end,
+            rest_util:response(Socket, Request, Response);
 	Tokens ->
 	    ?LOG_INFO(#{module => ?MODULE, unknown_post_path => Tokens}),
 	    rest_util:response(Socket, Request, {error, not_found})
     end.
 
-peer_negotiation(#http_request{headers = #http_chdr{other = Headers}},
-                 RemotePort) ->
+peer_negotiation_post(
+  #http_request{headers = #http_chdr{other = Headers}}, RemotePort) ->
     case get_gaia_headers(Headers) of
         {PeerId, _Nonce, _HMAC} when PeerId /= not_set ->
             case gaia_serv:handle_peer_negotiation(PeerId, RemotePort) of
                 {ok, LocalPort} ->
-                    {ok, {format, [{<<"port">>, LocalPort}]}};
+                    {ok, {format, #{<<"port">> => LocalPort}}};
                 {error, Reason} ->
                     ?LOG_INFO(#{module => ?MODULE,
                                 peer_negotiation_rejected => Reason}),
@@ -104,6 +164,10 @@ peer_negotiation(#http_request{headers = #http_chdr{other = Headers}},
             {error, {bad_request, "Missing GAIA HTTP headers"}}
     end.
 
+
+%%   Gaia-Peer-Id: ...
+%%   Gaia-Nonce: ...
+%%   Gaia-Hmac: ...
 get_gaia_headers(Headers) ->
     get_gaia_headers(Headers, {not_found, not_found, not_found}).
 
