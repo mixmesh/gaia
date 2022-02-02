@@ -88,16 +88,16 @@ group_get(GroupId) ->
             admin = Admin,
             session_key = SessionKey}] ->
             ResponseBody =
-                #{id => Id,
-                  name => Name,
-                  public => Public,
-                  multicast_ip_address =>
+                #{<<"id">> => Id,
+                  <<"name">> => Name,
+                  <<"public">> => Public,
+                  <<"multicast_ip_address">> =>
                       encode_multicast_ip_address(MulticastIpAddress),
-                  port => Port,
-                  type => ?a2b(Type),
-                  members => encode_members(Members),
-                  admin => Admin,
-                  session_key => SessionKey},
+                  <<"port">> => Port,
+                  <<"type">> => ?a2b(Type),
+                  <<"members">> => encode_members(Members),
+                  <<"admin">> => Admin,
+                  <<"session_key">> => SessionKey},
             {ok, {format, ResponseBody}};
         _ ->
             {error, not_found}
