@@ -177,15 +177,15 @@ peer_negotiation_post(
             {error, {bad_request, "Missing GAIA HTTP headers"}}
     end.
 
-
-%%   Gaia-Peer-Id: ...
-%%   Gaia-Nonce: ...
-%%   Gaia-Hmac: ...
 get_gaia_headers(Headers) ->
     get_gaia_headers(Headers, {not_found, not_found, not_found}).
 
 get_gaia_headers([], Acc) ->
     Acc;
+get_gaia_headers([{"Gaia-Nonce", _Nonce}|Rest], Acc) ->
+    get_gaia_headers(Rest, Acc);
+get_gaia_headers([{"Gaia-Nonce-Hmac", _HMAC}|Rest], Acc) ->
+    get_gaia_headers(Rest, Acc);
 get_gaia_headers([{"Gaia-Peer-Id", PeerId}|Rest], {_, Nonce, HMAC}) ->
     try ?l2i(PeerId) of
         DecodedPeerId ->

@@ -1,6 +1,6 @@
 -module(gaia_audio_source_serv).
 -export([start_link/0, start_link/1,
-	 stop/1, subscribe/1, subscribe/2, unsubscribe/1]).
+	 stop/0, subscribe/0, subscribe/1, unsubscribe/0]).
 -export([message_handler/1]).
 
 -include_lib("apptools/include/serv.hrl").
@@ -18,40 +18,40 @@ start_link() ->
 
 start_link(Params) ->
     ?spawn_server(fun(Parent) -> init(Parent, Params) end,
-                  fun message_handler/1).
+                  fun message_handler/1,
+                  #serv_options{name = ?MODULE}).
 
 %%
 %% Exported: stop
 %%
 
-stop(Pid) ->
-    serv:call(Pid, stop).
+stop() ->
+    serv:call(?MODULE, stop).
 
 %%
 %% Exported: subscribe
 %%
 
-subscribe(Pid, Callback) ->
-    serv:call(Pid, {subscribe, self(), Callback}).
+subscribe(Callback) ->
+    serv:call(?MODULE, {subscribe, self(), Callback}).
 
-subscribe(Pid) ->
-    serv:call(Pid, {subscribe, self(), bang}).
+subscribe() ->
+    serv:call(?MODULE, {subscribe, self(), bang}).
 
 %%
 %% Exported: unsubscribe
 %%
 
-unsubscribe(Pid) ->
-    serv:call(Pid, {unsubscribe, self()}).
+unsubscribe() ->
+    serv:call(?MODULE, {unsubscribe, self()}).
 
 %%
 %% Server
 %%
 
 init(Parent, Params) ->
-    AudioProducerPid = spawn_link(fun() ->
-					  audio_producer_init(Params)
-				  end),
+    AudioProducerPid =
+        spawn_link(fun() -> audio_producer_init(Params) end),
     ?LOG_INFO("Gaia audio source server has been started"),
     {ok, #{parent => Parent,
            audio_producer_pid => AudioProducerPid,

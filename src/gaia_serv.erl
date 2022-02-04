@@ -61,7 +61,7 @@ start_link(GaiaDir, PeerName, PeerId, RestPort, PlaybackPcmName) ->
                init(Parent, GaiaDir, PeerName, PeerId, RestPort,
                     PlaybackPcmName)
        end,
-       fun initial_message_handler/1,
+       fun message_handler/1,
        #serv_options{name = ?MODULE}).
 
 %%
@@ -207,25 +207,16 @@ init(Parent, GaiaDir, PeerName, PeerId, RestPort, PlaybackPcmName) ->
            groups_of_interest => GroupsOfInterest,
            nodis_subscription => NodisSubscription}}.
 
-initial_message_handler(State) ->
-    receive
-        {neighbour_workers, NeighbourWorkers} ->
-            [NetworkSenderPid] =
-                supervisor_helper:get_selected_worker_pids(
-                  [gaia_network_sender_serv], NeighbourWorkers),
-            {swap_message_handler, fun ?MODULE:message_handler/1,
-             State#{network_sender_pid => NetworkSenderPid}}
-    end.
-
 message_handler(#{parent := Parent,
                   peer_id := MyPeerId,
                   peer_name := MyPeerName,
                   db := Db,
                   groups_of_interest := GroupsOfInterest,
                   busy := Busy,
-                  nodis_subscription := NodisSubscription,
-                  network_sender_pid := NetworkSenderPid} = State) ->
+                  nodis_subscription := NodisSubscription} = State) ->
     receive
+        {neighbour_workers, _NeighbourWorkers} ->
+            noreply;
         {call, From, stop = Call} ->
             ?LOG_DEBUG(#{call => Call}),
             ok = gaia_nif:stop(),
@@ -247,7 +238,7 @@ message_handler(#{parent := Parent,
                         Peer#gaia_peer{conversation =
                                            {true, ConversationStatus}},
                     true = db_insert(Db, UpdatedPeer),
-                    ok = update_network(MyPeerId, Db, Busy, NetworkSenderPid),
+                    ok = update_network(MyPeerId, Db, Busy),
                     {reply, From, ok};
                 [] ->
                     {reply, From, {error, no_such_peer}}
@@ -264,7 +255,7 @@ message_handler(#{parent := Parent,
                       (_, Acc) ->
                            Acc
                    end, ok, Db),
-            ok = update_network(MyPeerId, Db, Busy, NetworkSenderPid),
+            ok = update_network(MyPeerId, Db, Busy),
             {reply, From, ok};
         {call, From, {stop_peer_conversation, PeerIdOrName} = Call} ->
             ?LOG_DEBUG(#{call => Call}),
@@ -274,7 +265,7 @@ message_handler(#{parent := Parent,
                 [Peer] ->
                     UpdatedPeer = Peer#gaia_peer{conversation = false},
                     true = db_insert(Db, UpdatedPeer),
-                    ok = update_network(MyPeerId, Db, Busy, NetworkSenderPid),
+                    ok = update_network(MyPeerId, Db, Busy),
                     {reply, From, ok};
                 [] ->
                     {reply, From, {error, no_such_peer}}
@@ -289,7 +280,7 @@ message_handler(#{parent := Parent,
                         Peer#gaia_peer{conversation =
                                            {true, ConversationStatus}},
                     true = db_insert(Db, UpdatedPeer),
-                    ok = update_network(MyPeerId, Db, Busy, NetworkSenderPid),
+                    ok = update_network(MyPeerId, Db, Busy),
                     {reply, From, ok};
                 [_] ->
                     {reply, From, {error, conversation_not_started}};
@@ -304,7 +295,7 @@ message_handler(#{parent := Parent,
                 [Group] ->
                     UpdatedGroup = Group#gaia_group{conversation = true},
                     true = db_insert(Db, UpdatedGroup),
-                    ok = update_network(MyPeerId, Db, Busy, NetworkSenderPid),
+                    ok = update_network(MyPeerId, Db, Busy),
                     {reply, From, ok};
                 [] ->
                     {reply, From, {error, no_such_group}}
@@ -319,7 +310,7 @@ message_handler(#{parent := Parent,
                       (_, Acc) ->
                            Acc
                    end, ok, Db),
-            ok = update_network(MyPeerId, Db, Busy, NetworkSenderPid),
+            ok = update_network(MyPeerId, Db, Busy),
             {reply, From, ok};
         {call, From, {stop_group_conversation, GroupIdOrName}= Call} ->
             ?LOG_DEBUG(#{call => Call}),
@@ -329,7 +320,7 @@ message_handler(#{parent := Parent,
                 [Group] ->
                     UpdatedGroup = Group#gaia_group{conversation = false},
                     true = db_insert(Db, UpdatedGroup),
-                    ok = update_network(MyPeerId, Db, Busy, NetworkSenderPid),
+                    ok = update_network(MyPeerId, Db, Busy),
                     {reply, From, ok};
                 [] ->
                     {reply, From, {error, no_such_group}}
@@ -351,8 +342,7 @@ message_handler(#{parent := Parent,
                         {yes, UpdatedPeer} ->
                             true = db_insert(Db, UpdatedPeer#gaia_peer{
                                                    remote_port = RemotePort}),
-                            ok = update_network(
-                                   MyPeerId, Db, Busy, NetworkSenderPid, false),
+                            ok = update_network(MyPeerId, Db, Busy, false),
                             case db_lookup_peer_by_id(Db, PeerId) of
                                 [#gaia_peer{local_port = undefined}] ->
                                     ?LOG_DEBUG(#{no_local_port_created =>
@@ -371,7 +361,7 @@ message_handler(#{parent := Parent,
         config_update = Message ->
             ?LOG_DEBUG(#{message => Message}),
             {ok, NewGroupsOfInterest} = sync_db(Db),
-            ok = update_network(MyPeerId, Db, Busy, NetworkSenderPid),
+            ok = update_network(MyPeerId, Db, Busy),
             {noreply, State#{group_of_interest => NewGroupsOfInterest}};
         {nodis, NodisSubscription, {pending, _NodisAddress} = NodisEvent} ->
             ?LOG_DEBUG(#{nodis_event => NodisEvent}),
@@ -384,7 +374,7 @@ message_handler(#{parent := Parent,
             case change_peer(MyPeerId, Db, GroupsOfInterest, NodisAddress,
                              Info) of
                 ok ->
-                    ok = update_network(MyPeerId, Db, Busy, NetworkSenderPid),
+                    ok = update_network(MyPeerId, Db, Busy),
                     noreply;
                 {error, Reason} ->
                     ?LOG_WARNING(#{change_peer => Reason}),
@@ -397,7 +387,7 @@ message_handler(#{parent := Parent,
             ?LOG_DEBUG(#{nodis_event => NodisEvent}),
             case down_peer(Db, NodisAddress) of
                 ok ->
-                    ok = update_network(MyPeerId, Db, Busy, NetworkSenderPid),
+                    ok = update_network(MyPeerId, Db, Busy),
                     noreply;
                 {error, Reason} ->
                     ?LOG_WARNING(#{down_peer => Reason}),
@@ -417,10 +407,10 @@ message_handler(#{parent := Parent,
 %% Network management
 %%
 
-update_network(MyPeerId, Db, Busy, NetworkSenderPid) ->
-    update_network(MyPeerId, Db, Busy, NetworkSenderPid, _Negotiate = true).
+update_network(MyPeerId, Db, Busy) ->
+    update_network(MyPeerId, Db, Busy, _Negotiate = true).
 
-update_network(MyPeerId, Db, Busy, NetworkSenderPid, Negotiate) ->
+update_network(MyPeerId, Db, Busy, Negotiate) ->
     Conversations = extract_conversations(Db, Busy),
     ?LOG_DEBUG(#{conversations => Conversations}),
     ok = update_network_receiver(Db, Conversations),
@@ -430,7 +420,7 @@ update_network(MyPeerId, Db, Busy, NetworkSenderPid, Negotiate) ->
         true ->
             skip_negotation
     end,
-    update_network_sender(Db, NetworkSenderPid, Conversations).
+    update_network_sender(Db, Conversations).
 
 extract_conversations(_Db, _Busy = true) ->
     [];
@@ -509,7 +499,7 @@ negotiate_with_peers(MyPeerId, Db, [{peer, PeerId}|Rest]) ->
             negotiate_with_peers(MyPeerId, Db, Rest)
     end.
 
-update_network_sender(Db, NetworkSenderPid, Conversations) ->
+update_network_sender(Db, Conversations) ->
     ConversationAddresses =
         lists:foldl(
           fun({peer, PeerId}, Acc) ->
@@ -565,7 +555,7 @@ update_network_sender(Db, NetworkSenderPid, Conversations) ->
           end, [], Conversations),
     ?LOG_INFO(#{conversation_addresses => ConversationAddresses}),
     gaia_network_sender_serv:set_conversation_addresses(
-      NetworkSenderPid, lists:usort(ConversationAddresses)).
+      lists:usort(ConversationAddresses)).
 
 %%
 %% Peer negotiation

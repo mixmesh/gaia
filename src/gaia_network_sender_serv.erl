@@ -1,5 +1,5 @@
 -module(gaia_network_sender_serv).
--export([start_link/3, stop/1, set_conversation_addresses/2]).
+-export([start_link/3, stop/0, set_conversation_addresses/1]).
 -export([message_handler/1]).
 -include_lib("apptools/include/serv.hrl").
 -include_lib("apptools/include/bits.hrl").
@@ -17,21 +17,22 @@ start_link(PeerId, UseCallback, OpusEnabled) ->
        fun(Parent) ->
                init(Parent, PeerId, UseCallback, OpusEnabled)
        end,
-       fun initial_message_handler/1).
+       fun message_handler/1,
+       #serv_options{name = ?MODULE}).
 
 %%
 %% Exported: stop
 %%
 
-stop(Pid) ->
-    serv:call(Pid, stop).
+stop() ->
+    serv:call(?MODULE, stop).
 
 %%
 %% Exported: set_conversation_addresses
 %%
 
-set_conversation_addresses(Pid, ConversationAddresses) ->
-    serv:cast(Pid, {set_conversation_addresses, ConversationAddresses}).
+set_conversation_addresses(ConversationAddresses) ->
+    serv:cast(?MODULE, {set_conversation_addresses, ConversationAddresses}).
 
 %%
 %% Server
@@ -61,18 +62,7 @@ create_opus_encoder(true) ->
 create_opus_encoder(false) ->
     no_opus_encoder.
 
-initial_message_handler(State) ->
-    receive
-        {neighbour_workers, NeighbourWorkers} ->
-            [AudioSourcePid] =
-                supervisor_helper:get_selected_worker_pids(
-                  [gaia_audio_source_serv], NeighbourWorkers),
-            {swap_message_handler, fun ?MODULE:message_handler/1,
-             State#{audio_source_pid => AudioSourcePid}}
-    end.
-
 message_handler(#{parent := Parent,
-                  audio_source_pid := AudioSourcePid,
                   peer_id := PeerId,
                   use_callback := UseCallback,
                   opus_encoder := OpusEncoder,
@@ -81,6 +71,8 @@ message_handler(#{parent := Parent,
                   flags := Flags,
                   conversation_addresses := ConversationAddresses} = State) ->
     receive
+        {neighbour_workers, _NeighbourWorkers} ->
+            noreply;
         {call, From, stop = Call} ->
             ?LOG_DEBUG(#{call => Call}),
             {stop, From, ok};
@@ -90,19 +82,18 @@ message_handler(#{parent := Parent,
                 {_, ConversationAddresses} ->
                     noreply;
                 {_, []} ->
-                    _ = gaia_audio_source_serv:unsubscribe(AudioSourcePid),
+                    _ = gaia_audio_source_serv:unsubscribe(),
                     {noreply, State#{conversation_addresses => [],
                                      subscription => false}};
                 {_, SortedConversationAddresses} when UseCallback ->
                     Callback = create_callback(
                                  PeerId, OpusEncoder, Socket, Seqnum, Flags,
                                  SortedConversationAddresses),
-                    ok = gaia_audio_source_serv:subscribe(
-                           AudioSourcePid, Callback),
+                    ok = gaia_audio_source_serv:subscribe(Callback),
                     {noreply, State#{conversation_addresses =>
                                          SortedConversationAddresses}};
                 {_, SortedConversationAddresses}  ->
-                    ok = gaia_audio_source_serv:subscribe(AudioSourcePid),
+                    ok = gaia_audio_source_serv:subscribe(),
                     {noreply, State#{conversation_addresses =>
                                          SortedConversationAddresses}}
             end;
