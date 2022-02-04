@@ -199,6 +199,7 @@ init(Parent, GaiaDir, PeerName, PeerId, RestPort, PlaybackPcmName) ->
     ok = config_serv:subscribe(),
     {ok, NodisSubscription} = nodis_serv:subscribe(),
     ?LOG_INFO("Gaia server has been started"),
+    self() ! purge_groups_of_interest,
     {ok, #{parent => Parent,
            peer_id => PeerId,
            peer_name => PeerName,
@@ -342,7 +343,6 @@ message_handler(#{parent := Parent,
                     case accept_peer(Busy, Peer) of
                         {no, Reason} ->
                             {reply, From, {error, Reason}};
-
                         {yes, UpdatedPeer} ->
                             true = db_insert(Db, UpdatedPeer#gaia_peer{
                                                    remote_port = RemotePort}),
@@ -397,6 +397,22 @@ message_handler(#{parent := Parent,
                     ?LOG_WARNING(#{down_peer => Reason}),
                     noreply
             end;
+        purge_groups_of_interest ->
+            Now = calendar:datetime_to_gregorian_seconds(calendar:local_time()),
+            UpdatedGroupsOfInterest =
+                db_fold(
+                  fun(#group_of_interest{id = GroupId,
+                                         admin = Admin,
+                                         cache_timeout = CacheTimeout}, Acc)
+                        when Admin /= MyPeerId andalso CacheTimeout < Now ->
+                          true = db_delete(Db, GroupId),
+                          lists:keydelete(GroupId, #group_of_interest.id, Acc);
+                     (_, Acc) ->
+                          Acc
+                  end, GroupsOfInterest, Db),
+            %% Purge groups of interest each half hour
+            _ = erlang:start_timer(30000, self(), purge_groups_of_interest),
+            {noreply, State#{groups_of_interest => UpdatedGroupsOfInterest}};
         {system, From, Request} ->
             ?LOG_DEBUG(#{system => Request}),
             {system, From, Request};
@@ -497,9 +513,9 @@ negotiate_with_peers(MyPeerId, Db, [{peer, PeerId}|Rest]) ->
             negotiate_with_peers(MyPeerId, Db, Rest);
         {error, Reason} ->
             ?LOG_ERROR(#{{rest_service_client, negotiate} => Reason}),
-            %% FIXME: Implement gaia_command_serv:not_available/1
-            %%ok = gaia_command_serv:not_available(PeerId),
-            true = db_insert(Db, Peer#gaia_peer{conversation = false}),
+            UpdatedPeer = Peer#gaia_peer{conversation = false},
+            ok = gaia_command_serv:negotiation_failed(UpdatedPeer, Reason),
+            true = db_insert(Db, UpdatedPeer),
             negotiate_with_peers(MyPeerId, Db, Rest)
     end.
 
@@ -529,7 +545,7 @@ update_network_sender(Db, Conversations) ->
                                     if
                                         Ephemeral ->
                                             case lists:member(
-                                                   known_peer_only,
+                                                   known_peers_only,
                                                    GroupOptions) of
                                                 true ->
                                                     MemberAddresses;
@@ -567,20 +583,22 @@ update_network_sender(Db, Conversations) ->
 
 accept_peer(_Busy,
             #gaia_peer{conversation = {true, _ConversationStatus}} = Peer) ->
+    ok = gaia_command_serv:conversation_accepted(Peer),
     {yes, Peer};
-accept_peer(_Busy, #gaia_peer{mode = ignore}) ->
+accept_peer(_Busy, #gaia_peer{mode = ignore} = Peer) ->
+    ok = gaia_command_serv:conversation_rejected(Peer, ignore),
     {no, ignore};
 accept_peer(_Busy, #gaia_peer{nodis_address = undefined}) ->
     {no, no_nodis_address};
 accept_peer(_Busy = true, #gaia_peer{mode = ask,
                                      options = Options,
-                                     conversation = false} = _Peer) ->
+                                     conversation = false} = Peer) ->
     case lists:member(override_busy, Options) of
         true ->
-            %% FIXME: Implement gaia_command_serv:ask/1
-            %%ok = gaia_command_serv:ask(Peer),
+            ok = gaia_command_serv:ask_for_conversation(Peer),
             {no, ask};
         false ->
+            ok = gaia_command_serv:conversation_rejected(Peer, busy),
             {no, busy}
     end;
 accept_peer(_Busy = true, #gaia_peer{
@@ -589,17 +607,22 @@ accept_peer(_Busy = true, #gaia_peer{
                              conversation = false} = Peer) ->
     case lists:member(override_busy, Options) of
         true ->
-            {yes, Peer#gaia_peer{conversation = {true, read_write}}};
+            UpdatedPeer = Peer#gaia_peer{conversation = {true, read_write}},
+            ok = gaia_command_serv:conversation_accepted(UpdatedPeer),
+            {yes, UpdatedPeer};
         false ->
+            ok = gaia_command_serv:conversation_rejected(Peer, busy),
             {no, busy}
     end;
-accept_peer(_Busy = false, #gaia_peer{mode = ask}) ->
-    %% FIXME: Implement gaia_command_serv:ask/1
-    %%ok = gaia_command_serv:ask(Peer),
+accept_peer(_Busy = false, #gaia_peer{mode = ask} = Peer) ->
+    ok = gaia_command_serv:ask_for_conversation(Peer),
     {no, ask};
 accept_peer(_Busy = false, #gaia_peer{mode = direct} = Peer) ->
-    {yes, Peer#gaia_peer{conversation = {true, read_write}}};
-accept_peer(_Busy, _Peer) ->
+    UpdatedPeer = Peer#gaia_peer{conversation = {true, read_write}},
+    ok = gaia_command_serv:conversation_accepted(UpdatedPeer),
+    {yes, UpdatedPeer};
+accept_peer(_Busy, Peer) ->
+    ok = gaia_command_serv:conversation_rejected(Peer, not_available),
     {no, not_available}.
 
 %%
@@ -617,6 +640,7 @@ prepare_node_info(MyPeerId, RestPort, Db) ->
              (_, Acc) ->
                   Acc
           end, [], Db),
+    ok = gaia_command_serv:my_public_groups(PublicGroups),
     #{gaia => #{peer_id => MyPeerId,
                 rest_port => RestPort,
                 public_groups => PublicGroups}}.
@@ -636,15 +660,6 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                NewRestPort >= 1024 andalso
                NewRestPort =< 65535 andalso
                is_list(PublicGroups) ->
-
-
-            %% use command server to say that group admins come and go?
-            %% use command server to say that peers come and go?
-            %% clean up on nodis_down (remove group?) no!
-            %% and more?
-            %% purge group of interest each hour
-
-
             %% Update groups of interest
             lists:foreach(
               fun(#group_of_interest{id = GroupId, admin = Admin})
@@ -654,10 +669,11 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                              GroupId) of
                           {ok, Group} ->
                               ?LOG_INFO(#{insert_group => Group}),
-                              true = db_insert(Db, Group);
+                              true = db_insert(Db, Group),
+                              ok = gaia_command_serv:peer_has_public_groups(Group);
                           {error, Reason} ->
-                              ?LOG_ERROR(
-                                 #{{gaia_rest_client, get_group} => Reason})
+                              ?LOG_ERROR(#{{gaia_rest_client,
+                                            get_group} => Reason})
                       end;
                  (_) ->
                       ok
@@ -673,7 +689,7 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                                        remote_port = undefined,
                                        rest_port = NewRestPort},
                     true = db_insert(Db, UpdatedPeer),
-                    ok;
+                    gaia_command_serv:peer_up(UpdatedPeer);
                 [_] ->
                     ok;
                 [] ->
@@ -685,7 +701,7 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                            rest_port = NewRestPort},
                     true = db_insert(Db, EphemeralPeer),
                     ok
-                end;
+            end;
         {value, {gaia, GaiaInfo, _PreviousGaiaInfo}} ->
             {error, {bad_gaia_info, GaiaInfo}};
         false ->
@@ -701,7 +717,7 @@ down_peer(Db, NodisAddress) ->
             true = db_insert(Db, Peer#gaia_peer{
                                    nodis_address = undefined,
                                    rest_port = undefined}),
-            ok;
+            gaia_command_serv:peer_down(Peer);
         [] ->
             {error, no_such_nodis_address}
     end.
@@ -820,6 +836,7 @@ sync_with_config(Db, _DeleteEphemeralPeers = false) ->
                    Acc
            end, ok, Db),
     %% Extract groups of interest
+    Now = calendar:datetime_to_gregorian_seconds(calendar:local_time()),
     GroupsOfInterest =
         lists:foldl(
           fun(ConfigGroupOfInterest, Acc) ->
@@ -831,7 +848,7 @@ sync_with_config(Db, _DeleteEphemeralPeers = false) ->
                          id = generate_id_if_needed(GroupId, GroupName),
                          name = GroupName,
                          admin = get_peer_id(Db, Admin),
-                         cache_timeout = CacheTimeout},
+                         cache_timeout = Now + (CacheTimeout * 3600)},
                   [GroupOfInterest|Acc]
           end, [], config:lookup([gaia, 'groups-of-interest'])),
     {ok, GroupsOfInterest}.
