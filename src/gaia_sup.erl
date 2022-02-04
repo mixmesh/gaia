@@ -60,8 +60,14 @@ init([]) ->
 	#{id => gaia_network_sender_serv,
           start => {gaia_network_sender_serv, start_link,
                     [PeerId, _UseCallback = true, UseOpusCodec]}},
+    GaiaCommandServ =
+	#{id => gaia_command_serv,
+          start => {gaia_command_serv, start_link,
+                    [CapturePcmName]}},
+
     {ok, {#{strategy => one_for_all},
           [GaiaServ,
            GaiaRestService,
            GaiaAudioSourceServ,
-           GaiaNetworkSenderServ]}}.
+           GaiaNetworkSenderServ,
+           GaiaCommandServ]}}.
