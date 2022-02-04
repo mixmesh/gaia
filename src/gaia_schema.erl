@@ -129,8 +129,23 @@ get() ->
           {members,
            [#json_type{
                name = string,
-               reloadable = true}]},
+               reloadable = true}]}]]},
+       {'groups-of-interest',
+        [[{id,
+           #json_type{
+              name = {integer, 0, trunc(math:pow(2, 32) - 1)},
+              reloadable = false}},
+          {name,
+           #json_type{
+              name = string,
+              reloadable = false}},
           {admin,
            #json_type{
               name = string,
+              reloadable = true}},
+          {'cache-timeout',
+           #json_type{
+              name = {integer, 0, 365*24},
+              info = <<"Cache timeout in hours">>,
+              typical = 96,
               reloadable = true}}]]}]}].

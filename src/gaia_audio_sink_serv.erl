@@ -39,19 +39,19 @@ message_handler(#{parent := Parent, audio_consumer_pid := AudioConsumerPid}) ->
     receive
         {neighbour_workers, _NeighbourWorkers} ->
             noreply;
-        {call, From, stop} ->
-            ?LOG_DEBUG(#{module => ?MODULE, call => stop}),
+        {call, From, stop = Call} ->
+            ?LOG_DEBUG(#{call => Call}),
             {stop, From, ok};
         {system, From, Request} ->
-            ?LOG_DEBUG(#{module => ?MODULE, system => Request}),
+            ?LOG_DEBUG(#{system => Request}),
             {system, From, Request};
         {'EXIT', AudioConsumerPid, Reason} ->
-            ?LOG_DEBUG(#{module => ?MODULE, audio_consumer_died => Reason}),
+            ?LOG_DEBUG(#{audio_consumer_died => Reason}),
             noreply;
         {'EXIT', Parent, Reason} ->
             exit(Reason);
         UnknownMessage ->
-            ?LOG_ERROR(#{module => ?MODULE, unknown_message => UnknownMessage}),
+            ?LOG_ERROR(#{unknown_message => UnknownMessage}),
             noreply
     end.
 
@@ -74,8 +74,7 @@ start_audio_consumer(Params) ->
     WantedSwParams =
         [{start_threshold,
           ?start_threshold(PeriodSizeInFrames, BufferPeriods)}],
-    ?LOG_DEBUG(#{module => ?MODULE,
-                 wanted_hw_params => WantedHwParams,
+    ?LOG_DEBUG(#{wanted_hw_params => WantedHwParams,
                  wanted_sw_params => WantedSwParams}),
     AlsaHandle = force_open_alsa(PcmName, WantedHwParams, WantedSwParams),
     audio_consumer(AlsaHandle).
@@ -83,8 +82,7 @@ start_audio_consumer(Params) ->
 force_open_alsa(PcmName, WantedHwParams, WantedSwParams) ->
     case alsa:open(PcmName, playback, WantedHwParams, WantedSwParams) of
         {ok, AlsaHandle, ActualHwParams, ActualSwParams} ->
-            ?LOG_DEBUG(#{module => ?MODULE,
-                         actual_hw_params => ActualHwParams,
+            ?LOG_DEBUG(#{actual_hw_params => ActualHwParams,
                          actual_sw_params => ActualSwParams}),
             %% Ensure that period size is exact or else things will break
             {value, {_, WantedPeriodSizeInFrames}} =
@@ -93,8 +91,7 @@ force_open_alsa(PcmName, WantedHwParams, WantedSwParams) ->
                 lists:keysearch(period_size, 1, ActualHwParams),
             AlsaHandle;
         {error, Reason} ->
-            ?LOG_ERROR(#{module => ?MODULE,
-                         function => {alsa, open, 3},
+            ?LOG_ERROR(#{function => {alsa, open, 3},
                          reason => alsa:strerror(Reason)}),
             timer:sleep(?ALSA_PUSHBACK_TIMEOUT_IN_MS),
             force_open_alsa(PcmName, WantedHwParams, WantedSwParams)
@@ -106,14 +103,13 @@ audio_consumer(AlsaHandle) ->
         {ok, N} when is_integer(N) ->
             audio_consumer(AlsaHandle);
         {ok, underrun} ->
-            ?LOG_WARNING(#{module => ?MODULE, reason => underrun}),
+            ?LOG_WARNING(#{reason => underrun}),
             audio_consumer(AlsaHandle);
         {ok, suspend_event} ->
-            ?LOG_WARNING(#{module => ?MODULE, reason => suspend_event}),
+            ?LOG_WARNING(#{reason => suspend_event}),
             audio_consumer(AlsaHandle);
         {error, Reason} ->
-            ?LOG_ERROR(#{module => ?MODULE,
-                         function => {alsa, read, 2},
+            ?LOG_ERROR(#{function => {alsa, read, 2},
                          reason => alsa:strerror(Reason)}),
             timer:sleep(?ALSA_PUSHBACK_TIMEOUT_IN_MS),
             audio_consumer(AlsaHandle)

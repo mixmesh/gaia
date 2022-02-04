@@ -1,5 +1,5 @@
 -module(gaia_rest_client).
--export([start_peer_negotiation/3, get_group/3]).
+-export([start_peer_negotiation/3, get_group/4]).
 
 -include_lib("kernel/include/logger.hrl").
 -include_lib("apptools/include/shorthand.hrl").
@@ -26,9 +26,9 @@ start_peer_negotiation(MyPeerId, Address, LocalPort) ->
     case request(MyPeerId, Address, "peer-negotiation", RequestBody, post) of
         {ok, {{_Version, 200, _ReasonPhrase}, _Headers, ResponseBody}} ->
             try jsone:decode(ResponseBody) of
-                {ok, #{<<"port">> := Port}, _} when is_integer(Port) ->
+                #{<<"port">> := Port} when is_integer(Port) ->
                     {ok, Port};
-                {ok, JsonValue, _} ->
+                JsonValue ->
                     {error, {invalid_response_body, JsonValue}}
             catch
                 _:_ ->
@@ -45,6 +45,7 @@ start_peer_negotiation(MyPeerId, Address, LocalPort) ->
 %%
 
 -spec get_group(gaia_serv:peer_id(),
+                gaia_serv:peer_id(),
                 {inet:ip_address(), inet:port_number()},
                 gaia_serv:group_id()) ->
           {ok, #gaia_group{}} |
@@ -54,7 +55,7 @@ start_peer_negotiation(MyPeerId, Address, LocalPort) ->
            {bad_response, Result :: term()} |
            {http_error, Reason :: term()}}.
 
-get_group(MyPeerId, Address, GroupId) ->
+get_group(MyPeerId, _Admin, Address, GroupId) ->
     RequestPath = "group/" ++ ?i2l(GroupId),
     case request(MyPeerId, Address, RequestPath, no_request_body, get) of
         {ok, {{_Version, 200, _ReasonPhrase}, _Headers, ResponseBody}} ->

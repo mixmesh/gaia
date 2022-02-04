@@ -63,11 +63,11 @@ message_handler(#{parent := Parent,
     receive
         {neighbour_workers, _NeighbourWorkers} ->
             noreply;
-        {call, From, stop} ->
-            ?LOG_DEBUG(#{module => ?MODULE, call => stop}),
+        {call, From, stop = Call} ->
+            ?LOG_DEBUG(#{call => Call}),
             {stop, From, ok};
-        {call, From, {subscribe, Pid, Callback}} ->
-            ?LOG_DEBUG(#{module => ?MODULE, call => subscribe}),
+        {call, From, {subscribe, Pid, Callback} = Call} ->
+            ?LOG_DEBUG(#{call => Call}),
             case lists:keytake(Pid, 1, Subscribers) of
                 {value, {Pid, MonitorRef, _OldCallback}, PurgedSubscribers} ->
                     UpdatedSubscribers =
@@ -83,8 +83,8 @@ message_handler(#{parent := Parent,
                     {reply, From, ok,
                      State#{subscribers => UpdatedSubscribers}}
             end;
-        {call, From, {unsubscribe, Pid}} ->
-            ?LOG_DEBUG(#{module => ?MODULE, call => unsubscribe}),
+        {call, From, {unsubscribe, Pid} = Call} ->
+            ?LOG_DEBUG(#{call => Call}),
             case lists:keysearch(Pid, 1, Subscribers) of
                 {value, {_Pid, MonitorRef, _Callback}} ->
                     UpdatedSubscribers = lists:keydelete(Pid, 1, Subscribers),
@@ -95,21 +95,21 @@ message_handler(#{parent := Parent,
                 false ->
                     {reply, From, {error, not_subscribed}}
             end;
-        {'DOWN', _Ref, process, Pid, _Info} ->
-            ?LOG_DEBUG(#{module => ?MODULE, event => subscriber_down}),
+        {'DOWN', _Ref, process, Pid, Info} ->
+            ?LOG_DEBUG(#{subscriber_down => Info}),
             UpdatedSubscribers = lists:keydelete(Pid, 1, Subscribers),
             AudioProducerPid ! {subscribers, UpdatedSubscribers},
             {noreply, State#{subscribers => UpdatedSubscribers}};
         {system, From, Request} ->
-            ?LOG_DEBUG(#{module => ?MODULE, system => Request}),
+            ?LOG_DEBUG(#{system => Request}),
             {system, From, Request};
         {'EXIT', AudioProducerPid, Reason} ->
-            ?LOG_DEBUG(#{module => ?MODULE, audio_producer_died => Reason}),
+            ?LOG_DEBUG(#{audio_producer_died => Reason}),
             noreply;
         {'EXIT', Parent, Reason} ->
             exit(Reason);
         UnknownMessage ->
-            ?LOG_ERROR(#{module => ?MODULE, unknown_message => UnknownMessage}),
+            ?LOG_ERROR(#{unknown_message => UnknownMessage}),
             noreply
     end.
 
@@ -129,16 +129,15 @@ audio_producer_init(Params) ->
 	 {rate, Rate},
 	 {period_size, PeriodSizeInFrames},
 	 {buffer_size, BufferSizeInFrames}],
-    ?LOG_DEBUG(#{module => ?MODULE, wanted_hw_params => WantedHwParams}),
+    ?LOG_DEBUG(#{wanted_hw_params => WantedHwParams}),
     AlsaHandle = force_open_alsa(PcmName, WantedHwParams),
     audio_producer(AlsaHandle, PeriodSizeInFrames, []).
 
 force_open_alsa(PcmName, WantedHwParams) ->
     case alsa:open(PcmName, capture, WantedHwParams, []) of
         {ok, AlsaHandle, ActualHwParams, ActualSwParams} ->
-            ?LOG_INFO(#{module => ?MODULE,
-                        actual_hw_params => ActualHwParams,
-                        actual_sw_params => ActualSwParams}),
+            ?LOG_DEBUG(#{actual_hw_params => ActualHwParams,
+                         actual_sw_params => ActualSwParams}),
             %% Ensure that period size is exact or else things will break
             {value, {_, WantedPeriodSizeInFrames}} =
                 lists:keysearch(period_size, 1, WantedHwParams),
@@ -146,8 +145,7 @@ force_open_alsa(PcmName, WantedHwParams) ->
                 lists:keysearch(period_size, 1, ActualHwParams),
             AlsaHandle;
         {error, Reason} ->
-            ?LOG_ERROR(#{module => ?MODULE,
-                         function => {alsa, open, 3},
+            ?LOG_ERROR(#{function => {alsa, open, 3},
                          reason => alsa:strerror(Reason)}),
             timer:sleep(?ALSA_PUSHBACK_TIMEOUT_IN_MS),
             force_open_alsa(PcmName, WantedHwParams)
@@ -189,14 +187,13 @@ audio_producer(AlsaHandle, PeriodSizeInFrames, CurrentSubscribers) ->
                           end, Subscribers),
             audio_producer(AlsaHandle, PeriodSizeInFrames, MergedSubscribers);
         {ok, overrun} ->
-            ?LOG_WARNING(#{module => ?MODULE, reason => overrun}),
+            ?LOG_WARNING(#{reason => overrun}),
             audio_producer(AlsaHandle, PeriodSizeInFrames, Subscribers);
         {ok, suspend_event} ->
-            ?LOG_WARNING(#{module => ?MODULE, reason => suspend_event}),
+            ?LOG_WARNING(#{reason => suspend_event}),
             audio_producer(AlsaHandle, PeriodSizeInFrames, Subscribers);
         {error, Reason} ->
-            ?LOG_ERROR(#{module => ?MODULE,
-                         function => {alsa, read, 2},
+            ?LOG_ERROR(#{function => {alsa, read, 2},
                          reason => alsa:strerror(Reason)}),
             timer:sleep(?ALSA_PUSHBACK_TIMEOUT_IN_MS),
             audio_producer(AlsaHandle, PeriodSizeInFrames, Subscribers)

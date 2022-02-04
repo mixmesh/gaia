@@ -81,13 +81,11 @@ message_handler(#{parent := Parent,
                   flags := Flags,
                   conversation_addresses := ConversationAddresses} = State) ->
     receive
-        {call, From, stop} ->
-            ?LOG_DEBUG(#{module => ?MODULE, call => stop}),
+        {call, From, stop = Call} ->
+            ?LOG_DEBUG(#{call => Call}),
             {stop, From, ok};
-        {cast, {set_conversation_addresses, NewConversationAddresses}} ->
-            ?LOG_DEBUG(#{module => ?MODULE,
-                         call => {set_conversation_addresses,
-                                  NewConversationAddresses}}),
+        {cast, {set_conversation_addresses, NewConversationAddresses} = Call} ->
+            ?LOG_DEBUG(#{call => Call}),
             case {ConversationAddresses, lists:sort(NewConversationAddresses)} of
                 {_, ConversationAddresses} ->
                     noreply;
@@ -113,12 +111,12 @@ message_handler(#{parent := Parent,
                              ConversationAddresses, Packet),
             {noreply, State#{seqnum => Seqnum + 1}};
         {system, From, Request} ->
-            ?LOG_DEBUG(#{module => ?MODULE, system => Request}),
+            ?LOG_DEBUG(#{system => Request}),
             {system, From, Request};
         {'EXIT', Parent, Reason} ->
             exit(Reason);
         UnknownMessage ->
-            ?LOG_ERROR(#{module => ?MODULE, unknown_message => UnknownMessage}),
+            ?LOG_ERROR(#{unknown_message => UnknownMessage}),
             noreply
     end.
 
@@ -171,8 +169,7 @@ send_packet(PeerId, _OpusEncoder, Socket, Seqnum, Flags, ConversationAddresses,
                   ok ->
                       ok;
                   {error, _Reason} ->
-%                      ?LOG_ERROR(#{module => ?MODULE,
-%                                   function => {gen_udp, send, 4},
+%                      ?LOG_ERROR(#{function => {gen_udp, send, 4},
 %                                   reason => file:format_error(Reason)}),
                       ok
               end

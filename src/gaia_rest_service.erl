@@ -31,8 +31,7 @@ start_link(PeerId, RestPort) ->
 
 handle_http_request(Socket, Request, Body, Options) ->
     ?LOG_DEBUG(
-       #{module => ?MODULE,
-         request => rester_http:format_request(Request),
+       #{request => rester_http:format_request(Request),
          headers => rester_http:format_hdr(Request#http_request.headers),
          body => Body,
          options => Options}),
@@ -45,8 +44,7 @@ handle_http_request(Socket, Request, Body, Options) ->
             rest_util:response(Socket, Request, {error, not_allowed})
     catch
 	_Class:Reason:StackTrace ->
-	    ?LOG_ERROR(#{module => ?MODULE,
-                         crash => Reason,
+	    ?LOG_ERROR(#{crash => Reason,
                          stack_trace => StackTrace}),
 	    erlang:error(Reason)
     end.
@@ -62,8 +60,8 @@ handle_http_get(Socket, Request, _Body, _Options) ->
             Response =
                 try ?l2i(GroupIdString) of
                     GroupId ->
-                        Group = group_get(GroupId),
-                        ?LOG_INFO(#{module => ?MODULE, group => Group}),
+                        Group = get_group(Request, GroupId),
+                        ?LOG_INFO(#{group => Group}),
                         Group
                 catch
                     _:_ ->
@@ -71,36 +69,48 @@ handle_http_get(Socket, Request, _Body, _Options) ->
                 end,
             rest_util:response(Socket, Request, Response);
         Tokens ->
-	    ?LOG_ERROR(#{module => ?MODULE, unknown_get_path => Tokens}),
+	    ?LOG_ERROR(#{unknown_get_path => Tokens}),
 	    rest_util:response(Socket, Request, {error, not_found})
     end.
 
-group_get(GroupId) ->
-    case gaia_serv:lookup(GroupId) of
-        [#gaia_group{
-            id = Id,
-            name = Name,
-            public = Public,
-            multicast_ip_address = MulticastIpAddress,
-            port = Port,
-            type = Type,
-            members = Members,
-            admin = Admin,
-            session_key = SessionKey}] ->
-            ResponseBody =
-                #{<<"id">> => Id,
-                  <<"name">> => Name,
-                  <<"public">> => Public,
-                  <<"multicast_ip_address">> =>
-                      encode_multicast_ip_address(MulticastIpAddress),
-                  <<"port">> => Port,
-                  <<"type">> => ?a2b(Type),
-                  <<"members">> => encode_members(Members),
-                  <<"admin">> => Admin,
-                  <<"session_key">> => SessionKey},
-            {ok, {format, ResponseBody}};
+get_group(
+  #http_request{headers = #http_chdr{other = Headers}}, GroupId) ->
+    case get_gaia_headers(Headers) of
+        {PeerId, _Nonce, _HMAC} when PeerId /= not_set ->
+            case gaia_serv:lookup(GroupId) of
+                [#gaia_group{
+                    id = Id,
+                    name = Name,
+                    public = Public,
+                    multicast_ip_address = MulticastIpAddress,
+                    port = Port,
+                    type = Type,
+                    members = Members,
+                    admin = Admin,
+                    session_key = SessionKey}] ->
+                    case encode_members(PeerId, Members) of
+                        {ok, EncodedMembers} ->
+                            ResponseBody =
+                                #{<<"id">> => Id,
+                                  <<"name">> => Name,
+                                  <<"public">> => Public,
+                                  <<"multicast_ip_address">> =>
+                                      encode_multicast_ip_address(
+                                        MulticastIpAddress),
+                                  <<"port">> => Port,
+                                  <<"type">> => ?a2b(Type),
+                                  <<"members">> => EncodedMembers,
+                                  <<"admin">> => Admin,
+                                  <<"session_key">> => SessionKey},
+                            {ok, {format, ResponseBody}};
+                        {error, not_member} ->
+                            {error, not_found}
+                    end;
+                _ ->
+                    {error, not_found}
+            end;
         _ ->
-            {error, not_found}
+            {error, {bad_request, "Missing GAIA HTTP headers"}}
     end.
 
 encode_multicast_ip_address(undefined) ->
@@ -108,10 +118,15 @@ encode_multicast_ip_address(undefined) ->
 encode_multicast_ip_address(IpAddress) ->
     inet:ntoa(IpAddress).
 
-encode_members('*') ->
-    <<"*">>;
-encode_members(Members) ->
-    Members.
+encode_members(_PeerId, '*') ->
+    {ok, <<"*">>};
+encode_members(PeerId, Members) ->
+    case lists:member(PeerId, Members) of
+        true ->
+            {ok, Members};
+        false ->
+            {error, not_member}
+    end.
 
 %%
 %% POST
@@ -129,13 +144,12 @@ handle_http_post(Socket, Request, Body, _Options) ->
                     #{<<"port">> := Port} when is_integer(Port) ->
                         peer_negotiation_post(Request, Port);
                     _ ->
-                        ?LOG_ERROR(#{module => ?MODULE,
-                                     invalid_request_body => Body}),
+                        ?LOG_ERROR(#{invalid_request_body => Body}),
                         {error, bad_request, "Invalid request body"}
                 end,
             rest_util:response(Socket, Request, Response);
 	Tokens ->
-	    ?LOG_ERROR(#{module => ?MODULE, unknown_post_path => Tokens}),
+	    ?LOG_ERROR(#{unknown_post_path => Tokens}),
 	    rest_util:response(Socket, Request, {error, not_found})
     end.
 
@@ -147,8 +161,7 @@ peer_negotiation_post(
                 {ok, LocalPort} ->
                     {ok, {format, #{<<"port">> => LocalPort}}};
                 {error, Reason} ->
-                    ?LOG_INFO(#{module => ?MODULE,
-                                peer_negotiation_rejected => Reason}),
+                    ?LOG_INFO(#{peer_negotiation_rejected => Reason}),
                     NoAccessBody =
                         case Reason of
                             ask ->
