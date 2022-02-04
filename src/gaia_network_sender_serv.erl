@@ -17,7 +17,7 @@ start_link(PeerId, UseCallback, OpusEnabled) ->
        fun(Parent) ->
                init(Parent, PeerId, UseCallback, OpusEnabled)
        end,
-       fun message_handler/1,
+       fun initial_message_handler/1,
        #serv_options{name = ?MODULE}).
 
 %%
@@ -62,6 +62,12 @@ create_opus_encoder(true) ->
 create_opus_encoder(false) ->
     no_opus_encoder.
 
+initial_message_handler(State) ->
+    receive
+        {neighbour_workers, _NeighbourWorkers} ->
+            {swap_message_handler, fun ?MODULE:message_handler/1, State}
+    end.
+
 message_handler(#{parent := Parent,
                   peer_id := PeerId,
                   use_callback := UseCallback,
@@ -71,8 +77,6 @@ message_handler(#{parent := Parent,
                   flags := Flags,
                   conversation_addresses := ConversationAddresses} = State) ->
     receive
-        {neighbour_workers, _NeighbourWorkers} ->
-            noreply;
         {call, From, stop = Call} ->
             ?LOG_DEBUG(#{call => Call}),
             {stop, From, ok};

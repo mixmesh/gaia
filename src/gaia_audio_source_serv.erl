@@ -18,7 +18,7 @@ start_link() ->
 
 start_link(Params) ->
     ?spawn_server(fun(Parent) -> init(Parent, Params) end,
-                  fun message_handler/1,
+                  fun initial_message_handler/1,
                   #serv_options{name = ?MODULE}).
 
 %%
@@ -57,12 +57,16 @@ init(Parent, Params) ->
            audio_producer_pid => AudioProducerPid,
            subscribers => []}}.
 
+initial_message_handler(State) ->
+    receive
+        {neighbour_workers, _NeighbourWorkers} ->
+            {swap_message_handler, fun ?MODULE:message_handler/1, State}
+    end.
+
 message_handler(#{parent := Parent,
                   audio_producer_pid := AudioProducerPid,
                   subscribers := Subscribers} = State) ->
     receive
-        {neighbour_workers, _NeighbourWorkers} ->
-            noreply;
         {call, From, stop = Call} ->
             ?LOG_DEBUG(#{call => Call}),
             {stop, From, ok};

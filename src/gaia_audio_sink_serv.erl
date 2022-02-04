@@ -17,7 +17,7 @@ start_link() ->
 
 start_link(Params) ->
     ?spawn_server(fun(Parent) -> init(Parent, Params) end,
-                  fun message_handler/1,
+                  fun initial_message_handler/1,
                   #serv_options{name = ?MODULE}).
 
 %%
@@ -36,10 +36,14 @@ init(Parent, Params) ->
     ?LOG_INFO("Gaia audio sink server has been started"),
     {ok, #{parent => Parent, audio_consumer_pid => AudioConsumerPid}}.
 
-message_handler(#{parent := Parent, audio_consumer_pid := AudioConsumerPid}) ->
+initial_message_handler(State) ->
     receive
         {neighbour_workers, _NeighbourWorkers} ->
-            noreply;
+            {swap_message_handler, fun ?MODULE:message_handler/1, State}
+    end.
+
+message_handler(#{parent := Parent, audio_consumer_pid := AudioConsumerPid}) ->
+    receive
         {call, From, stop = Call} ->
             ?LOG_DEBUG(#{call => Call}),
             {stop, From, ok};
