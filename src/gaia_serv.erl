@@ -51,14 +51,14 @@
 %% Exported: start_link
 %%
 
--spec start_link(binary(), peer_name(), peer_id(), inet:port_number(),
+-spec start_link(binary(), peer_id(), peer_name(), inet:port_number(),
                  string()) ->
           serv:spawn_server_result().
 
-start_link(GaiaDir, PeerName, PeerId, RestPort, PlaybackPcmName) ->
+start_link(GaiaDir, PeerId, PeerName, RestPort, PlaybackPcmName) ->
     ?spawn_server(
        fun(Parent) ->
-               init(Parent, GaiaDir, PeerName, PeerId, RestPort,
+               init(Parent, GaiaDir, PeerId, PeerName, RestPort,
                     PlaybackPcmName)
        end,
        fun initial_message_handler/1,
@@ -187,15 +187,12 @@ handle_peer_negotiation(PeerId, RemotePort) ->
 %% Server
 %%
 
-init(Parent, GaiaDir, PeerName, PeerId, RestPort, PlaybackPcmName) ->
+init(Parent, GaiaDir, PeerId, PeerName, RestPort, PlaybackPcmName) ->
     ok = gaia_nif:start(#{pcm_name => PlaybackPcmName,
                           playback_audio => ?PLAYBACK_AUDIO}),
     ?LOG_INFO("Gaia NIF has been initialized"),
     {ok, Db, GroupsOfInterest} = new_db(GaiaDir),
     ?LOG_DEBUG(#{groups_of_interest => GroupsOfInterest}),
-    NodeInfo = prepare_node_info(PeerId, RestPort, Db),
-    ?LOG_DEBUG(#{node_info => NodeInfo}),
-    ok = nodis:set_node_info(NodeInfo),
     ok = config_serv:subscribe(),
     {ok, NodisSubscription} = nodis_serv:subscribe(),
     ?LOG_INFO("Gaia server has been started"),
@@ -203,14 +200,20 @@ init(Parent, GaiaDir, PeerName, PeerId, RestPort, PlaybackPcmName) ->
     {ok, #{parent => Parent,
            peer_id => PeerId,
            peer_name => PeerName,
+           rest_port => RestPort,
            busy => false,
            db => Db,
            groups_of_interest => GroupsOfInterest,
            nodis_subscription => NodisSubscription}}.
 
-initial_message_handler(State) ->
+initial_message_handler(#{peer_id := PeerId,
+                          rest_port := RestPort,
+                          db := Db} = State) ->
     receive
         {neighbour_workers, _NeighbourWorkers} ->
+            NodeInfo = prepare_node_info(PeerId, RestPort, Db),
+            ?LOG_DEBUG(#{node_info => NodeInfo}),
+            ok = nodis:set_node_info(NodeInfo),
             {swap_message_handler, fun ?MODULE:message_handler/1, State}
     end.
 

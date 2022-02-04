@@ -33,15 +33,15 @@ init([]) ->
     MixmeshDir = config:lookup([system, 'mixmesh-dir']),
     GaiaDir = filename:join([MixmeshDir, <<"gaia">>]),
     ConfigGaia = config:lookup([gaia]),
-    [PeerName, PeerId, RestPort, UseOpusCodec, CapturePcmName,
+    [PeerId, PeerName, RestPort, UseOpusCodec, CapturePcmName,
      PlaybackPcmName] =
         config:lookup_children(
-          ['peer-name', 'peer-id', 'rest-port', 'use-opus-codec',
+          ['peer-id', 'peer-name', 'rest-port', 'use-opus-codec',
            'capture-pcm-name', 'playback-pcm-name'], ConfigGaia),
     GaiaServ =
 	#{id => gaia_serv,
           start => {gaia_serv, start_link,
-                    [GaiaDir, PeerName, PeerId, RestPort,
+                    [GaiaDir, PeerId, PeerName, RestPort,
                      ?b2l(PlaybackPcmName)]}},
     GaiaRestService =
 	#{id => gaia_rest_service,
@@ -64,7 +64,6 @@ init([]) ->
 	#{id => gaia_command_serv,
           start => {gaia_command_serv, start_link,
                     [CapturePcmName]}},
-
     {ok, {#{strategy => one_for_all},
           [GaiaServ,
            GaiaRestService,
