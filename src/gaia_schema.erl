@@ -10,13 +10,13 @@ get() ->
         #json_type{
            name = bool,
            reloadable = false}},
-       {'peer-name',
-        #json_type{
-           name = string,
-           reloadable = false}},
        {'peer-id',
         #json_type{
            name = {integer, 0, trunc(math:pow(2, 32) - 1)},
+           reloadable = false}},
+       {'peer-name',
+        #json_type{
+           name = string,
            reloadable = false}},
        {'rest-port',
         #json_type{

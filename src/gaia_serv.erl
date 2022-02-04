@@ -414,7 +414,7 @@ message_handler(#{parent := Parent,
                           Acc
                   end, GroupsOfInterest, Db),
             %% Purge groups of interest each half hour
-            _ = erlang:start_timer(30000, self(), purge_groups_of_interest),
+            _ = erlang:send_after(1800 * 1000, self(), purge_groups_of_interest),
             {noreply, State#{groups_of_interest => UpdatedGroupsOfInterest}};
         {system, From, Request} ->
             ?LOG_DEBUG(#{system => Request}),
