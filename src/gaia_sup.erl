@@ -50,9 +50,9 @@ init([]) ->
 	#{id => gaia_audio_source_serv,
           start => {gaia_audio_source_serv, start_link,
 		    [[{device, ?b2l(CapturePcmName)}]]}},
-    %% WARNING: To start the audio sink server playback_audio *must* be
-    %% set to false in ../c_src/audio_sink.c
-    _GaiaAudioSinkServ =
+    %% WARNING: To start the audio sink server PLAYBACK_AUDIO *must* be
+    %% set to false in globals.hrl
+    GaiaAudioSinkServ =
 	#{id => gaia_audio_sink_serv,
           start => {gaia_audio_sink_serv, start_link,
 		    [[{device, ?b2l(PlaybackPcmName)}]]}},
@@ -68,5 +68,6 @@ init([]) ->
           [GaiaServ,
            GaiaRestService,
            GaiaAudioSourceServ,
+           GaiaAudioSinkServ,
            GaiaNetworkSenderServ,
            GaiaCommandServ]}}.
