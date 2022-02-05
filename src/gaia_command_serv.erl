@@ -129,18 +129,18 @@ negotiation_failed(Peer, Reason) ->
 
 init(Parent, UseCallback) ->
     ?LOG_INFO("Gaia command server has been started"),
-    case UseCallback of
-        true ->
-            Callback = create_callback(),
-            ok = gaia_audio_source_serv:subscribe(Callback);
-        false ->
-            ok = gaia_audio_source_serv:subscribe()
-    end,
     {ok, #{parent => Parent, use_callback => UseCallback}}.
 
-initial_message_handler(State) ->
+initial_message_handler(#{use_callback := UseCallback} = State) ->
     receive
         {neighbour_workers, _NeighbourWorkers} ->
+            case UseCallback of
+                true ->
+                    Callback = create_callback(),
+                    ok = gaia_audio_source_serv:subscribe(Callback);
+                false ->
+                    ok = gaia_audio_source_serv:subscribe()
+            end,
             {swap_message_handler, fun ?MODULE:message_handler/1, State}
     end.
 
