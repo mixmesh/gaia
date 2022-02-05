@@ -1,6 +1,7 @@
 -module(gaia_command_serv).
 -export([start_link/1, stop/0]).
--export([my_public_group_ids/1, peer_has_public_groups/1,
+-export([local_public_groups/1, remote_public_groups/2,
+         groups_of_interest_updated/2,
          peer_up/1, peer_down/1,
          conversation_accepted/1, conversation_rejected/2,
          ask_for_conversation/1,
@@ -15,11 +16,11 @@
 %% Exported: start_link
 %%
 
--spec start_link(string()) ->
+-spec start_link(boolean()) ->
           serv:spawn_server_result().
 
-start_link(CapturePcmName) ->
-    ?spawn_server(fun(Parent) -> init(Parent, CapturePcmName) end,
+start_link(UseCallback) ->
+    ?spawn_server(fun(Parent) -> init(Parent, UseCallback) end,
                   fun initial_message_handler/1,
                   #serv_options{name = ?MODULE}).
 
@@ -33,23 +34,39 @@ stop() ->
     serv:call(?MODULE, stop).
 
 %%
-%% Exported: my_public_group_ids
+%% Exported: local_public_groups
 %%
 
--spec my_public_group_ids([gaia_serv:group_id()]) -> ok.
+-spec local_public_groups([gaia_serv:group_id()]) -> ok.
 
-my_public_group_ids(PublicGroupIds) ->
-    serv:cast(?MODULE, {my_public_group_ids, PublicGroupIds}).
+local_public_groups([]) ->
+    ok;
+local_public_groups(PublicGroupIds) ->
+    serv:cast(?MODULE, {local_public_groups, PublicGroupIds}).
 
 %%
-%% Exported: peer_has_public_groups
+%% Exported: remote_public_groups
 %%
 
--spec peer_has_public_groups(#gaia_group{}) -> ok.
+-spec remote_public_groups(gaia_serv:peer_name(), [gaia_serv:group_id()]) -> ok.
 
-peer_has_public_groups(PublicGroups) ->
-    serv:cast(?MODULE, {peer_has_public_groups, PublicGroups}).
+remote_public_groups(_PeerName, []) ->
+    ok;
+remote_public_groups(PeerName, PublicGroupIds) ->
+    serv:cast(?MODULE, {remote_public_groups, PeerName, PublicGroupIds}).
 
+%%
+%% Exported: groups_of_interest_updated
+%%
+
+-spec groups_of_interest_updated(gaia_serv:peer_name(),
+                                 [gaia_serv:group_name()]) -> ok.
+
+groups_of_interest_updated(_PeerName, []) ->
+    ok;
+groups_of_interest_updated(PeerName, GroupNamesOfInterest) ->
+    serv:cast(?MODULE, {groups_of_interest_updated, PeerName,
+                        GroupNamesOfInterest}).
 %%
 %% Exported: peer_up
 %%
@@ -110,9 +127,16 @@ negotiation_failed(Peer, Reason) ->
 %% Server
 %%
 
-init(Parent, _CapturePcmName) ->
+init(Parent, UseCallback) ->
     ?LOG_INFO("Gaia command server has been started"),
-    {ok, #{parent => Parent}}.
+    case UseCallback of
+        true ->
+            Callback = create_callback(),
+            ok = gaia_audio_source_serv:subscribe(Callback);
+        false ->
+            ok = gaia_audio_source_serv:subscribe()
+    end,
+    {ok, #{parent => Parent, use_callback => UseCallback}}.
 
 initial_message_handler(State) ->
     receive
@@ -126,65 +150,80 @@ message_handler(#{parent := Parent}) ->
             ?LOG_DEBUG(#{call => Call}),
             ok = gaia_nif:stop(),
             {stop, From, ok};
-        {cast, {my_public_group_ids, PublicGroupIds} = Cast} ->
+        {cast, {local_public_groups, PublicGroupIds} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
             case PublicGroupIds of
                 [GroupId] ->
                     [#gaia_group{name = GroupName}] = gaia_serv:lookup(GroupId),
-                    flite:say([<<"You have announced the public group ">>,
-                               GroupName, <<".">>]),
+                    flite:say([<<"You broadcasted the public group ">>,
+                               GroupName]),
                     noreply;
                 GroupIds ->
                     GroupNames = get_group_names(GroupIds),
-                    flite:say([<<"You have announced the following public groups: ">>,
-                               format_items(GroupNames), <<".">>]),
+                    flite:say(
+                      [<<"You broadcasted the following public groups: ">>,
+                       format_items(GroupNames)]),
                     noreply
             end;
-        {cast, {peer_has_public_groups, PublicGroups} = Cast} ->
+        {cast, {remote_public_groups, PeerName, PublicGroupIds} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
-            case PublicGroups of
-                [#gaia_group{name = GroupName, admin = Admin}] ->
-                    case gaia_serv:lookup(Admin) of
-                        [#gaia_peer{name = PeerName}] ->
-                            flite:say([<<"Peer ">>, PeerName,
-                                       <<" has announced the public group ">>,
-                                       GroupName, <<".">>]),
-                            noreply;
-                        _ ->
-                            noreply
-                    end;
-                [#gaia_group{admin = Admin}|Rest] ->
-                    case gaia_serv:lookup(Admin) of
-                        [#gaia_peer{name = PeerName}] ->
-                            GroupNames =
-                                [GroupName ||
-                                    #gaia_group{name = GroupName} <-
-                                        PublicGroups],
-                            flite:say([<<"Peer ">>, PeerName,
-                                       <<" has announced the following public groups: ">>,
-                                       GroupNames, <<".">>]),
-                            noreply;
-                        _ ->
-                            noreply
-                    end
+            case PublicGroupIds of
+                [GroupId] ->
+                    [#gaia_group{name = GroupName}] = gaia_serv:lookup(GroupId),
+                    flite:say(
+                      [PeerName, <<" broadcasted the public group ">>,
+                       GroupName]),
+                    noreply;
+                GroupIds ->
+                    GroupNames = get_group_names(GroupIds),
+                    flite:say([PeerName,
+                               <<" broadcasted the following public groups: ">>,
+                               format_items(GroupNames)]),
+                    noreply
             end;
-        {cast, {peer_up, _Peer} = Cast} ->
+        {cast, {groups_of_interest_updated, PeerName, GroupNamesOfInterest}} ->
+            case GroupNamesOfInterest of
+                [GroupName] ->
+                    flite:say([PeerName, <<" updated the group ">>, GroupName]),
+                    noreply;
+                GroupNames ->
+                    flite:say(
+                      [PeerName, <<" updated the following groups: ">>,
+                       format_items(GroupNames)]),
+                    noreply
+            end;
+        {cast, {peer_up, #gaia_peer{name = PeerName}} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
+            flite:say([PeerName, <<" appeared on the network">>]),
             noreply;
-        {cast, {peer_down, _Peer} = Cast} ->
+        {cast, {peer_down, #gaia_peer{name = PeerName}} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
+            flite:say([PeerName, <<" disappeared from the network">>]),
             noreply;
-        {cast, {conversation_accepted, _Peer} = Cast} ->
+        {cast, {conversation_accepted, #gaia_peer{name = PeerName}} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
+            flite:say(
+              [<<"A conversation with ">>, PeerName, <<" was accepted">>]),
             noreply;
-        {cast, {conversation_rejected, _Peer, _Reason} = Cast} ->
+        {cast, {conversation_rejected, #gaia_peer{name = PeerName},
+                _Reason} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
+            flite:say(
+              [<<"A conversation with ">>, PeerName, <<" was rejected">>]),
             noreply;
-        {cast, {ask_for_conversation, _Peer} = Cast} ->
+        {cast, {ask_for_conversation, #gaia_peer{name = PeerName}} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
+            flite:say(
+              [PeerName,
+               <<" wants to have a conversation with you. Do you accept?">>]),
             noreply;
-        {cast, {negotiation_failed, _Peer, _Reason} = Cast} ->
+        {cast, {negotiation_failed,
+                #gaia_peer{name = PeerName}, _Reason} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
+            flite:say([<<"Nehgoation with ">>, PeerName, <<" failed">>]),
+            noreply;
+        {subscription_packet, _Packet} ->
+            %% Do something with the the audio packet
             noreply;
         {system, From, Request} ->
             ?LOG_DEBUG(#{system => Request}),
@@ -213,3 +252,9 @@ format_remaining_items([Item]) ->
     [<<" and ">>, Item];
 format_remaining_items([Item|Rest]) ->
     [<<", ">>, Item|format_remaining_items(Rest)].
+
+create_callback() ->
+    fun(_Packet) ->
+            %% Do something with the the audio packet
+            create_callback()
+    end.

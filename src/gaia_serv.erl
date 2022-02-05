@@ -220,6 +220,7 @@ initial_message_handler(#{peer_id := PeerId,
 message_handler(#{parent := Parent,
                   peer_id := MyPeerId,
                   peer_name := MyPeerName,
+                  rest_port := RestPort,
                   db := Db,
                   groups_of_interest := GroupsOfInterest,
                   busy := Busy,
@@ -369,6 +370,9 @@ message_handler(#{parent := Parent,
             ?LOG_DEBUG(#{message => Message}),
             {ok, NewGroupsOfInterest} = sync_db(Db),
             ok = update_network(MyPeerId, Db, Busy),
+            NodeInfo = prepare_node_info(MyPeerId, RestPort, Db),
+            ?LOG_DEBUG(#{node_info => NodeInfo}),
+            ok = nodis:set_node_info(NodeInfo),
             {noreply, State#{group_of_interest => NewGroupsOfInterest}};
         {nodis, NodisSubscription, {pending, _NodisAddress} = NodisEvent} ->
             ?LOG_DEBUG(#{nodis_event => NodisEvent}),
@@ -643,7 +647,7 @@ prepare_node_info(MyPeerId, RestPort, Db) ->
              (_, Acc) ->
                   Acc
           end, [], Db),
-    ok = gaia_command_serv:my_public_group_ids(PublicGroupIds),
+    ok = gaia_command_serv:local_public_groups(PublicGroupIds),
     #{gaia => #{peer_id => MyPeerId,
                 rest_port => RestPort,
                 public_group_ids => PublicGroupIds}}.
@@ -663,27 +667,30 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                NewRestPort >= 1024 andalso
                NewRestPort =< 65535 andalso
                is_list(PublicGroupIds) ->
-            %% Update groups of interest
-            lists:foreach(
-              fun(#group_of_interest{id = GroupId, admin = Admin})
-                    when Admin == NewPeerId ->
-                      case gaia_rest_client:get_group(
-                             MyPeerId, Admin, {IpAddress, NewRestPort},
-                             GroupId) of
-                          {ok, Group} ->
-                              ?LOG_INFO(#{insert_group => Group}),
-                              true = db_insert(Db, Group),
-                              ok = gaia_command_serv:peer_has_public_groups(Group);
-                          {error, Reason} ->
-                              ?LOG_ERROR(#{{gaia_rest_client,
-                                            get_group} => Reason})
-                      end;
-                 (_) ->
-                      ok
-              end, GroupsOfInterest),
+            %% Check for groups of interest
+            GroupNamesOfInterest =
+                lists:foldl(
+                  fun(#group_of_interest{id = GroupId, admin = Admin}, Acc)
+                        when Admin == NewPeerId ->
+                          case gaia_rest_client:get_group(
+                                 MyPeerId, Admin, {IpAddress, NewRestPort},
+                                 GroupId) of
+                              {ok, #gaia_group{name = GroupName} = Group} ->
+                                  ?LOG_INFO(#{insert_group => Group}),
+                                  true = db_insert(Db, Group),
+                                  [GroupName|Acc];
+                              {error, Reason} ->
+                                  ?LOG_ERROR(#{{gaia_rest_client,
+                                                get_group} => Reason}),
+                                  Acc
+                          end;
+                     (_, Acc) ->
+                          Acc
+                  end, [], GroupsOfInterest),
             %% Update peer if needed or create ephemeral peer
             case db_lookup_peer_by_id(Db, NewPeerId) of
-                [#gaia_peer{nodis_address = NodisAddress,
+                [#gaia_peer{name = PeerName,
+                            nodis_address = NodisAddress,
                             rest_port = RestPort} = Peer]
                   when NodisAddress /= NewNodisAddress andalso
                        RestPort /= NewRestPort ->
@@ -692,7 +699,16 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                                        remote_port = undefined,
                                        rest_port = NewRestPort},
                     true = db_insert(Db, UpdatedPeer),
-                    gaia_command_serv:peer_up(UpdatedPeer);
+                    ok = gaia_command_serv:peer_up(UpdatedPeer),
+                    ok = gaia_command_serv:remote_public_groups(
+                           PeerName, PublicGroupIds),
+                    gaia_command_serv:groups_of_interest_updated(
+                      PeerName, GroupNamesOfInterest);
+                [#gaia_peer{name = PeerName}] ->
+                    ok = gaia_command_serv:remote_public_groups(
+                           PeerName, PublicGroupIds),
+                    gaia_command_serv:groups_of_interest_updated(
+                      PeerName, GroupNamesOfInterest);
                 [_] ->
                     ok;
                 [] ->
