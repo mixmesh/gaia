@@ -633,7 +633,7 @@ accept_peer(_Busy, Peer) ->
 %%
 
 prepare_node_info(MyPeerId, RestPort, Db) ->
-    PublicGroups =
+    PublicGroupIds =
         db_fold(
           fun(#gaia_group{id = GroupId,
                           public = true,
@@ -643,10 +643,10 @@ prepare_node_info(MyPeerId, RestPort, Db) ->
              (_, Acc) ->
                   Acc
           end, [], Db),
-    ok = gaia_command_serv:my_public_groups(PublicGroups),
+    ok = gaia_command_serv:my_public_group_ids(PublicGroupIds),
     #{gaia => #{peer_id => MyPeerId,
                 rest_port => RestPort,
-                public_groups => PublicGroups}}.
+                public_group_ids => PublicGroupIds}}.
 
 change_peer(MyPeerId, Db, GroupsOfInterest,
             {IpAddress, _SyncPort} = NewNodisAddress, Info) ->
@@ -654,7 +654,7 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
     case lists:keysearch(gaia, 1, Info) of
         {value, {gaia, #{peer_id := NewPeerId,
                          rest_port := NewRestPort,
-                         public_groups := PublicGroups},
+                         public_group_ids := PublicGroupIds},
                  _PreviousGaiaInfo}}
           when is_integer(NewPeerId) andalso
                NewPeerId > 0 andalso
@@ -662,7 +662,7 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                is_integer(NewRestPort) andalso
                NewRestPort >= 1024 andalso
                NewRestPort =< 65535 andalso
-               is_list(PublicGroups) ->
+               is_list(PublicGroupIds) ->
             %% Update groups of interest
             lists:foreach(
               fun(#group_of_interest{id = GroupId, admin = Admin})

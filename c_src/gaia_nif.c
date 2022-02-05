@@ -50,6 +50,8 @@ bool kill_network_receiver = false;
 bool kill_audio_sink = false;
 uint8_t *playback_packet;
 thread_mutex_t *playback_packet_mutex;
+thread_cond_t *playback_packet_cond;
+bool playback_packet_is_ready = false;
 conversation_table_t *conversation_table;
 
 void take_params_rdlock(void) {
@@ -132,11 +134,14 @@ static ERL_NIF_TERM _start(ErlNifEnv* env, int argc,
     // Create conversation table
     conversation_table = conversation_table_new();
 
-    // Create playback packet data and mutex
+    // Create playback packet data, mutex and conditional
     playback_packet = malloc(PERIOD_SIZE_IN_BYTES);
     playback_packet_mutex = malloc(sizeof(thread_mutex_t));
     assert(thread_mutex_init(playback_packet_mutex,
                              "playback_packet_mutex") == 0);
+    playback_packet_cond = malloc(sizeof(thread_cond_t));
+    assert(thread_cond_init(playback_packet_cond,
+                             "playback_packet_cond") == 0);
 
     // Start network receiver thread
     enif_thread_create("network_receiver", &network_receiver_tid,
@@ -184,12 +189,14 @@ static ERL_NIF_TERM _stop(ErlNifEnv* env, int argc,
     // Remove conversation table
     conversation_table_free(conversation_table);
 
-    // Remove playback packet data and mutex
+    // Remove playback packet data, mutex and conditional
     assert(thread_mutex_lock(playback_packet_mutex) == 0);
     free(playback_packet);
     assert(thread_mutex_unlock(playback_packet_mutex) == 0);
     assert(thread_mutex_destroy(playback_packet_mutex) == 0);
     free(playback_packet_mutex);
+    assert(thread_cond_destroy(playback_packet_cond) == 0);
+    free(playback_packet_cond);
 
     INFOF("All is good. We can die in peace.");
     started = false;
@@ -217,10 +224,17 @@ static ERL_NIF_TERM _set_params(ErlNifEnv* env, int argc,
 static ERL_NIF_TERM _read_packet(ErlNifEnv* env, int argc,
                                  const ERL_NIF_TERM argv[]) {
     assert(thread_mutex_lock(playback_packet_mutex) == 0);
+    /*
+    while (!playback_packet_is_ready) {
+        assert(thread_cond_wait(playback_packet_cond,
+                                playback_packet_mutex) == 0);
+    }
+    */
     ERL_NIF_TERM bin;
     uint8_t *data =
         (uint8_t *)enif_make_new_binary(env, PERIOD_SIZE_IN_BYTES, &bin);
     memcpy(data, playback_packet, PERIOD_SIZE_IN_BYTES);
+    playback_packet_is_ready = false;
     assert(thread_mutex_unlock(playback_packet_mutex) == 0);
     return bin;
 }

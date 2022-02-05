@@ -26,7 +26,7 @@
 -define(OPUS_COMPLEXITY, 5).
 -define(OPUS_MAX_PACKET_LEN_IN_BYTES, 1276).
 
--define(PLAYBACK_AUDIO, false).
+-define(PLAYBACK_AUDIO, true).
 
 %% |peer_id:4|timestamp:8|seqnum:4|packet_len:2|flags:1| = 19 bytes
 -define(HEADER_SIZE, (4 + 8 + 4 + 2 + 1)).

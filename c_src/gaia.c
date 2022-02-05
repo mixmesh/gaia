@@ -20,6 +20,8 @@ bool kill_network_receiver = false;
 bool kill_audio_sink = false;
 uint8_t *playback_packet;
 thread_mutex_t *playback_packet_mutex;
+thread_cond_t *playback_packet_cond;
+bool playback_packet_is_ready = false;
 conversation_table_t *conversation_table;
 
 void usage(char *argv[]) {
@@ -164,6 +166,9 @@ int main (int argc, char *argv[]) {
     playback_packet_mutex = malloc(sizeof(thread_mutex_t));
     assert(thread_mutex_init(playback_packet_mutex,
                              "playback_packet_mutex") == 0);
+    playback_packet_cond = malloc(sizeof(thread_cond_t));
+    assert(thread_cond_init(playback_packet_cond,
+                             "playback_packet_cond") == 0);
 
     // Start sender thread
     pthread_t sender_thread;
@@ -229,6 +234,8 @@ int main (int argc, char *argv[]) {
     assert(thread_mutex_unlock(playback_packet_mutex) == 0);
     assert(thread_mutex_destroy(playback_packet_mutex) == 0);
     free(playback_packet_mutex);
+    assert(thread_cond_destroy(playback_packet_cond) == 0);
+    free(playback_packet_cond);
 
     fprintf(stderr, "All is good. We can die in peace.");
     return 0;

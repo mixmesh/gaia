@@ -11,6 +11,8 @@ extern jb_table_t *jb_table;
 extern bool kill_audio_sink;
 extern uint8_t *playback_packet;
 extern thread_mutex_t *playback_packet_mutex;
+extern thread_cond_t *playback_packet_cond;
+extern bool playback_packet_is_ready;
 
 #define MAX_SILENCE_CYCLES 4
 
@@ -171,6 +173,8 @@ entry %u but got %u (%u will be reused as %u!)",
                 }
             }
 
+            playback_packet_is_ready = true;
+//            assert(thread_cond_signal(playback_packet_cond) == 0);
             assert(thread_mutex_unlock(playback_packet_mutex) == 0);
             holding_playback_packet_mutex = false;
             silence_cycles = 0;
