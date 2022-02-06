@@ -158,10 +158,14 @@ message_handler(#{parent := Parent}) ->
                     flite:say([<<"You broadcasted ">>, GroupName]),
                     noreply;
                 GroupIds ->
-                    GroupNames = get_group_names(GroupIds),
-                    flite:say(
-                      [<<"You broadcasted: ">>, format_items(GroupNames)]),
-                    noreply
+                    case get_group_names(GroupIds) of
+                        [] ->
+                            noreply;
+                        GroupNames ->
+                            flite:say(
+                              [<<"You broadcasted: ">>, format_items(GroupNames)]),
+                            noreply
+                    end
             end;
         {cast, {remote_public_groups, PeerName, PublicGroupIds} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
@@ -171,10 +175,14 @@ message_handler(#{parent := Parent}) ->
                     flite:say([PeerName, <<" broadcasted ">>, GroupName]),
                     noreply;
                 GroupIds ->
-                    GroupNames = get_group_names(GroupIds),
-                    flite:say([PeerName, <<" broadcasted: ">>,
-                               format_items(GroupNames)]),
-                    noreply
+                    case get_group_names(GroupIds) of
+                        [] ->
+                            noreply;
+                        GroupNames ->
+                            flite:say([PeerName, <<" broadcasted: ">>,
+                                       format_items(GroupNames)]),
+                            noreply
+                    end
             end;
         {cast, {groups_of_interest_updated, PeerName, GroupNamesOfInterest}} ->
             case GroupNamesOfInterest of
