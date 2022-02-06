@@ -116,12 +116,11 @@ ask_for_conversation(Peer) ->
 %% Exported: negotiation_failed
 %%
 
--spec negotiation_failed(
-        #gaia_peer{}, gaia_rest_client:start_peer_negotiation_error_reason()) ->
+-spec negotiation_failed(gaia_serv:peer_name(), asking | busy | not_available) ->
           ok.
 
-negotiation_failed(Peer, Reason) ->
-    serv:cast(?MODULE, {negotiation_failed, Peer, Reason}).
+negotiation_failed(PeerName, Reason) ->
+    serv:cast(?MODULE, {negotiation_failed, PeerName, Reason}).
 
 %%
 %% Server
@@ -155,31 +154,27 @@ message_handler(#{parent := Parent}) ->
             case PublicGroupIds of
                 [GroupId] ->
                     [#gaia_group{name = GroupName}] = gaia_serv:lookup(GroupId),
-                    say([<<"You broadcasted ">>, GroupName]),
+                    say([<<"You broadcast the group ">>, GroupName]),
                     noreply;
                 GroupIds ->
-                    case get_group_names(GroupIds) of
-                        [] ->
-                            noreply;
-                        GroupNames ->
-                            say([<<"You broadcasted: ">>,
-                                 format_items(GroupNames)]),
-                            noreply
-                    end
+                    GroupNames = get_group_names(GroupIds),
+                    say([<<"You broadcast the groups ">>,
+                         format_items(GroupNames)]),
+                    noreply
             end;
         {cast, {remote_public_groups, PeerName, PublicGroupIds} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
             case PublicGroupIds of
                 [GroupId] ->
                     [#gaia_group{name = GroupName}] = gaia_serv:lookup(GroupId),
-                    say([PeerName, <<" broadcasted ">>, GroupName]),
+                    say([PeerName, <<" broadcasts the group ">>, GroupName]),
                     noreply;
                 GroupIds ->
                     case get_group_names(GroupIds) of
                         [] ->
                             noreply;
                         GroupNames ->
-                            say([PeerName, <<" broadcasted: ">>,
+                            say([PeerName, <<" broadcasts the groups ">>,
                                  format_items(GroupNames)]),
                             noreply
                     end
@@ -225,13 +220,21 @@ message_handler(#{parent := Parent}) ->
             noreply;
         {cast, {ask_for_conversation, #gaia_peer{name = PeerName}} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
-            say([PeerName, <<" is calling. Do you accept?">>]),
+            say([PeerName, <<" is calling. Do you want to answer?">>]),
             noreply;
-        {cast, {negotiation_failed,
-                #gaia_peer{name = PeerName}, _Reason} = Cast} ->
+        {cast, {negotiation_failed, PeerName, Reason} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
-            say([<<"Negotiation with ">>, PeerName, <<" failed!">>]),
-            noreply;
+            case Reason of
+                asking ->
+                    say([<<"Calling ">>, PeerName, <<"now">>]),
+                    noreply;
+                busy ->
+                    say([PeerName, <<" is busy">>]),
+                    noreply;
+                not_available ->
+                    say([PeerName, <<" is not available">>]),
+                    noreply
+            end;
         {subscription_packet, _Packet} ->
             %% Do something with the the audio packet
             noreply;

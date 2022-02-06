@@ -418,7 +418,8 @@ message_handler(#{parent := Parent,
                           Acc
                   end, GroupsOfInterest, Db),
             %% Purge groups of interest each half hour
-            _ = erlang:send_after(1800 * 1000, self(), purge_groups_of_interest),
+            _ = erlang:send_after(1800 * 1000, self(),
+                                  purge_groups_of_interest),
             {noreply, State#{groups_of_interest => UpdatedGroupsOfInterest}};
         {system, From, Request} ->
             ?LOG_DEBUG(#{system => Request}),
@@ -509,7 +510,8 @@ negotiate_with_peers(
   MyPeerId, Db, [{group, _GroupId, _MulticastIpAddress, _GroupPort}|Rest]) ->
     negotiate_with_peers(MyPeerId, Db, Rest);
 negotiate_with_peers(MyPeerId, Db, [{peer, PeerId}|Rest]) ->
-    [#gaia_peer{nodis_address = {IpAddress, _SyncPort},
+    [#gaia_peer{name = PeerName,
+                nodis_address = {IpAddress, _SyncPort},
                 rest_port = RestPort,
                 local_port = LocalPort} = Peer] =
         db_lookup_peer_by_id(Db, PeerId),
@@ -518,10 +520,16 @@ negotiate_with_peers(MyPeerId, Db, [{peer, PeerId}|Rest]) ->
         {ok, NewRemotePort} ->
             true = db_insert(Db, Peer#gaia_peer{remote_port = NewRemotePort}),
             negotiate_with_peers(MyPeerId, Db, Rest);
+        asking ->
+            gaia_command_serv:negotiation_failed(PeerName, asking);
+        busy ->
+            gaia_command_serv:negotiation_failed(PeerName, busy);
+        not_available ->
+            gaia_command_serv:negotiation_failed(PeerName, not_available);
         {error, Reason} ->
-            ?LOG_ERROR(#{{rest_service_client, negotiate} => Reason}),
+            ?LOG_ERROR(#{{rest_service_client, start_peer_negotiation} =>
+                             Reason}),
             UpdatedPeer = Peer#gaia_peer{conversation = false},
-            ok = gaia_command_serv:negotiation_failed(UpdatedPeer, Reason),
             true = db_insert(Db, UpdatedPeer),
             negotiate_with_peers(MyPeerId, Db, Rest)
     end.

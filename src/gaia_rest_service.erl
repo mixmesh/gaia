@@ -110,7 +110,7 @@ get_group(
                     {error, not_found}
             end;
         _ ->
-            {error, {bad_request, "Missing GAIA HTTP headers"}}
+            {error, {bad_request, "Bad GAIA HTTP headers"}}
     end.
 
 encode_multicast_ip_address(undefined) ->
@@ -137,8 +137,9 @@ handle_http_post(Socket, Request, Body, _Options) ->
     case string:tokens(Url#url.path, "/") of
 	["peer-negotiation"] ->
             Response =
-                case rest_util:parse_body(Request, Body,
-                                          [{jsone_options, [undefined_as_null]}]) of
+                case rest_util:parse_body(
+                       Request, Body,
+                       [{jsone_options, [undefined_as_null]}]) of
                     {error, _Reason} ->
                         {error, bad_request, "Invalid JSON format"};
                     #{<<"port">> := Port} when is_integer(Port) ->
@@ -174,7 +175,7 @@ peer_negotiation_post(
                     {error, {no_access, NoAccessBody}}
             end;
         _ ->
-            {error, {bad_request, "Missing GAIA HTTP headers"}}
+            {error, {bad_request, "Bad GAIA HTTP headers"}}
     end.
 
 get_gaia_headers(Headers) ->

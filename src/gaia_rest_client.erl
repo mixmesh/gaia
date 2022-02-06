@@ -1,20 +1,11 @@
 -module(gaia_rest_client).
 -export([start_peer_negotiation/3, get_group/4]).
--export_type([start_peer_negotiation_error_reason/0]).
 
 -include_lib("kernel/include/logger.hrl").
 -include_lib("apptools/include/shorthand.hrl").
 -include("../include/gaia_serv.hrl").
 
 -define(HTTPC_TIMEOUT, 2000).
-
--type request_error_reason() ::
-        {invalid_response_body, jsone:json_value()} |
-        {json_decode, Reason :: term()} |
-        {http_error, Reason :: term()}.
-
--type start_peer_negotiation_error_reason() ::
-        request_error_reason() | {json_decode, Reason :: term()}.
 
 %%
 %% Exported: start_peer_negotiation
@@ -23,8 +14,13 @@
 -spec start_peer_negotiation(gaia_serv:peer_id(),
                              {inet:ip_address(), inet:port_number()},
                              inet:port_number()) ->
-          {ok, inet:port_number()} |
-          {error, start_peer_negotiation_error_reason()}.
+          {ok, inet:port_number()} | asking | busy | not_available |
+          {error,
+           {invalid_response_body, jsone:json_value()} |
+           {invalid_json_syntax, ResponseBody :: binary()} |
+           {bad_request, Reason :: binary()} |
+           {invalid_response, Response :: term()} |
+           {http_error, Reason :: term()}}.
 
 start_peer_negotiation(MyPeerId, Address, LocalPort) ->
     RequestBody = encode_json(#{<<"port">> => LocalPort}),
@@ -37,10 +33,18 @@ start_peer_negotiation(MyPeerId, Address, LocalPort) ->
                     {error, {invalid_response_body, JsonValue}}
             catch
                 _:_ ->
-                    {error, {json_decode, invalid_json}}
+                    {error, {invalid_json_syntax, ResponseBody}}
             end;
-        {ok, Result} ->
-            {error, {bad_response, Result}};
+        {ok, {{_Version, 403, _ReasonPhrase}, _Headers, <<"Asking">>}} ->
+            asking;
+        {ok, {{_Version, 403, _ReasonPhrase}, _Headers, <<"Busy">>}} ->
+            busy;
+        {ok, {{_Version, 403, _ReasonPhrase}, _Headers, <<"Not Available">>}} ->
+            not_available;
+        {ok, {{_Version, 400, _ReasonPhrase}, _Headers, Reason}} ->
+            {error, {bad_request, Reason}};
+        {ok, Response} ->
+            {error, {invalid_response, Response}};
         {error, Reason} ->
             {error, {http_error, Reason}}
     end.
@@ -54,7 +58,11 @@ start_peer_negotiation(MyPeerId, Address, LocalPort) ->
                 {inet:ip_address(), inet:port_number()},
                 gaia_serv:group_id()) ->
           {ok, #gaia_group{}} |
-          {error, request_error_reason() | {json_decode, Reason :: term()}}.
+          {error,
+           {invalid_response_body, jsone:json_value()} |
+           {invalid_json_syntax, ResponseBody :: binary()} |
+           {invalid_response, Response :: term()} |
+           {http_error, Reason :: term()}}.
 
 get_group(MyPeerId, _Admin, Address, GroupId) ->
     RequestPath = "group/" ++ ?i2l(GroupId),
@@ -67,14 +75,14 @@ get_group(MyPeerId, _Admin, Address, GroupId) ->
                             {ok, Group}
                     catch
                         _:_ ->
-                            {error, {json_decode, JsonValue}}
+                            {error, {invalid_response_body, JsonValue}}
                     end
             catch
                 _:_ ->
-                    {error, {json_decode, invalid_json}}
+                    {error, {invalid_json_syntax, ResponseBody}}
             end;
-        {ok, Result} ->
-            {error, {bad_response, Result}};
+        {ok, Response} ->
+            {error, {invalid_response, Response}};
         {error, Reason} ->
             {error, {http_error, Reason}}
     end.
