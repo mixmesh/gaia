@@ -155,15 +155,15 @@ message_handler(#{parent := Parent}) ->
             case PublicGroupIds of
                 [GroupId] ->
                     [#gaia_group{name = GroupName}] = gaia_serv:lookup(GroupId),
-                    flite:say([<<"You broadcasted ">>, GroupName]),
+                    say([<<"You broadcasted ">>, GroupName]),
                     noreply;
                 GroupIds ->
                     case get_group_names(GroupIds) of
                         [] ->
                             noreply;
                         GroupNames ->
-                            flite:say(
-                              [<<"You broadcasted: ">>, format_items(GroupNames)]),
+                            say([<<"You broadcasted: ">>,
+                                 format_items(GroupNames)]),
                             noreply
                     end
             end;
@@ -172,35 +172,34 @@ message_handler(#{parent := Parent}) ->
             case PublicGroupIds of
                 [GroupId] ->
                     [#gaia_group{name = GroupName}] = gaia_serv:lookup(GroupId),
-                    flite:say([PeerName, <<" broadcasted ">>, GroupName]),
+                    say([PeerName, <<" broadcasted ">>, GroupName]),
                     noreply;
                 GroupIds ->
                     case get_group_names(GroupIds) of
                         [] ->
                             noreply;
                         GroupNames ->
-                            flite:say([PeerName, <<" broadcasted: ">>,
-                                       format_items(GroupNames)]),
+                            say([PeerName, <<" broadcasted: ">>,
+                                 format_items(GroupNames)]),
                             noreply
                     end
             end;
         {cast, {groups_of_interest_updated, PeerName, GroupNamesOfInterest}} ->
             case GroupNamesOfInterest of
                 [GroupName] ->
-                    flite:say([PeerName, <<" updated ">>, GroupName]),
+                    say([PeerName, <<" updated ">>, GroupName]),
                     noreply;
                 GroupNames ->
-                    flite:say(
-                      [PeerName, <<" updated: ">>, format_items(GroupNames)]),
+                    say([PeerName, <<" updated: ">>, format_items(GroupNames)]),
                     noreply
             end;
         {cast, {peer_up, #gaia_peer{name = PeerName}} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
-            flite:say([PeerName, <<" appeared">>]),
+            say([PeerName, <<" appeared">>]),
             noreply;
         {cast, {peer_down, #gaia_peer{name = PeerName}} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
-            flite:say([PeerName, <<" disappeared">>]),
+            say([PeerName, <<" disappeared">>]),
             noreply;
         {cast, {conversation_accepted,
                 #gaia_peer{name = PeerName,
@@ -208,13 +207,13 @@ message_handler(#{parent := Parent}) ->
             ?LOG_DEBUG(#{cast => Cast}),
             case Conversation of
                 {true, read} ->
-                    flite:say([<<"You now listen to ">>, PeerName]),
+                    say([<<"You now listen to ">>, PeerName]),
                     noreply;
                 {true, write} ->
-                    flite:say([<<"You now talk to ">>, PeerName]),
+                    say([<<"You now talk to ">>, PeerName]),
                     noreply;
                 {true, read_write} ->
-                    flite:say([<<"You now listen *and* talk to ">>, PeerName]),
+                    say([<<"You now listen *and* talk to ">>, PeerName]),
                     noreply;
                 false ->
                     noreply
@@ -222,16 +221,16 @@ message_handler(#{parent := Parent}) ->
         {cast, {conversation_rejected, #gaia_peer{name = PeerName},
                 _Reason} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
-            flite:say([<<"Conversation with ">>, PeerName, <<" rejected">>]),
+            say([<<"Conversation with ">>, PeerName, <<" rejected">>]),
             noreply;
         {cast, {ask_for_conversation, #gaia_peer{name = PeerName}} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
-            flite:say([PeerName, <<" is calling. Do you accept?">>]),
+            say([PeerName, <<" is calling. Do you accept?">>]),
             noreply;
         {cast, {negotiation_failed,
                 #gaia_peer{name = PeerName}, _Reason} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
-            flite:say([<<"Negotiation with ">>, PeerName, <<" failed!">>]),
+            say([<<"Negotiation with ">>, PeerName, <<" failed!">>]),
             noreply;
         {subscription_packet, _Packet} ->
             %% Do something with the the audio packet
@@ -271,3 +270,6 @@ create_callback() ->
             %% Do something with the the audio packet
             create_callback()
     end.
+
+say(IoString) ->
+   flite:say(IoString, [{latency, 60}]).
