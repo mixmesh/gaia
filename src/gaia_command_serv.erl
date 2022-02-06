@@ -248,6 +248,8 @@ get_group_names([GroupId|Rest]) ->
             get_group_names(Rest)
     end.
 
+format_items([Item]) ->
+    Item;
 format_items([Item|Rest]) ->
     [Item|format_remaining_items(Rest)].
 
