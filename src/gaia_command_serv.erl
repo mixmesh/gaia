@@ -4,7 +4,7 @@
          groups_of_interest_updated/2,
          peer_up/1, peer_down/1,
          conversation_accepted/1, conversation_rejected/2,
-         ask_for_conversation/1,
+         call/1,
          negotiation_failed/2]).
 -export([message_handler/1]).
 
@@ -104,19 +104,19 @@ conversation_rejected(Peer, Reason) ->
     serv:cast(?MODULE, {conversation_rejected, Peer, Reason}).
 
 %%
-%% Exported: ask_for_conversation
+%% Exported: call
 %%
 
--spec ask_for_conversation(#gaia_peer{}) -> ok.
+-spec call(#gaia_peer{}) -> ok.
 
-ask_for_conversation(Peer) ->
-    serv:cast(?MODULE, {ask_for_conversation, Peer}).
+call(Peer) ->
+    serv:cast(?MODULE, {call, Peer}).
 
 %%
 %% Exported: negotiation_failed
 %%
 
--spec negotiation_failed(gaia_serv:peer_name(), asking | busy | not_available) ->
+-spec negotiation_failed(gaia_serv:peer_name(), calling | busy | not_available) ->
           ok.
 
 negotiation_failed(PeerName, Reason) ->
@@ -218,14 +218,14 @@ message_handler(#{parent := Parent}) ->
             ?LOG_DEBUG(#{cast => Cast}),
             say([<<"Conversation with ">>, PeerName, <<" rejected">>]),
             noreply;
-        {cast, {ask_for_conversation, #gaia_peer{name = PeerName}} = Cast} ->
+        {cast, {call, #gaia_peer{name = PeerName}} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
             say([PeerName, <<" is calling. Do you want to answer?">>]),
             noreply;
         {cast, {negotiation_failed, PeerName, Reason} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
             case Reason of
-                asking ->
+                calling ->
                     say([<<"Calling ">>, PeerName, <<"now">>]),
                     noreply;
                 busy ->

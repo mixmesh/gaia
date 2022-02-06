@@ -165,8 +165,8 @@ peer_negotiation_post(
                     ?LOG_INFO(#{peer_negotiation_rejected => Reason}),
                     NoAccessBody =
                         case Reason of
-                            ask ->
-                                "Asking";
+                            call ->
+                                "Calling";
                             busy ->
                                 "Busy";
                             _ ->

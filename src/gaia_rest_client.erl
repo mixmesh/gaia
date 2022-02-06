@@ -14,7 +14,7 @@
 -spec start_peer_negotiation(gaia_serv:peer_id(),
                              {inet:ip_address(), inet:port_number()},
                              inet:port_number()) ->
-          {ok, inet:port_number()} | asking | busy | not_available |
+          {ok, inet:port_number()} | calling | busy | not_available |
           {error,
            {invalid_response_body, jsone:json_value()} |
            {invalid_json_syntax, ResponseBody :: binary()} |
@@ -35,8 +35,8 @@ start_peer_negotiation(MyPeerId, Address, LocalPort) ->
                 _:_ ->
                     {error, {invalid_json_syntax, ResponseBody}}
             end;
-        {ok, {{_Version, 403, _ReasonPhrase}, _Headers, <<"Asking">>}} ->
-            asking;
+        {ok, {{_Version, 403, _ReasonPhrase}, _Headers, <<"Calling">>}} ->
+            calling;
         {ok, {{_Version, 403, _ReasonPhrase}, _Headers, <<"Busy">>}} ->
             busy;
         {ok, {{_Version, 403, _ReasonPhrase}, _Headers, <<"Not Available">>}} ->

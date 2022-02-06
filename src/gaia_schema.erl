@@ -50,13 +50,13 @@ get() ->
               name = atom,
               transform =
                   fun(Mode) ->
-                          case lists:member(Mode, [direct, ask, ignore]) of
+                          case lists:member(Mode, [direct, call, ignore]) of
                               true ->
                                   Mode;
                               false ->
                                   throw(
                                     {failed,
-                                     "Must be one of direct, ask or ignore"})
+                                     "Must be one of direct, call or ignore"})
                        end
                   end,
               reloadable = true}},
