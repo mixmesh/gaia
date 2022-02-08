@@ -11,6 +11,9 @@
 -include_lib("apptools/include/serv.hrl").
 -include_lib("kernel/include/logger.hrl").
 -include("../include/gaia_serv.hrl").
+-include("globals.hrl").
+
+-define(MODEL, "vosk-model-small-en-us-0.15").
 
 %%
 %% Exported: start_link
@@ -127,15 +130,28 @@ negotiation_failed(PeerName, Reason) ->
 %%
 
 init(Parent, UseCallback) ->
+    VoskModel = vosk:model_new(filename:join(code:priv_dir(vosk), ?MODEL)),
+    VoskRecognizer = vosk:recognizer_new(VoskModel, ?RATE_IN_HZ),
+    VoskTransform =
+        if ?CHANNELS =:= 2 ->
+                fun(Data) -> alsa_util:stereo_to_mono(?FORMAT, Data) end;
+           true ->
+                fun(Data) -> Data end
+        end,
     ?LOG_INFO("Gaia command server has been started"),
-    {ok, #{parent => Parent, use_callback => UseCallback}}.
+    {ok, #{parent => Parent,
+           use_callback => UseCallback,
+           vosk_recognizer => VoskRecognizer,
+           vosk_transform => VoskTransform}}.
 
-initial_message_handler(#{use_callback := UseCallback} = State) ->
+initial_message_handler(#{use_callback := UseCallback,
+                          vosk_recognizer := VoskRecognizer,
+                          vosk_transform := VoskTransform} = State) ->
     receive
         {neighbour_workers, _NeighbourWorkers} ->
             case UseCallback of
                 true ->
-                    Callback = create_callback(),
+                    Callback = create_callback(VoskRecognizer, VoskTransform),
                     ok = gaia_audio_source_serv:subscribe(Callback);
                 false ->
                     ok = gaia_audio_source_serv:subscribe()
@@ -268,11 +284,40 @@ format_remaining_items([Item]) ->
 format_remaining_items([Item|Rest]) ->
     [<<", ">>, Item|format_remaining_items(Rest)].
 
-create_callback() ->
-    fun(_Packet) ->
-            %% Do something with the the audio packet
-            create_callback()
+create_callback(VoskRecognizer, VoskTransform) ->
+    fun(Packet) ->
+            case vosk:recognizer_accept_waveform(
+                   VoskRecognizer, VoskTransform(Packet)) of
+		0 ->
+                    create_callback(VoskRecognizer, VoskTransform);
+		1 ->
+                    #{"text" := Text} = vosk:recognizer_result(VoskRecognizer),
+                    case Text of
+                        "hi gaia" ->
+                            hi_gaia();
+                        "hey gaia" ->
+                            hi_gaia();
+                        What ->
+                            io:format("~s\n", [What])
+                    end,
+                    _ = vosk:recognizer_reset(VoskRecognizer),
+                    create_callback(VoskRecognizer, VoskTransform);
+		-1 ->
+                    ?LOG_ERROR("Vosk failed!"),
+		    _ = vosk:recognizer_reset(VoskRecognizer),
+                    create_callback(VoskRecognizer, VoskTransform)
+	    end
     end.
 
+hi_gaia() ->
+    alsa_wave:play(#{rate => 16000,
+                     envelope => #{sustain => 0.05,
+                                   release => 0.05,
+                                   peek_level => 0.9,
+                                   sustain_level => 0.7},
+                     waves => [[{sine, ["C4"]}],
+                               [{sine, ["E4"]}],
+                               [{sine, ["G4"]}]]}).
+
 say(IoString) ->
-   flite:say(IoString, [{latency, 60}]).
+    flite:say(IoString, [{latency, 60}]).

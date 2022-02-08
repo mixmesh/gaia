@@ -439,7 +439,7 @@ update_network(MyPeerId, Db, Busy) ->
     update_network(MyPeerId, Db, Busy, _Negotiate = true).
 
 update_network(MyPeerId, Db, Busy, Negotiate) ->
-    Conversations = extract_conversations(Db, Busy),
+    Conversations = find_conversations(Db, Busy),
     ?LOG_DEBUG(#{conversations => Conversations}),
     ok = update_network_receiver(Db, Conversations),
     if
@@ -450,9 +450,9 @@ update_network(MyPeerId, Db, Busy, Negotiate) ->
     end,
     update_network_sender(Db, Conversations).
 
-extract_conversations(_Db, _Busy = true) ->
+find_conversations(_Db, _Busy = true) ->
     [];
-extract_conversations(Db, _Busy = false) ->
+find_conversations(Db, _Busy = false) ->
     db_fold(
       fun(#gaia_peer{name = <<"*">>}, Acc) ->
               Acc;
@@ -655,7 +655,7 @@ prepare_node_info(MyPeerId, RestPort, Db) ->
              (_, Acc) ->
                   Acc
           end, [], Db),
-    ok = gaia_command_serv:local_public_groups(PublicGroupIds),
+    %%ok = gaia_command_serv:local_public_groups(PublicGroupIds),
     #{gaia => #{peer_id => MyPeerId,
                 rest_port => RestPort,
                 public_group_ids => PublicGroupIds}}.
