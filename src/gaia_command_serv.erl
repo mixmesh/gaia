@@ -293,10 +293,8 @@ create_callback(VoskRecognizer, VoskTransform) ->
 		1 ->
                     #{"text" := Text} = vosk:recognizer_result(VoskRecognizer),
                     case Text of
-                        "hi gaia" ->
-                            hi_gaia();
-                        "hey gaia" ->
-                            hi_gaia();
+                        "command" ->
+                            command();
                         What ->
                             io:format("~s\n", [What])
                     end,
@@ -309,7 +307,7 @@ create_callback(VoskRecognizer, VoskTransform) ->
 	    end
     end.
 
-hi_gaia() ->
+command() ->
     alsa_wave:play(#{rate => 16000,
                      envelope => #{sustain => 0.05,
                                    release => 0.05,
