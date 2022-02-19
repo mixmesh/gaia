@@ -1,0 +1,44 @@
+Commands
+--------
+
+1. Overview
+
+You can *always* say "what?" to repeat the last thing said by Gaia.
+
+2. Dialogue
+
+2.1 Entering and leaving Gaia command mode:
+
+-> "Hi Gaia", "Enter Gaia", "Command"
+   [Enters gaia command mode]
+   [A beep is played played when you enter command mode]
+   [During command mode an ambient continous beep is played in the background]
+
+-> "Bye gaia", "Goodbye gaia", "Leave gaia" or "End command"
+   [Leaves gaia command mode]
+   [A beep is played played when you leave command mode]
+   NOTE: Can be used at any time!!!
+
+2.2 Start a conversation with a peer or group:
+
+-> "Call X", "Speak with X"
+  <- "Do you want to call X?"
+    -> "Yes" or "Yeah"
+      <- "You now talk with X"
+        [Leaves command mode]
+        NOTE: See "Incoming asynchronous messages" below
+      <- "You already talk with X"
+        [Leaves command mode]
+    -> "No" or "Nah"
+       <- "OK"
+         [Leaves command mode]
+  <- "You don't know anyone called X? Please try again!"
+     [Stays in command mode]
+
+2.3 Stop a conversation with a peer or group:
+
+...
+
+3. Incoming asynchronous messages:
+
+??? X is busy/not-available/You could not connect to X.
