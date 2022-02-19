@@ -403,8 +403,9 @@ handle_command(Text, #{parent := Parent,
                 [] ->
                     CommandState;
                 _ ->
-                    case match_patterns(Tokens, #{}, [["give", "up"],
-                                                      ["bye", "gaia"],
+                    case match_patterns(Tokens, #{}, [["bye", "gaia"],
+                                                      ["goodbye", "gaia"],
+                                                      ["leave", "gaia"],
                                                       ["end", "command"]]) of
                         {ok, _} ->
                             leave_command_mode(CommandState);
@@ -512,7 +513,7 @@ update_last_say(LastSay, SuccessResult) ->
 all_commands() ->
     [#command{
         name = hi,
-        patterns = [["hi", "gaia"], ["hey", "gaia"], ["command"]],
+        patterns = [["hi", "gaia"], ["enter", "gaia"], ["command"]],
         onsuccess =
             fun(_Dict) ->
                     ?LOG_INFO(#{onsuccess => hi}),
@@ -572,7 +573,7 @@ all_commands() ->
                         onsuccess =
                             fun(_Dict) ->
                                     ?LOG_INFO(#{onsuccess => no}),
-                                    ok = say(<<"OK!">>),
+                                    ok = say(<<"OK">>),
                                     leave_command_mode()
                             end}]}]}].
 
