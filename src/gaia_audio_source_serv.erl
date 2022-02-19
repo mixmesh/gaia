@@ -1,6 +1,6 @@
 -module(gaia_audio_source_serv).
 -export([start_link/0, start_link/1,
-	 stop/0, subscribe/0, subscribe/1, unsubscribe/0]).
+	 stop/0, subscribe/0, subscribe/1, unsubscribe/0, trigger_callback/1]).
 -export([message_handler/1]).
 
 -include_lib("apptools/include/serv.hrl").
@@ -46,6 +46,13 @@ unsubscribe() ->
     serv:call(?MODULE, {unsubscribe, self()}).
 
 %%
+%% Exported: trigger_callback
+%%
+
+trigger_callback(Term) ->
+    serv:cast(?MODULE, {trigger_callback, self(), Term}).
+
+%%
 %% Server
 %%
 
@@ -70,19 +77,19 @@ message_handler(#{parent := Parent,
         {call, From, stop = Call} ->
             ?LOG_DEBUG(#{call => Call}),
             {stop, From, ok};
-        {call, From, {subscribe, Pid, Callback} = Call} ->
+        {call, From, {subscribe, Pid, NewCallback} = Call} ->
             ?LOG_DEBUG(#{call => Call}),
             case lists:keytake(Pid, 1, Subscribers) of
-                {value, {Pid, MonitorRef, _OldCallback}, PurgedSubscribers} ->
+                {value, {Pid, MonitorRef, _Callback}, PurgedSubscribers} ->
                     UpdatedSubscribers =
-                        [{Pid, MonitorRef, Callback}|PurgedSubscribers],
+                        [{Pid, MonitorRef, NewCallback}|PurgedSubscribers],
                     AudioProducerPid ! {subscribers, UpdatedSubscribers},
                     {reply, From, ok,
                      State#{subscribers => UpdatedSubscribers}};
                 false ->
                     MonitorRef = monitor(process, Pid),
                     UpdatedSubscribers =
-                        [{Pid, MonitorRef, Callback}|Subscribers],
+                        [{Pid, MonitorRef, NewCallback}|Subscribers],
                     AudioProducerPid ! {subscribers, UpdatedSubscribers},
                     {reply, From, ok,
                      State#{subscribers => UpdatedSubscribers}}
@@ -98,6 +105,18 @@ message_handler(#{parent := Parent,
                      State#{subscribers => UpdatedSubscribers}};
                 false ->
                     {reply, From, {error, not_subscribed}}
+            end;
+        {cast, {trigger_callback, Pid, Term} = Cast} ->
+            ?LOG_DEBUG(#{cast => Cast}),
+            case lists:keytake(Pid, 1, Subscribers) of
+                {value, {Pid, MonitorRef, Callback}, PurgedSubscribers} ->
+                    NewCallback = Callback(Term),
+                    UpdatedSubscribers =
+                        [{Pid, MonitorRef, NewCallback}|PurgedSubscribers],
+                    AudioProducerPid ! {subscribers, UpdatedSubscribers},
+                    {noreply, State#{subscribers => UpdatedSubscribers}};
+                false ->
+                    noreply
             end;
         {'DOWN', _Ref, process, Pid, Info} ->
             ?LOG_DEBUG(#{subscriber_down => Info}),
@@ -165,12 +184,12 @@ audio_producer(AlsaHandle, PeriodSizeInFrames, CurrentSubscribers) ->
         receive
             {subscribers, UpdatedSubscribers} ->
                 lists:map(
-                  fun({Pid, MonitorRef, Callback} = Subscriber) ->
+                  fun({Pid, MonitorRef, NewCallback} = Subscriber) ->
                           case lists:keysearch(Pid, 1, CurrentSubscribers) of
-                              {value, {Pid, MonitorRef, OldCallback}} ->
+                              {value, {Pid, MonitorRef, Callback}} ->
                                   %% NOTE: All this to reuse the already
                                   %% running seqnum
-                                  {Pid, MonitorRef, Callback(OldCallback)};
+                                  {Pid, MonitorRef, NewCallback(Callback)};
                               false ->
                                   Subscriber
                           end
@@ -186,8 +205,8 @@ audio_producer(AlsaHandle, PeriodSizeInFrames, CurrentSubscribers) ->
                                   Pid ! {subscription_packet, Packet},
                                   Subscriber;
                              ({Pid, MonitorRef, Callback}) ->
-                                  NextCallback = Callback(Packet),
-                                  {Pid, MonitorRef, NextCallback}
+                                  NewCallback = Callback(Packet),
+                                  {Pid, MonitorRef, NewCallback}
                           end, Subscribers),
             audio_producer(AlsaHandle, PeriodSizeInFrames, MergedSubscribers);
         {ok, overrun} ->

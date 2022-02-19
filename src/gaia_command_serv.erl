@@ -9,11 +9,24 @@
 -export([message_handler/1]).
 
 -include_lib("apptools/include/serv.hrl").
+-include_lib("apptools/include/shorthand.hrl").
 -include_lib("kernel/include/logger.hrl").
 -include("../include/gaia_serv.hrl").
 -include("globals.hrl").
 
 -define(MODEL, "vosk-model-small-en-us-0.15").
+
+-record(command,
+        {
+         name :: atom(),
+         patterns :: [[string() | atom()]],
+         onsuccess ::
+           fun((map()) -> [{cd, '..' | '.' | [atom()]} |
+                           {set_timeout, integer(), fun((map()) -> map())} |
+                           remove_timeout |
+                           {dict, map()}]),
+         children = [] :: [#command{}]
+        }).
 
 %%
 %% Exported: start_link
@@ -22,8 +35,8 @@
 -spec start_link(boolean()) ->
           serv:spawn_server_result().
 
-start_link(UseCallback) ->
-    ?spawn_server(fun(Parent) -> init(Parent, UseCallback) end,
+start_link(AudioSourceCallback) ->
+    ?spawn_server(fun(Parent) -> init(Parent, AudioSourceCallback) end,
                   fun initial_message_handler/1,
                   #serv_options{name = ?MODULE}).
 
@@ -129,7 +142,7 @@ negotiation_failed(PeerName, Reason) ->
 %% Server
 %%
 
-init(Parent, UseCallback) ->
+init(Parent, AudioSourceCallback) ->
     VoskModel = vosk:model_new(filename:join(code:priv_dir(vosk), ?MODEL)),
     VoskRecognizer = vosk:recognizer_new(VoskModel, ?RATE_IN_HZ),
     VoskTransform =
@@ -140,26 +153,37 @@ init(Parent, UseCallback) ->
         end,
     ?LOG_INFO("Gaia command server has been started"),
     {ok, #{parent => Parent,
-           use_callback => UseCallback,
+           audio_source_callback => AudioSourceCallback,
            vosk_recognizer => VoskRecognizer,
            vosk_transform => VoskTransform}}.
 
-initial_message_handler(#{use_callback := UseCallback,
+initial_message_handler(#{audio_source_callback := AudioSourceCallback,
                           vosk_recognizer := VoskRecognizer,
                           vosk_transform := VoskTransform} = State) ->
     receive
         {neighbour_workers, _NeighbourWorkers} ->
-            case UseCallback of
-                true ->
-                    Callback = create_callback(VoskRecognizer, VoskTransform),
-                    ok = gaia_audio_source_serv:subscribe(Callback);
-                false ->
-                    ok = gaia_audio_source_serv:subscribe()
-            end,
-            {swap_message_handler, fun ?MODULE:message_handler/1, State}
+            CommandState =
+                #{parent => self(),
+                  path => [],
+                  all_commands => all_commands(),
+                  dict => #{},
+                  timeout_timer => undefined,
+                  last_say => <<"I didn't say anything!">>},
+            Callback =
+                create_callback(VoskRecognizer, VoskTransform, CommandState),
+            UpdatedState =
+                case AudioSourceCallback of
+                    true ->
+                        ok = gaia_audio_source_serv:subscribe(Callback),
+                        State#{local_callback => undefined};
+                    false ->
+                        ok = gaia_audio_source_serv:subscribe(),
+                        State#{local_callback => Callback}
+                    end,
+            {swap_message_handler, fun ?MODULE:message_handler/1, UpdatedState}
     end.
 
-message_handler(#{parent := Parent}) ->
+message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
     receive
         {call, From, stop = Call} ->
             ?LOG_DEBUG(#{call => Call}),
@@ -170,99 +194,142 @@ message_handler(#{parent := Parent}) ->
             case PublicGroupIds of
                 [GroupId] ->
                     [#gaia_group{name = GroupName}] = gaia_serv:lookup(GroupId),
-                    say([<<"You broadcast the group ">>, GroupName]),
-                    noreply;
+                    Text = [<<"You broadcast the group ">>, GroupName],
+                    NewLocalCallback = say(LocalCallback, Text),
+                    {noreply, State#{local_callback => NewLocalCallback}};
                 GroupIds ->
                     GroupNames = get_group_names(GroupIds),
-                    say([<<"You broadcast the groups ">>,
-                         format_items(GroupNames)]),
-                    noreply
+                    Text = [<<"You broadcast the groups ">>,
+                            format_items(GroupNames)],
+                    NewLocalCallback = say(LocalCallback, Text),
+                    {noreply, State#{local_callback => NewLocalCallback}}
             end;
         {cast, {remote_public_groups, PeerName, PublicGroupIds} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
             case PublicGroupIds of
                 [GroupId] ->
                     [#gaia_group{name = GroupName}] = gaia_serv:lookup(GroupId),
-                    say([PeerName, <<" broadcasts the group ">>, GroupName]),
-                    noreply;
+                    Text = [PeerName, <<" broadcasts the group ">>, GroupName],
+                    NewLocalCallback = say(LocalCallback, Text),
+                    {noreply, State#{local_callback => NewLocalCallback}};
                 GroupIds ->
                     case get_group_names(GroupIds) of
                         [] ->
                             noreply;
                         GroupNames ->
-                            say([PeerName, <<" broadcasts the groups ">>,
-                                 format_items(GroupNames)]),
-                            noreply
-                    end
+                            Text = [PeerName, <<" broadcasts the groups ">>,
+                                    format_items(GroupNames)],
+                            NewLocalCallback = say(LocalCallback, Text),
+                            {noreply,
+                             State#{local_callback => NewLocalCallback}}
+                        end
             end;
         {cast, {groups_of_interest_updated, PeerName, GroupNamesOfInterest}} ->
             case GroupNamesOfInterest of
                 [GroupName] ->
-                    say([PeerName, <<" updated ">>, GroupName]),
-                    noreply;
+                    Text = [PeerName, <<" updated ">>, GroupName],
+                    NewLocalCallback = say(LocalCallback, Text),
+                    {noreply, State#{local_callback => NewLocalCallback}};
                 GroupNames ->
-                    say([PeerName, <<" updated: ">>, format_items(GroupNames)]),
-                    noreply
+                    Text = [PeerName, <<" updated: ">>,
+                            format_items(GroupNames)],
+                    NewLocalCallback = say(LocalCallback, Text),
+                    {noreply, State#{local_callback => NewLocalCallback}}
             end;
         {cast, {peer_up, #gaia_peer{name = PeerName}} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
-            say([PeerName, <<" appeared">>]),
-            noreply;
+            Text = [PeerName, <<" appeared">>],
+            NewLocalCallback = say(LocalCallback, Text),
+            {noreply, State#{local_callback => NewLocalCallback}};
         {cast, {peer_down, #gaia_peer{name = PeerName}} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
-            say([PeerName, <<" disappeared">>]),
-            noreply;
+            Text = [PeerName, <<" disappeared">>],
+            NewLocalCallback = say(LocalCallback, Text),
+            {noreply, State#{local_callback => NewLocalCallback}};
         {cast, {conversation_accepted,
                 #gaia_peer{name = PeerName,
                            conversation = Conversation}} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
             case Conversation of
                 {true, read} ->
-                    say([<<"You now listen to ">>, PeerName]),
-                    noreply;
+                    Text = [<<"You now listen to ">>, PeerName],
+                    NewLocalCallback = say(LocalCallback, Text),
+                    {noreply, State#{local_callback => NewLocalCallback}};
                 {true, write} ->
-                    say([<<"You now talk to ">>, PeerName]),
-                    noreply;
+                    Text = [<<"You now talk to ">>, PeerName],
+                    NewLocalCallback = say(LocalCallback, Text),
+                    {noreply, State#{local_callback => NewLocalCallback}};
                 {true, read_write} ->
-                    say([<<"You now listen *and* talk to ">>, PeerName]),
-                    noreply;
+                    Text = [<<"You now listen *and* talk to ">>, PeerName],
+                    NewLocalCallback = say(LocalCallback, Text),
+                    {noreply, State#{local_callback => NewLocalCallback}};
                 false ->
                     noreply
             end;
         {cast, {conversation_rejected, #gaia_peer{name = PeerName},
                 _Reason} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
-            say([<<"Conversation with ">>, PeerName, <<" rejected">>]),
-            noreply;
+            Text = [<<"Conversation with ">>, PeerName, <<" rejected">>],
+            NewLocalCallback = say(LocalCallback, Text),
+            {noreply, State#{local_callback => NewLocalCallback}};
         {cast, {call, #gaia_peer{name = PeerName}} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
-            say([PeerName, <<" is calling. Do you want to answer?">>]),
-            noreply;
+            Text = [PeerName, <<" is calling. Do you want to answer?">>],
+            NewLocalCallback = say(LocalCallback, Text),
+            {noreply, State#{local_callback => NewLocalCallback}};
         {cast, {negotiation_failed, PeerName, Reason} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
             case Reason of
                 calling ->
-                    say([<<"Calling ">>, PeerName, <<"now">>]),
-                    noreply;
+                    Text = [<<"Calling ">>, PeerName, <<"now">>],
+                    NewLocalCallback = say(LocalCallback, Text),
+                    {noreply, State#{local_callback => NewLocalCallback}};
                 busy ->
-                    say([PeerName, <<" is busy">>]),
-                    noreply;
+                    Text = [PeerName, <<" is busy">>],
+                    NewLocalCallback = say(LocalCallback, Text),
+                    {noreply, State#{local_callback => NewLocalCallback}};
                 not_available ->
-                    say([PeerName, <<" is not available">>]),
-                    noreply
+                    Text = [PeerName, <<" is not available">>],
+                    NewLocalCallback = say(LocalCallback, Text),
+                    {noreply, State#{local_callback => NewLocalCallback}}
             end;
-        {subscription_packet, _Packet} ->
-            %% Do something with the the audio packet
-            noreply;
+        {subscription_packet, Packet} when LocalCallback /= undefined ->
+            NewLocalCallback = LocalCallback(Packet),
+            {noreply, State#{local_callback => NewLocalCallback}};
         {system, From, Request} ->
             ?LOG_DEBUG(#{system => Request}),
             {system, From, Request};
+        {command_timeout, TimeoutCallback} = Message ->
+            ?LOG_DEBUG(#{message => Message}),
+            case LocalCallback of
+                undefined ->
+                    ok = gaia_audio_source_serv:trigger_callback(
+                           {remove_timeout, TimeoutCallback}),
+                    noreply;
+                _ ->
+                    NewLocalCallback =
+                        LocalCallback({remove_timeout, TimeoutCallback}),
+                    {noreply, State#{local_callback => NewLocalCallback}}
+            end;
         {'EXIT', Parent, Reason} ->
             exit(Reason);
         UnknownMessage ->
             ?LOG_ERROR(#{unknown_message => UnknownMessage}),
             noreply
     end.
+
+say(_LocalCallback = undefined, Text) ->
+    ok = gaia_audio_source_serv:trigger_callback({last_say, Text}),
+    _ = say(Text),
+    undefined;
+say(LocalCallback, Text) ->
+    NewLocalCallback = LocalCallback({last_say, Text}),
+    _ = say(Text),
+    NewLocalCallback.
+
+say(Text) ->
+    _ = flite:say(Text, [{latency, 60}]),
+    ok.
 
 get_group_names([]) ->
     [];
@@ -284,30 +351,252 @@ format_remaining_items([Item]) ->
 format_remaining_items([Item|Rest]) ->
     [<<", ">>, Item|format_remaining_items(Rest)].
 
-create_callback(VoskRecognizer, VoskTransform) ->
-    fun(Packet) ->
+create_callback(VoskRecognizer, VoskTransform, CommandState) ->
+    fun({last_say, Text}) ->
+            create_callback(VoskRecognizer, VoskTransform,
+                            CommandState#{last_say => Text});
+       ({remove_timeout, Callback}) ->
+            NewCommandState = Callback(CommandState),
+            create_callback(VoskRecognizer, VoskTransform,
+                            NewCommandState#{timeout_timer => undefined});
+       (Packet) when is_binary(Packet) ->
             case vosk:recognizer_accept_waveform(
                    VoskRecognizer, VoskTransform(Packet)) of
 		0 ->
-                    create_callback(VoskRecognizer, VoskTransform);
-		1 ->
+                    create_callback(VoskRecognizer, VoskTransform, CommandState);
+                1 ->
                     #{"text" := Text} = vosk:recognizer_result(VoskRecognizer),
-                    case Text of
-                        "command" ->
-                            command();
-                        What ->
-                            io:format("~s\n", [What])
-                    end,
+                    ?LOG_INFO(#{vosk_text => Text}),
+                    NewCommandState = handle_command(Text, CommandState),
                     _ = vosk:recognizer_reset(VoskRecognizer),
-                    create_callback(VoskRecognizer, VoskTransform);
+                    create_callback(VoskRecognizer, VoskTransform,
+                                    NewCommandState);
 		-1 ->
                     ?LOG_ERROR("Vosk failed!"),
 		    _ = vosk:recognizer_reset(VoskRecognizer),
-                    create_callback(VoskRecognizer, VoskTransform)
-	    end
+                    create_callback(VoskRecognizer, VoskTransform, CommandState)
+	    end;
+       (OldCallback) when is_function(OldCallback) ->
+            create_callback(VoskRecognizer, VoskTransform, CommandState)
     end.
 
-command() ->
+handle_command(Text, #{parent := Parent,
+                       path := Path,
+                       all_commands := AllCommands,
+                       dict := Dict,
+                       timeout_timer := TimeoutTimer,
+                       last_say := LastSay} = CommandState) ->
+    Commands = get_commands(Path, AllCommands),
+    ?LOG_INFO(#{match_commands => {string:lexemes(Text, " "), Dict, Commands}}),
+    Tokens = string:lexemes(Text, " "),
+    case match_command(Tokens, Dict, Commands) of
+        {ok, UpdatedDict, #command{name = Name, onsuccess = OnSuccess}} ->
+            Result = OnSuccess(UpdatedDict),
+            CommandState#
+                {path => update_path(Path, Name, Result),
+                 dict => update_dict(UpdatedDict, Result),
+                 timeout_timer =>
+                     update_timeout_timer(Parent, TimeoutTimer, Result),
+                 last_say => update_last_say(LastSay, Result)};
+        nomatch ->
+            case Path of
+                [] ->
+                    CommandState;
+                _ ->
+                    case match_patterns(Tokens, #{}, [["give", "up"],
+                                                      ["bye", "gaia"],
+                                                      ["end", "command"]]) of
+                        {ok, _} ->
+                            leave_command_mode(CommandState);
+                        nomatch ->
+                            case match_patterns(Tokens, #{}, [["what?"]]) of
+                                {ok, _} ->
+                                    ok = say(LastSay),
+                                    CommandState;
+                                nomatch ->
+                                    ok = say("I don't understand. Try again!"),
+                                    CommandState
+                            end
+                    end
+            end
+    end.
+
+get_commands([], Commands) ->
+    Commands;
+get_commands([Name|Rest], [#command{name = Name, children = Children}|_]) ->
+    get_commands(Rest, Children);
+get_commands(Path, [_|Rest]) ->
+    get_commands(Path, Rest).
+
+match_command(_Tokens, _Dict, []) ->
+    nomatch;
+match_command(Tokens, Dict, [#command{patterns = Patterns} = Command|Rest]) ->
+    case match_patterns(Tokens, Dict, Patterns) of
+        {ok, UpdatedDict} ->
+            {ok, UpdatedDict, Command};
+        nomatch ->
+            match_command(Tokens, Dict, Rest)
+    end.
+
+match_patterns(_Tokens, _Dict, []) ->
+    nomatch;
+match_patterns(Tokens, Dict, [Pattern|Rest])
+  when length(Tokens) == length(Pattern) ->
+    case match_pattern(Tokens, Dict, Pattern) of
+        {ok, UpdatedDict} ->
+            {ok, UpdatedDict};
+        nomatch ->
+            match_patterns(Tokens, Dict, Rest)
+    end;
+match_patterns(Tokens, Dict, [_|Rest]) ->
+    match_patterns(Tokens, Dict, Rest).
+
+match_pattern([], Dict, []) ->
+    {ok, Dict};
+match_pattern([Token|RemainingTokens], Dict, [PatternVariable|Rest])
+  when is_atom(PatternVariable) ->
+    match_pattern(RemainingTokens, Dict#{PatternVariable => Token}, Rest);
+match_pattern([Token|RemainingTokens], Dict, [PatternToken|Rest]) ->
+    case gaia_fuzzy:match(?l2b(Token), [?l2b(PatternToken)]) of
+        {ok, _} ->
+            match_pattern(RemainingTokens, Dict, Rest);
+        nomatch ->
+            nomatch
+    end.
+
+update_path(Path, Name, SuccessResult) ->
+    case lists:keysearch(cd, 1, SuccessResult) of
+        {value, {_, '.'}} ->
+            Path ++ [Name];
+        {value, {_, '..'}} ->
+            Path;
+        {value, {_, NewPath}} ->
+            NewPath;
+        false ->
+            Path ++ [Name]
+    end.
+
+update_dict(Dict, SuccessResult) ->
+    case lists:keysearch(dict, 1, SuccessResult) of
+        {value, {_, NewDict}} ->
+            NewDict;
+        false ->
+            Dict
+    end.
+
+update_timeout_timer(_Parent, TimeoutTimer, []) ->
+    TimeoutTimer;
+update_timeout_timer(Parent, TimeoutTimer, [{set_timeout, Time, Callback}|_]) ->
+    ok = cancel_timer(TimeoutTimer),
+    erlang:send_after(Time, Parent, {command_timeout, Callback});
+update_timeout_timer(_Parent, TimeoutTimer, [remove_timeout|_]) ->
+    ok = cancel_timer(TimeoutTimer),
+    undefined;
+update_timeout_timer(Parent, TimeoutTimer, [_|Rest]) ->
+    update_timeout_timer(Parent, TimeoutTimer, Rest).
+
+cancel_timer(undefined) ->
+    ok;
+cancel_timer(Timer) ->
+    erlang:cancel_timer(Timer),
+    ok.
+
+update_last_say(LastSay, SuccessResult) ->
+    case lists:keysearch(last_say, 1, SuccessResult) of
+        {value, {_, NewLastSay}} ->
+            NewLastSay;
+        false ->
+            LastSay
+    end.
+
+all_commands() ->
+    [#command{
+        name = hi,
+        patterns = [["hi", "gaia"], ["hey", "gaia"], ["command"]],
+        onsuccess =
+            fun(_Dict) ->
+                    ?LOG_INFO(#{onsuccess => hi}),
+                    enter_command_mode()
+            end,
+        children =
+            [#command{
+                name = call,
+                patterns = [["call", name],
+                            ["speak", "with", name]],
+                onsuccess =
+                    fun(Dict) ->
+                            ?LOG_INFO(#{onsuccess => call}),
+                            Name = maps:get(name, Dict),
+                            case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
+                                [#gaia_peer{name = PeerName} = Peer] ->
+                                    Text = [<<"Do you want to call ">>,
+                                            PeerName, <<"?">>],
+                                    ok = say(Text),
+                                    [{dict, Dict#{peer => Peer}},
+                                     remove_timeout,
+                                     {last_say, Text}];
+                                [] ->
+                                    Text =
+                                        [<<"You don't know anyone called ">>,
+                                         Name, <<". Please try again!">>],
+                                    ok = say(Text),
+                                    [{cd, '..'}, {last_say, Text}]
+                            end
+                    end,
+                children =
+                    [#command{
+                        name = yes,
+                        patterns = [["yes"], ["yeah"]],
+                        onsuccess =
+                            fun(#{peer := #gaia_peer{id = PeerId,
+                                                     name = PeerName}}) ->
+                                    ?LOG_INFO(#{onsuccess => yes}),
+                                    case gaia_serv:start_peer_conversation(
+                                           PeerId, read_write) of
+                                        ok ->
+                                            Text = [<<"You now talk with ">>,
+                                                    PeerName],
+                                            ok = say(Text),
+                                            [{last_say, Text}|leave_command_mode()];
+                                        {error, already_started} ->
+                                            Text =
+                                                [<<"You already talk with ">>,
+                                                 PeerName],
+                                            ok = say(Text),
+                                            [{last_say, Text}|leave_command_mode()]
+                                    end
+                            end},
+                     #command{
+                        name = no,
+                        patterns = [["no"], ["nah"]],
+                        onsuccess =
+                            fun(_Dict) ->
+                                    ?LOG_INFO(#{onsuccess => no}),
+                                    ok = say(<<"OK!">>),
+                                    leave_command_mode()
+                            end}]}]}].
+
+enter_command_mode() ->
+    ?LOG_DEBUG(#{enter_command_mode => now}),
+    ok = mute(),
+    ok = beep(enter_command_mode),
+    [].
+%    [{set_timeout, 4000, fun leave_command_mode/1}].
+
+leave_command_mode() ->
+    ?LOG_DEBUG(#{leave_command_mode => now}),
+    ok = beep(leave_command_mode),
+    unmute(),
+    [{cd, []}, {dict, #{}}].
+
+leave_command_mode(CommandState) ->
+    ?LOG_DEBUG(#{leave_command_mode => now2}),
+    ok = beep(leave_command_mode),
+    ok = unmute(),
+    CommandState#{path => [], dict => #{}}.
+
+beep(Sound) ->
+    ?LOG_DEBUG(#{beep => Sound}),
     alsa_wave:play(#{rate => 16000,
                      envelope => #{sustain => 0.05,
                                    release => 0.05,
@@ -315,7 +604,13 @@ command() ->
                                    sustain_level => 0.7},
                      waves => [[{sine, ["C4"]}],
                                [{sine, ["E4"]}],
-                               [{sine, ["G4"]}]]}).
+                               [{sine, ["G4"]}]]}),
+    ok.
 
-say(IoString) ->
-    flite:say(IoString, [{latency, 60}]).
+mute() ->
+    ?LOG_DEBUG(#{mute => now}),
+    ok.
+
+unmute() ->
+    ?LOG_DEBUG(#{unmute => now}),
+    ok.

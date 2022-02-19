@@ -145,7 +145,7 @@ stop_group_conversation(GroupIdOrName) ->
 %% Exported: lookup
 %%
 
--spec lookup(id() | {name, name()}) -> [#gaia_peer{}|#gaia_group{}].
+-spec lookup(id() | {name | fuzzy_name, name()}) -> [#gaia_peer{}|#gaia_group{}].
 
 lookup(IdOrName) ->
     serv:call(?MODULE, {lookup, IdOrName}).
@@ -191,7 +191,7 @@ init(Parent, GaiaDir, PeerId, PeerName, RestPort, PlaybackPcmName) ->
     ok = gaia_nif:start(#{pcm_name => PlaybackPcmName,
                           playback_audio => ?PLAYBACK_AUDIO}),
     ?LOG_INFO("Gaia NIF has been initialized"),
-    {ok, Db, GroupsOfInterest} = new_db(GaiaDir),
+    {ok, Db, GroupsOfInterest, AllNames} = new_db(GaiaDir),
     ?LOG_DEBUG(#{groups_of_interest => GroupsOfInterest}),
     ok = config_serv:subscribe(),
     {ok, NodisSubscription} = nodis_serv:subscribe(),
@@ -204,6 +204,7 @@ init(Parent, GaiaDir, PeerId, PeerName, RestPort, PlaybackPcmName) ->
            busy => false,
            db => Db,
            groups_of_interest => GroupsOfInterest,
+           all_names => AllNames,
            nodis_subscription => NodisSubscription}}.
 
 initial_message_handler(#{peer_id := PeerId,
@@ -223,6 +224,7 @@ message_handler(#{parent := Parent,
                   rest_port := RestPort,
                   db := Db,
                   groups_of_interest := GroupsOfInterest,
+                  all_names := AllNames,
                   busy := Busy,
                   nodis_subscription := NodisSubscription} = State) ->
     receive
@@ -334,6 +336,14 @@ message_handler(#{parent := Parent,
                 [] ->
                     {reply, From, {error, no_such_group}}
             end;
+        {call, From, {lookup, {fuzzy_name, FuzzyName} = Call}} ->
+            ?LOG_DEBUG(#{call => Call}),
+            case gaia_fuzzy:match(FuzzyName, AllNames) of
+                nomatch ->
+                    {reply, From, []};
+                {ok, Name} ->
+                    {reply, From, db_lookup(Db, {name, Name})}
+            end;
         {call, From, {lookup, IdOrName} = Call} ->
             ?LOG_DEBUG(#{call => Call}),
             {reply, From, db_lookup(Db, IdOrName)};
@@ -368,12 +378,13 @@ message_handler(#{parent := Parent,
             end;
         config_update = Message ->
             ?LOG_DEBUG(#{message => Message}),
-            {ok, NewGroupsOfInterest} = sync_db(Db),
+            {ok, NewGroupsOfInterest, NewAllNames} = sync_db(Db),
             ok = update_network(MyPeerId, Db, Busy),
             NodeInfo = prepare_node_info(MyPeerId, RestPort, Db),
             ?LOG_DEBUG(#{node_info => NodeInfo}),
             ok = nodis:set_node_info(NodeInfo),
-            {noreply, State#{group_of_interest => NewGroupsOfInterest}};
+            {noreply, State#{group_of_interest => NewGroupsOfInterest,
+                             all_names => NewAllNames}};
         {nodis, NodisSubscription, {pending, _NodisAddress} = NodisEvent} ->
             ?LOG_DEBUG(#{nodis_event => NodisEvent}),
             noreply;
@@ -762,15 +773,15 @@ new_db(GaiaDir) ->
     Tab = ets:new(?MODULE, [public, {keypos, #gaia_peer.id}]),
     Tab = dets:to_ets(DetsTab, Tab),
     Db = {Tab, DetsTab},
-    {ok, GroupsOfInterest} = sync_with_config(Db, true),
+    {ok, GroupsOfInterest, AllNames} = sync_with_config(Db, true),
     ?LOG_DEBUG(#{db_created => ets:tab2list(Tab)}),
-    {ok, Db, GroupsOfInterest}.
+    {ok, Db, GroupsOfInterest, AllNames}.
 
 sync_db({Tab, DetsTab} = Db) ->
-    {ok, GroupsOfInterest} = sync_with_config(Db, false),
+    {ok, GroupsOfInterest, AllNames} = sync_with_config(Db, false),
     DetsTab = ets:to_dets(Tab, DetsTab),
     ?LOG_DEBUG(#{db_synced_with_config => ets:tab2list(Tab)}),
-    {ok, GroupsOfInterest}.
+    {ok, GroupsOfInterest, AllNames}.
 
 sync_with_config(Db, _DeleteEphemeralPeers = true) ->
     db_delete_ephemeral_peers(Db),
@@ -779,7 +790,8 @@ sync_with_config(Db, _DeleteEphemeralPeers = false) ->
     %% Update existing peers and groups
     {NewConfigPeers, NewConfigGroups} =
         db_fold(
-          fun(#gaia_peer{id = PeerId} = Peer, {ConfigPeers, ConfigGroups}) ->
+          fun(#gaia_peer{id = PeerId} = Peer,
+              {ConfigPeers, ConfigGroups}) ->
                   case lists:keytake(id, 1, ConfigPeers) of
                       {value, ConfigPeer, RemainingConfigPeers} ->
                           [Mode, Options] =
@@ -878,7 +890,15 @@ sync_with_config(Db, _DeleteEphemeralPeers = false) ->
                          cache_timeout = Now + (CacheTimeout * 3600)},
                   [GroupOfInterest|Acc]
           end, [], config:lookup([gaia, 'groups-of-interest'])),
-    {ok, GroupsOfInterest}.
+    %% Extract all peer and group names
+    AllNames =
+        db_fold(
+          fun(#gaia_peer{name = PeerName}, Acc) ->
+                  [PeerName|Acc];
+             ( #gaia_group{name = GroupName}, Acc) ->
+                  [GroupName|Acc]
+          end, [], Db),
+    {ok, GroupsOfInterest, AllNames}.
 
 generate_id_if_needed(0, Name) ->
     generate_artificial_id(Name);
