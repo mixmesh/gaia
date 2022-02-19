@@ -3,28 +3,28 @@ Commands
 
 1. Overview
 
-You can *always* say "what?" to repeat the last thing said by Gaia.
+You can *always* say "What?" to repeat the last thing said by Gaia.
 
 2. Dialogue
 
 2.1 Entering and leaving Gaia command mode:
 
--> "Hi Gaia", "Enter Gaia", "Command"
+-> "Hi Gaia", "Command"
    [Enters gaia command mode]
    [A beep is played played when you enter command mode]
    [During command mode an ambient continous beep is played in the background]
 
--> "Bye gaia", "Goodbye gaia", "Leave gaia" or "End command"
+-> "Goodbye"
    [Leaves gaia command mode]
    [A beep is played played when you leave command mode]
    NOTE: Can be used at any time!!!
 
-2.2 Start a conversation with a peer or group:
+2.2 Talk with peer 
 
--> "Call X", "Speak with X"
-  <- "Do you want to call X?"
+-> "Talk with X"
+  <- "Do you want to talk with X?"
     -> "Yes" or "Yeah"
-      <- "You now talk with X"
+      <- "You now talk with with X"
         [Leaves command mode]
         NOTE: See "Incoming asynchronous messages" below
       <- "You already talk with X"
@@ -35,7 +35,83 @@ You can *always* say "what?" to repeat the last thing said by Gaia.
   <- "You don't know anyone called X? Please try again!"
      [Stays in command mode]
 
-2.3 Stop a conversation with a peer or group:
+2.3 End talk with peer
+
+-> "End talk with X"
+  <- "Do you want to end talk with X?"
+    -> "Yes" or "Yeah"
+      <- "The talk with X has ended"
+        [Leaves command mode]
+        NOTE: See "Incoming asynchronous messages" below
+      <- "You don't talk with X"
+        [Leaves command mode]
+    -> "No" or "Nah"
+       <- "OK"
+         [Leaves command mode]
+  <- "You don't know anyone called X? Please try again!"
+     [Stays in command mode]
+
+2.4 Join a group
+
+-> "Join X"
+  <- "Do you want to join group X?"
+    -> "Yes" or "Yeah"
+      <- "You have joined group X"
+        [Leaves command mode]
+        NOTE: See "Incoming asynchronous messages" below
+      <- "You are already a member of group X"
+        [Leaves command mode]
+    -> "No" or "Nah"
+       <- "OK"
+         [Leaves command mode]
+  <- "You don't know about a group named X? Please try again!"
+     [Stays in command mode]
+
+2.5 Leave a group conversation
+
+
+
+? Mute
+
+? Unmute
+
+only listen to
+
+only speak to
+
+
+
+
+busy
+
+not buse
+
+ignore
+
+
+
+direct
+
+if busy
+
+
+
+taling with peers?
+
+join groups?
+
+which users?
+
+
+
+
+
+
+Only talk to X
+Talk with X
+
+
+
 
 ...
 
