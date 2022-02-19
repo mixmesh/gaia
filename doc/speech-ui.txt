@@ -70,23 +70,34 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 2.5 Leave a group conversation
 
 
-
-? Mute
-
-? Unmute
-
-only listen to
-
-only speak to
+Status?
+  Not busy/busy
 
 
+Available peers
+
+Current talks
+
+Let X overide busy
+
+Give X direct access
+
+X must call
+
+Available groups
+
+Joined group
 
 
-busy
 
-not buse
+I'm busy
 
-ignore
+I'm not busy
+
+
+Ignore X
+
+No longer ignore X
 
 
 
@@ -98,9 +109,24 @@ if busy
 
 taling with peers?
 
-join groups?
+joined groups?
+
+available groups?
 
 which users?
+
+available users
+
+
+
+
+? Mute
+
+? Unmute
+
+only listen to
+
+only speak to
 
 
 
