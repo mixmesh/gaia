@@ -519,18 +519,18 @@ all_commands() ->
         children =
             [
              %%
-             %% Talk with peer
+             %% Call contact
              %%
              #command{
-                name = talk,
-                patterns = [["talk", "with", name]],
+                name = call,
+                patterns = [["call", name], ["call", "contact", name]],
                 onsuccess =
                     fun(Dict) ->
-                            ?LOG_INFO(#{onsuccess => talk}),
+                            ?LOG_INFO(#{onsuccess => call}),
                             Name = maps:get(name, Dict),
                             case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
                                 [#gaia_peer{name = PeerName} = Peer] ->
-                                    Text = [<<"Do you want to talk with ">>,
+                                    Text = [<<"Do you want to call ">>,
                                             PeerName, <<"?">>],
                                     ok = say(Text),
                                     [{dict, Dict#{peer => Peer}},
@@ -538,8 +538,7 @@ all_commands() ->
                                      {last_say, Text}];
                                 [] ->
                                     Text =
-                                        [<<"You don't know anyone called ">>,
-                                         Name, <<". Please try again!">>],
+                                        [Name, <<" is not known. Please try again!">>],
                                     ok = say(Text),
                                     [{cd, '..'}, {last_say, Text}]
                             end
@@ -555,13 +554,13 @@ all_commands() ->
                                     case gaia_serv:start_peer_conversation(
                                            PeerId, read_write) of
                                         ok ->
-                                            Text = [<<"You now talk with ">>,
+                                            Text = [<<"You are now in a call with ">>,
                                                     PeerName],
                                             ok = say(Text),
                                             [{last_say, Text}|leave_command_mode()];
                                         {error, already_started} ->
                                             Text =
-                                                [<<"You already talk with ">>,
+                                                [<<"You are already in a call with ">>,
                                                  PeerName],
                                             ok = say(Text),
                                             [{last_say, Text}|leave_command_mode()]
@@ -577,27 +576,24 @@ all_commands() ->
                                     leave_command_mode()
                             end}]},
              %%
-             %% End talk with peer
+             %% Hangup contact
              %%
              #command{
-                name = end_talk,
-                patterns = [["end", "talk", "with", name]],
+                name = hangup,
+                patterns = [["hangup", name], ["hangup", "contact", name]],
                 onsuccess =
                     fun(Dict) ->
-                            ?LOG_INFO(#{onsuccess => end_talk}),
+                            ?LOG_INFO(#{onsuccess => hangup}),
                             Name = maps:get(name, Dict),
                             case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
                                 [#gaia_peer{name = PeerName} = Peer] ->
-                                    Text = [<<"Do you want to end talk with ">>,
-                                            PeerName, <<"?">>],
+                                    Text = [<<"Do you want to hangup ">>, PeerName, <<"?">>],
                                     ok = say(Text),
                                     [{dict, Dict#{peer => Peer}},
                                      remove_timeout,
                                      {last_say, Text}];
                                 [] ->
-                                    Text =
-                                        [<<"You don't know anyone called ">>,
-                                         Name, <<". Please try again!">>],
+                                    Text = [Name, <<" is not known. Please try again!">>],
                                     ok = say(Text),
                                     [{cd, '..'}, {last_say, Text}]
                             end
@@ -613,8 +609,7 @@ all_commands() ->
                                     case gaia_serv:stop_peer_conversation(
                                            PeerId) of
                                         ok ->
-                                            Text = [<<"The talk with ">>,
-                                                    PeerName, <<" has ended">>],
+                                            Text = [<<"You are no longer in a call with ">>, PeerName],
                                             ok = say(Text),
                                             [{last_say, Text}|
                                              leave_command_mode()];
@@ -622,9 +617,120 @@ all_commands() ->
                                             ?LOG_ERROR(#{unexpected_return_value => no_such_peer}),
                                             leave_command_mode();
                                         {error, already_stopped} ->
+                                            Text = [<<"You are not in a call with ">>, PeerName],
+                                            ok = say(Text),
+                                            [{last_say, Text}|
+                                             leave_command_mode()]
+                                    end
+                            end},
+                     #command{
+                        name = no,
+                        patterns = [["no"], ["nah"]],
+                        onsuccess =
+                            fun(_Dict) ->
+                                    ?LOG_INFO(#{onsuccess => no}),
+                                    ok = say(<<"OK">>),
+                                    leave_command_mode()
+                            end}]},
+             %%
+             %% Join group
+             %%
+             #command{
+                name = join,
+                patterns = [["join", name], ["join", "group", name]],
+                onsuccess =
+                    fun(Dict) ->
+                            ?LOG_INFO(#{onsuccess => join}),
+                            Name = maps:get(name, Dict),
+                            case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
+                                [#gaia_group{name = GroupName} = Group] ->
+                                    Text = [<<"Do you want to join ">>,
+                                            GroupName, <<"?">>],
+                                    ok = say(Text),
+                                    [{dict, Dict#{group => Group}},
+                                     remove_timeout,
+                                     {last_say, Text}];
+                                [] ->
+                                    Text =
+                                        [Name, <<" is not known. Please try again!">>],
+                                    ok = say(Text),
+                                    [{cd, '..'}, {last_say, Text}]
+                            end
+                    end,
+                children =
+                    [#command{
+                        name = yes,
+                        patterns = [["yes"], ["yeah"]],
+                        onsuccess =
+                            fun(#{group := #gaia_group{id = GroupId,
+                                                       name = GroupName}}) ->
+                                    ?LOG_INFO(#{onsuccess => yes}),
+                                    case gaia_serv:start_group_conversation(GroupId) of
+                                        ok ->
+                                            Text = [<<"You are now an active member of ">>,
+                                                    GroupName],
+                                            ok = say(Text),
+                                            [{last_say, Text}|leave_command_mode()];
+                                        {error, already_started} ->
                                             Text =
-                                                [<<"You don't talk with ">>,
-                                                 PeerName],
+                                                [<<"You are already in active member of ">>,
+                                                 GroupName],
+                                            ok = say(Text),
+                                            [{last_say, Text}|leave_command_mode()]
+                                    end
+                            end},
+                     #command{
+                        name = no,
+                        patterns = [["no"], ["nah"]],
+                        onsuccess =
+                            fun(_Dict) ->
+                                    ?LOG_INFO(#{onsuccess => no}),
+                                    ok = say(<<"OK">>),
+                                    leave_command_mode()
+                            end}]},
+             %%
+             %% Leave group
+             %%
+             #command{
+                name = leave,
+                patterns = [["leave", name], ["leave", "group", name]],
+                onsuccess =
+                    fun(Dict) ->
+                            ?LOG_INFO(#{onsuccess => leave}),
+                            Name = maps:get(name, Dict),
+                            case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
+                                [#gaia_group{name = GroupName} = Group] ->
+                                    Text = [<<"Do you want to leave ">>, GroupName, <<"?">>],
+                                    ok = say(Text),
+                                    [{dict, Dict#{group => Group}},
+                                     remove_timeout,
+                                     {last_say, Text}];
+                                [] ->
+                                    Text = [Name, <<" is not known. Please try again!">>],
+                                    ok = say(Text),
+                                    [{cd, '..'}, {last_say, Text}]
+                            end
+                    end,
+                children =
+                    [#command{
+                        name = yes,
+                        patterns = [["yes"], ["yeah"]],
+                        onsuccess =
+                            fun(#{group := #gaia_group{id = GroupId,
+                                                       name = GroupName}}) ->
+                                    ?LOG_INFO(#{onsuccess => yes}),
+                                    case gaia_serv:stop_group_conversation(
+                                           GroupId) of
+                                        ok ->
+                                            Text = [<<"You are no longer active in ">>, GroupName],
+                                            ok = say(Text),
+                                            [{last_say, Text}|
+                                             leave_command_mode()];
+                                        {error, no_such_group} ->
+                                            ?LOG_ERROR(#{unexpected_return_value => no_such_group}),
+                                            leave_command_mode();
+                                        {error, already_stopped} ->
+                                            Text = [<<"You are not an active member of ">>, GroupName],
                                             ok = say(Text),
                                             [{last_say, Text}|
                                              leave_command_mode()]

@@ -5,6 +5,19 @@ Commands
 
 You can *always* say "What?" to repeat the last thing said by Gaia.
 
+1.1 Short command reference
+
+* "Hi Gaia" or "Command"
+* "Goodbye"
+* "Call X" or "Call contact X"
+* "Hangup X" or "Hangup contact X"
+* "Join X" or "Join group X" 
+* "Leave X" or "Leave group X"
+
+
+
+
+
 2. Dialogue
 
 2.1 Entering and leaving Gaia command mode:
@@ -17,55 +30,78 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 -> "Goodbye"
    [Leaves gaia command mode]
    [A beep is played played when you leave command mode]
-   NOTE: Can be used at any time!!!
+   NOTE: Can be used at any time when in command mode!!!
 
-2.2 Talk with peer 
+2.2 Call peer 
 
--> "Talk with X"
-  <- "Do you want to talk with X?"
+-> "Call X" or "Call contact X"
+  <- "Do you want to call X?"
     -> "Yes" or "Yeah"
-      <- "You now talk with with X"
+      <- "You are now in a call with  X"
         [Leaves command mode]
         NOTE: See "Incoming asynchronous messages" below
-      <- "You already talk with X"
+      <- "You are already in a call with X"
         [Leaves command mode]
     -> "No" or "Nah"
        <- "OK"
          [Leaves command mode]
-  <- "You don't know anyone called X? Please try again!"
+  <- "X is not known. Please try again!"
      [Stays in command mode]
 
-2.3 End talk with peer
+2.3 Hangup peer
 
--> "End talk with X"
-  <- "Do you want to end talk with X?"
+-> "Hangup X" or "Hangup contact X"
+  <- "Do you want hangup X?"
     -> "Yes" or "Yeah"
-      <- "The talk with X has ended"
+      <- "You are no longer in a call with X"
         [Leaves command mode]
         NOTE: See "Incoming asynchronous messages" below
-      <- "You don't talk with X"
+      <- "You are not in a call with X"
         [Leaves command mode]
     -> "No" or "Nah"
        <- "OK"
          [Leaves command mode]
-  <- "You don't know anyone called X? Please try again!"
+  <- "X is not known. Please try again!"
      [Stays in command mode]
 
-2.4 Join a group
+2.4 Join group
 
--> "Join X"
-  <- "Do you want to join group X?"
+-> "Join X" or "Join group X"
+  <- "Do you want to join X?"
     -> "Yes" or "Yeah"
-      <- "You have joined group X"
+      <- "You are now an active member of X"
         [Leaves command mode]
         NOTE: See "Incoming asynchronous messages" below
-      <- "You are already a member of group X"
+      <- "You are already an active member of X"
         [Leaves command mode]
     -> "No" or "Nah"
        <- "OK"
          [Leaves command mode]
-  <- "You don't know about a group named X? Please try again!"
+  <- "X is not known. Please try again!"
      [Stays in command mode]
+
+2.5 Leave group
+
+-> "Leave X" or "Leave group X"
+  <- "Do you want leave X?"
+    -> "Yes" or "Yeah"
+      <- "You are no longer active in group X"
+        [Leaves command mode]
+        NOTE: See "Incoming asynchronous messages" below
+      <- "You are not an active member of X"
+        [Leaves command mode]
+    -> "No" or "Nah"
+       <- "OK"
+         [Leaves command mode]
+  <- "X is not known. Please try again!"
+     [Stays in command mode]
+
+
+
+
+
+
+
 
 2.5 Leave a group conversation
 
@@ -109,9 +145,16 @@ if busy
 
 taling with peers?
 
+
+
+
 joined groups?
 
 available groups?
+
+active groups
+
+
 
 which users?
 
@@ -120,23 +163,25 @@ available users
 
 
 
-? Mute
+? Mute X
+
+Unmute X
+
+Defaen X
+
+Undeafen X
+
+Mute all
+
+Unmute all
 
 ? Unmute
 
-only listen to
-
-only speak to
 
 
 
 
-
-
-Only talk to X
-Talk with X
-
-
+contact and group!!!
 
 
 ...
