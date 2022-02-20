@@ -519,7 +519,7 @@ all_commands() ->
         children =
             [
              %%
-             %% Call contact
+             %% Call contact X
              %%
              #command{
                 name = call,
@@ -576,7 +576,7 @@ all_commands() ->
                                     leave_command_mode()
                             end}]},
              %%
-             %% Hangup contact
+             %% Hangup contact X
              %%
              #command{
                 name = hangup,
@@ -633,7 +633,7 @@ all_commands() ->
                                     leave_command_mode()
                             end}]},
              %%
-             %% Join group
+             %% Join group X
              %%
              #command{
                 name = join,
@@ -689,7 +689,7 @@ all_commands() ->
                                     leave_command_mode()
                             end}]},
              %%
-             %% Leave group
+             %% Leave group X
              %%
              #command{
                 name = leave,
@@ -744,7 +744,67 @@ all_commands() ->
                                     ?LOG_INFO(#{onsuccess => no}),
                                     ok = say(<<"OK">>),
                                     leave_command_mode()
-                            end}]}]}].
+                            end}]},
+             %%
+             %% Am I busy?
+             %%
+             #command{
+                name = is_busy,
+                patterns = [["is" "busy"], ["am", "i", "busy"]],
+                onsuccess =
+                    fun(_Dict) ->
+                            ?LOG_INFO(#{onsuccess => is_busy}),
+                            case gaia_serv:busy() of
+                                true ->
+                                    Text = <<"Yes">>,
+                                    ok = say(Text),
+                                    [{last_say, Text}|leave_command_mode()];
+                                false ->
+                                    Text = <<"No">>,
+                                    ok = say(Text),
+                                    [{last_say, Text}|leave_command_mode()]
+                            end
+                    end},
+             %%
+             %% I am busy
+             %%
+             #command{
+                name = busy,
+                patterns = [["busy"], ["i", "am", "busy"]],
+                onsuccess =
+                    fun(_Dict) ->
+                            ?LOG_INFO(#{onsuccess => busy}),
+                            case gaia_serv:busy() of
+                                true ->
+                                    Text =
+                                        <<"You are already flagged as busy">>,
+                                    [{last_say, Text}|leave_command_mode()];
+                                false ->
+                                    ok = gaia_serv:busy(true),
+                                    Text = <<"You are now flagged as busy">>,
+                                    [{last_say, Text}|leave_command_mode()]
+                            end
+                    end},
+             %%
+             %% I am not busy
+             %%
+             #command{
+                name = not_busy,
+                patterns = [["not", "busy"], ["I", "am", "not", "busy"]],
+                onsuccess =
+                    fun(_Dict) ->
+                            ?LOG_INFO(#{onsuccess => busy}),
+                            case gaia_serv:busy() of
+                                true ->
+                                    Text = <<"You aren't flagged as busy">>,
+                                    [{last_say, Text}|leave_command_mode()];
+                                false ->
+                                    ok = gaia_serv:busy(true),
+                                    Text =
+                                        <<"You are no longer flagged as busy">>,
+                                    [{last_say, Text}|leave_command_mode()]
+                            end
+                    end}]}].
 
 enter_command_mode() ->
     ?LOG_DEBUG(#{enter_command_mode => now}),

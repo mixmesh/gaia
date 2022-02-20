@@ -9,16 +9,17 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 
 * "Hi Gaia" or "Command"
 * "Goodbye"
+
 * "Call X" or "Call contact X"
 * "Hangup X" or "Hangup contact X"
 * "Join X" or "Join group X" 
 * "Leave X" or "Leave group X"
 
+* "Is busy?" or "Am I busy?"
+* "Busy" or "I am busy"
+* "Not busy" or "I am not busy"
 
-
-
-
-2. Dialogue
+2 Commands
 
 2.1 Entering and leaving Gaia command mode:
 
@@ -32,7 +33,9 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
    [A beep is played played when you leave command mode]
    NOTE: Can be used at any time when in command mode!!!
 
-2.2 Call peer 
+2.2 Initiate and hangup calls to individual contacts
+
+2.2.1 Call contact X
 
 -> "Call X" or "Call contact X"
   <- "Do you want to call X?"
@@ -48,7 +51,7 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
   <- "X is not known. Please try again!"
      [Stays in command mode]
 
-2.3 Hangup peer
+2.2.2 Hangup contact X
 
 -> "Hangup X" or "Hangup contact X"
   <- "Do you want hangup X?"
@@ -64,7 +67,9 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
   <- "X is not known. Please try again!"
      [Stays in command mode]
 
-2.4 Join group
+2.3 Join and leave groups
+
+2.3.1 Join group X
 
 -> "Join X" or "Join group X"
   <- "Do you want to join X?"
@@ -80,7 +85,7 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
   <- "X is not known. Please try again!"
      [Stays in command mode]
 
-2.5 Leave group
+2.3.2 Leave group X
 
 -> "Leave X" or "Leave group X"
   <- "Do you want leave X?"
@@ -96,6 +101,25 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
   <- "X is not known. Please try again!"
      [Stays in command mode]
 
+2.4 Busy flagging
+
+2.4.1 Am I busy?
+
+-> "Is busy?" or "Am I busy?"
+  <- "Yes"
+  <- "No"
+
+2.4.2 I am busy
+
+-> "Busy" or "I am busy"
+  <- "You are now flagged as busy"
+  <- "You are already flagged as busy"
+
+2.4.3 I am not busy
+
+-> "Not busy" or "I am not busy"
+  <- "You are no longer flagged as busy"
+  <- "You aren't flagged as busy"
 
 
 
@@ -103,11 +127,12 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 
 
 
-2.5 Leave a group conversation
 
 
-Status?
-  Not busy/busy
+
+
+
+
 
 
 Available peers
@@ -125,10 +150,6 @@ Available groups
 Joined group
 
 
-
-I'm busy
-
-I'm not busy
 
 
 Ignore X
