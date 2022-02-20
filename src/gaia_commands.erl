@@ -41,8 +41,8 @@ all() ->
                                      {last_say, Text}];
                                 [] ->
                                     Text =
-                                        [Name,
-                                         <<" is not known. Please try again!">>],
+                                        [Name, <<" is not known. \
+Please try again!">>],
                                     ok = say(Text),
                                     [{cd, '..'}, {last_say, Text}]
                             end
@@ -303,13 +303,12 @@ all() ->
                             ?LOG_INFO(#{onsuccess => busy}),
                             case gaia_serv:busy() of
                                 true ->
-                                    Text =
-                                        <<"You are already flagged as busy">>,
+                                    Text = <<"You are already busy">>,
                                     ok = say(Text),
                                     [{last_say, Text}|leave_command_mode()];
                                 false ->
                                     ok = gaia_serv:busy(true),
-                                    Text = <<"You are now flagged as busy">>,
+                                    Text = <<"You are now busy">>,
                                     ok = say(Text),
                                     [{last_say, Text}|leave_command_mode()]
                             end
@@ -324,14 +323,13 @@ all() ->
                     fun(_Dict) ->
                             ?LOG_INFO(#{onsuccess => busy}),
                             case gaia_serv:busy() of
-                                true ->
-                                    Text = <<"You aren't flagged as busy">>,
+                                false ->
+                                    Text = <<"You aren't busy">>,
                                     ok = say(Text),
                                     [{last_say, Text}|leave_command_mode()];
-                                false ->
-                                    ok = gaia_serv:busy(true),
-                                    Text =
-                                        <<"You are no longer flagged as busy">>,
+                                true ->
+                                    ok = gaia_serv:busy(false),
+                                    Text = <<"You are no longer busy">>,
                                     ok = say(Text),
                                     [{last_say, Text}|leave_command_mode()]
                             end

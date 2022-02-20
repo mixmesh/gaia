@@ -121,7 +121,8 @@ call(Peer) ->
 %% Exported: negotiation_failed
 %%
 
--spec negotiation_failed(gaia_serv:peer_name(), calling | busy | not_available) ->
+-spec negotiation_failed(gaia_serv:peer_name(),
+                         calling | busy | not_available) ->
           ok.
 
 negotiation_failed(PeerName, Reason) ->

@@ -101,7 +101,7 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
   <- "X is not known. Please try again!"
      [Stays in command mode]
 
-2.4 Busy flagging
+2.4 Busy
 
 2.4.1 Am I busy?
 
@@ -112,14 +112,14 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 2.4.2 I'm busy
 
 -> "Busy" or "I'm busy"
-  <- "You are now flagged as busy"
-  <- "You are already flagged as busy"
+  <- "You are now busy"
+  <- "You are already busy"
 
 2.4.3 I'm not busy
 
 -> "Not busy" or "I'm not busy"
-  <- "You are no longer flagged as busy"
-  <- "You aren't flagged as busy"
+  <- "You are no longer busy"
+  <- "You aren't busy"
 
 
 
