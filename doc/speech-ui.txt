@@ -16,8 +16,8 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 * "Leave X" or "Leave group X"
 
 * "Is busy?" or "Am I busy?"
-* "Busy" or "I am busy"
-* "Not busy" or "I am not busy"
+* "Busy" or "I'm busy"
+* "Not busy" or "I'm not busy"
 
 2 Commands
 
@@ -109,15 +109,15 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
   <- "Yes"
   <- "No"
 
-2.4.2 I am busy
+2.4.2 I'm busy
 
--> "Busy" or "I am busy"
+-> "Busy" or "I'm busy"
   <- "You are now flagged as busy"
   <- "You are already flagged as busy"
 
-2.4.3 I am not busy
+2.4.3 I'm not busy
 
--> "Not busy" or "I am not busy"
+-> "Not busy" or "I'm not busy"
   <- "You are no longer flagged as busy"
   <- "You aren't flagged as busy"
 

@@ -22,7 +22,9 @@
 %%%-------------------------------------------------------------------
 
 -module(gaia_fuzzy).
--export([match/2]).
+-export([match/2, match/3]).
+
+-type matchers() :: [exact | abbreviation | levenshtein |  tokens].
 
 %%
 %% Export: match
@@ -31,17 +33,37 @@
 -spec match(binary(), [binary()]) -> nomatch | {ok, binary()}.
 
 match(S, Canonicals) ->
-    match(S, Canonicals,
-          [fun exact/2, fun abbreviation/2, fun levenshtein/2, fun tokens/2]).
+    do_match(
+      S, Canonicals,
+      [fun exact/2, fun abbreviation/2, fun levenshtein/2, fun tokens/2]).
 
-match(_S, _Canonicals, []) ->
+
+-spec match(binary(), [binary()], matchers() | all) -> nomatch | {ok, binary()}.
+
+match(S, Canonicals, all) ->
+    match(S, Canonicals);
+match(S, Canonicals, Matchers) ->
+    do_match(S, Canonicals, get_matcher_callbacks(Matchers)).
+
+get_matcher_callbacks([]) ->
+    [];
+get_matcher_callbacks([exact|Rest]) ->
+    [fun exact/2|get_matcher_callbacks(Rest)];
+get_matcher_callbacks([abbreviation|Rest]) ->
+    [fun abbreviation/2|get_matcher_callbacks(Rest)];
+get_matcher_callbacks([levenshtein|Rest]) ->
+    [fun levenshtein/2|get_matcher_callbacks(Rest)];
+get_matcher_callbacks([tokens|Rest]) ->
+    [fun tokens/2|get_matcher_callbacks(Rest)].
+
+do_match(_S, _Canonicals, []) ->
     nomatch;
-match(S, Canonicals, [Matcher|Rest]) ->
+do_match(S, Canonicals, [Matcher|Rest]) ->
     case Matcher(S, Canonicals) of
         {ok, T} ->
             {ok, T};
         undefined ->
-            match(S, Canonicals, Rest)
+            do_match(S, Canonicals, Rest)
     end.
 
 %%

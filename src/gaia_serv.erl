@@ -235,9 +235,9 @@ message_handler(#{parent := Parent,
         {call, From, busy = Call} ->
             ?LOG_DEBUG(#{call => Call}),
             {reply, From, Busy};
-        {call, From, {busy, Busy} = Call} ->
+        {call, From, {busy, UpdatedBusy} = Call} ->
             ?LOG_DEBUG(#{call => Call}),
-            {reply, From, ok, State#{busy => Busy}};
+            {reply, From, ok, State#{busy => UpdatedBusy}};
         {call, From, {start_peer_conversation, PeerIdOrName,
                       ConversationStatus} = Call} ->
             ?LOG_DEBUG(#{call => Call}),

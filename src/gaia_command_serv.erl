@@ -12,21 +12,10 @@
 -include_lib("apptools/include/shorthand.hrl").
 -include_lib("kernel/include/logger.hrl").
 -include("../include/gaia_serv.hrl").
+-include("gaia_commands.hrl").
 -include("globals.hrl").
 
 -define(MODEL, "vosk-model-small-en-us-0.15").
-
--record(command,
-        {
-         name :: atom(),
-         patterns :: [[string() | atom()]],
-         onsuccess ::
-           fun((map()) -> [{cd, '..' | '.' | [atom()]} |
-                           {set_timeout, integer(), fun((map()) -> map())} |
-                           remove_timeout |
-                           {dict, map()}]),
-         children = [] :: [#command{}]
-        }).
 
 %%
 %% Exported: start_link
@@ -165,7 +154,7 @@ initial_message_handler(#{audio_source_callback := AudioSourceCallback,
             CommandState =
                 #{parent => self(),
                   path => [],
-                  all_commands => all_commands(),
+                  all_commands => gaia_commands:all(),
                   dict => #{},
                   timeout_timer => undefined,
                   last_say => <<"I didn't say anything!">>},
@@ -363,7 +352,8 @@ create_callback(VoskRecognizer, VoskTransform, CommandState) ->
             case vosk:recognizer_accept_waveform(
                    VoskRecognizer, VoskTransform(Packet)) of
 		0 ->
-                    create_callback(VoskRecognizer, VoskTransform, CommandState);
+                    create_callback(VoskRecognizer, VoskTransform,
+                                    CommandState);
                 1 ->
                     #{"text" := Text} = vosk:recognizer_result(VoskRecognizer),
                     ?LOG_INFO(#{vosk_text => Text}),
@@ -391,6 +381,8 @@ handle_command(Text, #{parent := Parent,
     Tokens = string:lexemes(Text, " "),
     case match_command(Tokens, Dict, Commands) of
         {ok, UpdatedDict, #command{name = Name, onsuccess = OnSuccess}} ->
+
+
             Result = OnSuccess(UpdatedDict),
             CommandState#
                 {path => update_path(Path, Name, Result),
@@ -405,7 +397,7 @@ handle_command(Text, #{parent := Parent,
                 _ ->
                     case match_patterns(Tokens, #{}, [["goodbye"]]) of
                         {ok, _} ->
-                            leave_command_mode(CommandState);
+                            gaia_commands:leave_command_mode(CommandState);
                         nomatch ->
                             case match_patterns(Tokens, #{}, [["what?"]]) of
                                 {ok, _} ->
@@ -429,10 +421,24 @@ get_commands(Path, [_|Rest]) ->
 match_command(_Tokens, _Dict, []) ->
     nomatch;
 match_command(Tokens, Dict, [#command{patterns = Patterns} = Command|Rest]) ->
+
+
+    ?LOG_DEBUG(#{match => {Tokens, Patterns}}),
+
+
+
+
     case match_patterns(Tokens, Dict, Patterns) of
         {ok, UpdatedDict} ->
+            ?LOG_DEBUG(#{found_it => yes}),
+
+
+
             {ok, UpdatedDict, Command};
         nomatch ->
+            ?LOG_DEBUG(#{no => 1}),
+
+
             match_command(Tokens, Dict, Rest)
     end.
 
@@ -455,7 +461,14 @@ match_pattern([Token|RemainingTokens], Dict, [PatternVariable|Rest])
   when is_atom(PatternVariable) ->
     match_pattern(RemainingTokens, Dict#{PatternVariable => Token}, Rest);
 match_pattern([Token|RemainingTokens], Dict, [PatternToken|Rest]) ->
-    case gaia_fuzzy:match(?l2b(Token), [?l2b(PatternToken)]) of
+    Matchers =
+        if
+            length(Token) < 4 ->
+                [exact];
+            true ->
+                all
+        end,
+    case gaia_fuzzy:match(?l2b(Token), [?l2b(PatternToken)], Matchers) of
         {ok, _} ->
             match_pattern(RemainingTokens, Dict, Rest);
         nomatch ->
@@ -506,341 +519,3 @@ update_last_say(LastSay, SuccessResult) ->
         false ->
             LastSay
     end.
-
-all_commands() ->
-    [#command{
-        name = hi,
-        patterns = [["hi", "gaia"], ["command"]],
-        onsuccess =
-            fun(_Dict) ->
-                    ?LOG_INFO(#{onsuccess => hi}),
-                    enter_command_mode()
-            end,
-        children =
-            [
-             %%
-             %% Call contact X
-             %%
-             #command{
-                name = call,
-                patterns = [["call", name], ["call", "contact", name]],
-                onsuccess =
-                    fun(Dict) ->
-                            ?LOG_INFO(#{onsuccess => call}),
-                            Name = maps:get(name, Dict),
-                            case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
-                                [#gaia_peer{name = PeerName} = Peer] ->
-                                    Text = [<<"Do you want to call ">>,
-                                            PeerName, <<"?">>],
-                                    ok = say(Text),
-                                    [{dict, Dict#{peer => Peer}},
-                                     remove_timeout,
-                                     {last_say, Text}];
-                                [] ->
-                                    Text =
-                                        [Name, <<" is not known. Please try again!">>],
-                                    ok = say(Text),
-                                    [{cd, '..'}, {last_say, Text}]
-                            end
-                    end,
-                children =
-                    [#command{
-                        name = yes,
-                        patterns = [["yes"], ["yeah"]],
-                        onsuccess =
-                            fun(#{peer := #gaia_peer{id = PeerId,
-                                                     name = PeerName}}) ->
-                                    ?LOG_INFO(#{onsuccess => yes}),
-                                    case gaia_serv:start_peer_conversation(
-                                           PeerId, read_write) of
-                                        ok ->
-                                            Text = [<<"You are now in a call with ">>,
-                                                    PeerName],
-                                            ok = say(Text),
-                                            [{last_say, Text}|leave_command_mode()];
-                                        {error, already_started} ->
-                                            Text =
-                                                [<<"You are already in a call with ">>,
-                                                 PeerName],
-                                            ok = say(Text),
-                                            [{last_say, Text}|leave_command_mode()]
-                                    end
-                            end},
-                     #command{
-                        name = no,
-                        patterns = [["no"], ["nah"]],
-                        onsuccess =
-                            fun(_Dict) ->
-                                    ?LOG_INFO(#{onsuccess => no}),
-                                    ok = say(<<"OK">>),
-                                    leave_command_mode()
-                            end}]},
-             %%
-             %% Hangup contact X
-             %%
-             #command{
-                name = hangup,
-                patterns = [["hangup", name], ["hangup", "contact", name]],
-                onsuccess =
-                    fun(Dict) ->
-                            ?LOG_INFO(#{onsuccess => hangup}),
-                            Name = maps:get(name, Dict),
-                            case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
-                                [#gaia_peer{name = PeerName} = Peer] ->
-                                    Text = [<<"Do you want to hangup ">>, PeerName, <<"?">>],
-                                    ok = say(Text),
-                                    [{dict, Dict#{peer => Peer}},
-                                     remove_timeout,
-                                     {last_say, Text}];
-                                [] ->
-                                    Text = [Name, <<" is not known. Please try again!">>],
-                                    ok = say(Text),
-                                    [{cd, '..'}, {last_say, Text}]
-                            end
-                    end,
-                children =
-                    [#command{
-                        name = yes,
-                        patterns = [["yes"], ["yeah"]],
-                        onsuccess =
-                            fun(#{peer := #gaia_peer{id = PeerId,
-                                                     name = PeerName}}) ->
-                                    ?LOG_INFO(#{onsuccess => yes}),
-                                    case gaia_serv:stop_peer_conversation(
-                                           PeerId) of
-                                        ok ->
-                                            Text = [<<"You are no longer in a call with ">>, PeerName],
-                                            ok = say(Text),
-                                            [{last_say, Text}|
-                                             leave_command_mode()];
-                                        {error, no_such_peer} ->
-                                            ?LOG_ERROR(#{unexpected_return_value => no_such_peer}),
-                                            leave_command_mode();
-                                        {error, already_stopped} ->
-                                            Text = [<<"You are not in a call with ">>, PeerName],
-                                            ok = say(Text),
-                                            [{last_say, Text}|
-                                             leave_command_mode()]
-                                    end
-                            end},
-                     #command{
-                        name = no,
-                        patterns = [["no"], ["nah"]],
-                        onsuccess =
-                            fun(_Dict) ->
-                                    ?LOG_INFO(#{onsuccess => no}),
-                                    ok = say(<<"OK">>),
-                                    leave_command_mode()
-                            end}]},
-             %%
-             %% Join group X
-             %%
-             #command{
-                name = join,
-                patterns = [["join", name], ["join", "group", name]],
-                onsuccess =
-                    fun(Dict) ->
-                            ?LOG_INFO(#{onsuccess => join}),
-                            Name = maps:get(name, Dict),
-                            case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
-                                [#gaia_group{name = GroupName} = Group] ->
-                                    Text = [<<"Do you want to join ">>,
-                                            GroupName, <<"?">>],
-                                    ok = say(Text),
-                                    [{dict, Dict#{group => Group}},
-                                     remove_timeout,
-                                     {last_say, Text}];
-                                [] ->
-                                    Text =
-                                        [Name, <<" is not known. Please try again!">>],
-                                    ok = say(Text),
-                                    [{cd, '..'}, {last_say, Text}]
-                            end
-                    end,
-                children =
-                    [#command{
-                        name = yes,
-                        patterns = [["yes"], ["yeah"]],
-                        onsuccess =
-                            fun(#{group := #gaia_group{id = GroupId,
-                                                       name = GroupName}}) ->
-                                    ?LOG_INFO(#{onsuccess => yes}),
-                                    case gaia_serv:start_group_conversation(GroupId) of
-                                        ok ->
-                                            Text = [<<"You are now an active member of ">>,
-                                                    GroupName],
-                                            ok = say(Text),
-                                            [{last_say, Text}|leave_command_mode()];
-                                        {error, already_started} ->
-                                            Text =
-                                                [<<"You are already in active member of ">>,
-                                                 GroupName],
-                                            ok = say(Text),
-                                            [{last_say, Text}|leave_command_mode()]
-                                    end
-                            end},
-                     #command{
-                        name = no,
-                        patterns = [["no"], ["nah"]],
-                        onsuccess =
-                            fun(_Dict) ->
-                                    ?LOG_INFO(#{onsuccess => no}),
-                                    ok = say(<<"OK">>),
-                                    leave_command_mode()
-                            end}]},
-             %%
-             %% Leave group X
-             %%
-             #command{
-                name = leave,
-                patterns = [["leave", name], ["leave", "group", name]],
-                onsuccess =
-                    fun(Dict) ->
-                            ?LOG_INFO(#{onsuccess => leave}),
-                            Name = maps:get(name, Dict),
-                            case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
-                                [#gaia_group{name = GroupName} = Group] ->
-                                    Text = [<<"Do you want to leave ">>, GroupName, <<"?">>],
-                                    ok = say(Text),
-                                    [{dict, Dict#{group => Group}},
-                                     remove_timeout,
-                                     {last_say, Text}];
-                                [] ->
-                                    Text = [Name, <<" is not known. Please try again!">>],
-                                    ok = say(Text),
-                                    [{cd, '..'}, {last_say, Text}]
-                            end
-                    end,
-                children =
-                    [#command{
-                        name = yes,
-                        patterns = [["yes"], ["yeah"]],
-                        onsuccess =
-                            fun(#{group := #gaia_group{id = GroupId,
-                                                       name = GroupName}}) ->
-                                    ?LOG_INFO(#{onsuccess => yes}),
-                                    case gaia_serv:stop_group_conversation(
-                                           GroupId) of
-                                        ok ->
-                                            Text = [<<"You are no longer active in ">>, GroupName],
-                                            ok = say(Text),
-                                            [{last_say, Text}|
-                                             leave_command_mode()];
-                                        {error, no_such_group} ->
-                                            ?LOG_ERROR(#{unexpected_return_value => no_such_group}),
-                                            leave_command_mode();
-                                        {error, already_stopped} ->
-                                            Text = [<<"You are not an active member of ">>, GroupName],
-                                            ok = say(Text),
-                                            [{last_say, Text}|
-                                             leave_command_mode()]
-                                    end
-                            end},
-                     #command{
-                        name = no,
-                        patterns = [["no"], ["nah"]],
-                        onsuccess =
-                            fun(_Dict) ->
-                                    ?LOG_INFO(#{onsuccess => no}),
-                                    ok = say(<<"OK">>),
-                                    leave_command_mode()
-                            end}]},
-             %%
-             %% Am I busy?
-             %%
-             #command{
-                name = is_busy,
-                patterns = [["is" "busy"], ["am", "i", "busy"]],
-                onsuccess =
-                    fun(_Dict) ->
-                            ?LOG_INFO(#{onsuccess => is_busy}),
-                            case gaia_serv:busy() of
-                                true ->
-                                    Text = <<"Yes">>,
-                                    ok = say(Text),
-                                    [{last_say, Text}|leave_command_mode()];
-                                false ->
-                                    Text = <<"No">>,
-                                    ok = say(Text),
-                                    [{last_say, Text}|leave_command_mode()]
-                            end
-                    end},
-             %%
-             %% I am busy
-             %%
-             #command{
-                name = busy,
-                patterns = [["busy"], ["i", "am", "busy"]],
-                onsuccess =
-                    fun(_Dict) ->
-                            ?LOG_INFO(#{onsuccess => busy}),
-                            case gaia_serv:busy() of
-                                true ->
-                                    Text =
-                                        <<"You are already flagged as busy">>,
-                                    [{last_say, Text}|leave_command_mode()];
-                                false ->
-                                    ok = gaia_serv:busy(true),
-                                    Text = <<"You are now flagged as busy">>,
-                                    [{last_say, Text}|leave_command_mode()]
-                            end
-                    end},
-             %%
-             %% I am not busy
-             %%
-             #command{
-                name = not_busy,
-                patterns = [["not", "busy"], ["I", "am", "not", "busy"]],
-                onsuccess =
-                    fun(_Dict) ->
-                            ?LOG_INFO(#{onsuccess => busy}),
-                            case gaia_serv:busy() of
-                                true ->
-                                    Text = <<"You aren't flagged as busy">>,
-                                    [{last_say, Text}|leave_command_mode()];
-                                false ->
-                                    ok = gaia_serv:busy(true),
-                                    Text =
-                                        <<"You are no longer flagged as busy">>,
-                                    [{last_say, Text}|leave_command_mode()]
-                            end
-                    end}]}].
-
-enter_command_mode() ->
-    ?LOG_DEBUG(#{enter_command_mode => now}),
-    ok = mute(),
-    ok = beep(enter_command_mode),
-    [].
-%    [{set_timeout, 4000, fun leave_command_mode/1}].
-
-leave_command_mode() ->
-    ?LOG_DEBUG(#{leave_command_mode => now}),
-    ok = beep(leave_command_mode),
-    unmute(),
-    [{cd, []}, {dict, #{}}].
-
-leave_command_mode(CommandState) ->
-    ?LOG_DEBUG(#{leave_command_mode => now2}),
-    ok = beep(leave_command_mode),
-    ok = unmute(),
-    CommandState#{path => [], dict => #{}}.
-
-beep(Sound) ->
-    ?LOG_DEBUG(#{beep => Sound}),
-    alsa_wave:play(#{rate => 16000,
-                     envelope => #{sustain => 0.05,
-                                   release => 0.05,
-                                   peek_level => 0.9,
-                                   sustain_level => 0.7},
-                     waves => [[{sine, ["C4"]}],
-                               [{sine, ["E4"]}],
-                               [{sine, ["G4"]}]]}),
-    ok.
-
-mute() ->
-    ?LOG_DEBUG(#{mute => now}),
-    ok.
-
-unmute() ->
-    ?LOG_DEBUG(#{unmute => now}),
-    ok.
