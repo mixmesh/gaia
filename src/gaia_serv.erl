@@ -115,7 +115,7 @@ stop_peer_conversation(PeerIdOrName) ->
 
 -spec set_peer_conversation_status(
         peer_id() | {name, peer_name()}, conversation_status()) ->
-          ok | {error, no_such_peer | conversation_not_started}.
+          ok | {error, no_such_peer | conversation_not_started | already_set}.
 
 set_peer_conversation_status(PeerIdOrName, ConversationStatus) ->
     serv:call(?MODULE, {set_peer_conversation_status, PeerIdOrName,
@@ -285,8 +285,9 @@ message_handler(#{parent := Parent,
                       ConversationStatus} = Call} ->
             ?LOG_DEBUG(#{call => Call}),
             case db_lookup_peer(Db, PeerIdOrName) of
-                [#gaia_peer{conversation =
-                                {true, _ConversationStatus}} = Peer] ->
+                [#gaia_peer{conversation = {true, ConversationStatus}}] ->
+                    {reply, From, {error, already_set}};
+                [#gaia_peer{conversation = {true, _}} = Peer] ->
                     UpdatedPeer =
                         Peer#gaia_peer{conversation =
                                            {true, ConversationStatus}},

@@ -10,14 +10,18 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 * "Hi Gaia" or "Command"
 * "Goodbye"
 
-* "Call X" or "Call contact X"
-* "Hangup X" or "Hangup contact X"
-* "Join X" or "Join group X" 
-* "Leave X" or "Leave group X"
+* "Call X"
+* "Hangup X"
+
+* "Join X"
+* "Leave X"
 
 * "Is busy?" or "Am I busy?"
 * "Busy" or "I'm busy"
 * "Not busy" or "I'm not busy"
+
+* "Mute for X"
+* "Unmute for X"
 
 2 Commands
 
@@ -33,11 +37,11 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
    [A beep is played played when you leave command mode]
    NOTE: Can be used at any time when in command mode!!!
 
-2.2 Initiate and hangup calls to individual contacts
+2.2 Initiate and hangup calls to individuals
 
-2.2.1 Call contact X
+2.2.1 Call X
 
--> "Call X" or "Call contact X"
+-> "Call X"
   <- "Do you want to call X?"
     -> "Yes" or "Yeah"
       <- "You are now in a call with  X"
@@ -51,9 +55,9 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
   <- "X is not known. Please try again!"
      [Stays in command mode]
 
-2.2.2 Hangup contact X
+2.2.2 Hang-up X
 
--> "Hangup X" or "Hangup contact X"
+-> "Hang up X"
   <- "Do you want hangup X?"
     -> "Yes" or "Yeah"
       <- "You are no longer in a call with X"
@@ -69,9 +73,9 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 
 2.3 Join and leave groups
 
-2.3.1 Join group X
+2.3.1 Join X
 
--> "Join X" or "Join group X"
+-> "Join X"
   <- "Do you want to join X?"
     -> "Yes" or "Yeah"
       <- "You are now an active member of X"
@@ -85,12 +89,12 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
   <- "X is not known. Please try again!"
      [Stays in command mode]
 
-2.3.2 Leave group X
+2.3.2 Leave X
 
--> "Leave X" or "Leave group X"
+-> "Leave X"
   <- "Do you want leave X?"
     -> "Yes" or "Yeah"
-      <- "You are no longer active in group X"
+      <- "You are no longer active in X"
         [Leaves command mode]
         NOTE: See "Incoming asynchronous messages" below
       <- "You are not an active member of X"
@@ -124,12 +128,78 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 
 
 
+2.5 Mute
+
+2.5.1 Mute for X
+
+-> Mute for X
+  <- Do you want to mute for X?
+    -> "Yes" or "Yeah"
+      <- "You are now muted for X"
+        [Leaves command mode]
+      <- "You are already muted for X"
+        [Leaves command mode]
+    -> "No" or "Nah"
+      <- "OK"
+        [Leaves command mode]
+  <- "X is not known. Please try again!"
+     [Stays in command mode]
+
+NOTE: X might be "all"
+
+2.5.2 Unmute for X
+
+-> Unmute for X
+  <- Do you want to unmute for X?
+    -> "Yes" or "Yeah"
+      <- "You are now unmuted for X"
+        [Leaves command mode]
+      <- "You are already unmuted for X"
+        [Leaves command mode]
+    -> "No" or "Nah"
+      <- "OK"
+        [Leaves command mode]
+  <- "X is not known. Please try again!"
+     [Stays in command mode]
+
+NOTE: X might be "all"
 
 
 
 
 
 
+
+
+2.5.2 Unmute for X
+
+-> Unmute X
+  -> You are no longer muted for X
+  -> You are not muted for X
+  -> 
+
+
+NOTE: X might be all
+
+2.6 Deafen indviduals
+
+2.6.1 Deafen X
+
+-> Deafen X
+  -> You have deafened X
+  -> You already deafen X
+
+NOTE: X might be all
+
+2.6.2 Undeafen X
+
+-> Unmute X
+  -> 
+
+  -> You are no deafening X
+  -> You do not deafen X
+
+NOTE: X might be all
 
 
 
@@ -148,9 +218,6 @@ X must call
 Available groups
 
 Joined group
-
-
-
 
 Ignore X
 
@@ -180,32 +247,6 @@ active groups
 which users?
 
 available users
-
-
-
-
-? Mute X
-
-Unmute X
-
-Defaen X
-
-Undeafen X
-
-Mute all
-
-Unmute all
-
-? Unmute
-
-
-
-
-
-contact and group!!!
-
-
-...
 
 3. Incoming asynchronous messages:
 
