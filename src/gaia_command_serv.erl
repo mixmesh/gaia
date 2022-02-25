@@ -241,16 +241,16 @@ message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
                            conversation = Conversation}} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
             case Conversation of
-                {true, read} ->
+                {true, #{read := true, write := true}} ->
+                    Text = [<<"You now listen *and* talk to ">>, PeerName],
+                    NewLocalCallback = say(LocalCallback, Text),
+                    {noreply, State#{local_callback => NewLocalCallback}};
+                {true, #{read := true}} ->
                     Text = [<<"You now listen to ">>, PeerName],
                     NewLocalCallback = say(LocalCallback, Text),
                     {noreply, State#{local_callback => NewLocalCallback}};
-                {true, write} ->
+                {true, #{write := true}} ->
                     Text = [<<"You now talk to ">>, PeerName],
-                    NewLocalCallback = say(LocalCallback, Text),
-                    {noreply, State#{local_callback => NewLocalCallback}};
-                {true, read_write} ->
-                    Text = [<<"You now listen *and* talk to ">>, PeerName],
                     NewLocalCallback = say(LocalCallback, Text),
                     {noreply, State#{local_callback => NewLocalCallback}};
                 false ->
@@ -422,24 +422,10 @@ get_commands(Path, [_|Rest]) ->
 match_command(_Tokens, _Dict, []) ->
     nomatch;
 match_command(Tokens, Dict, [#command{patterns = Patterns} = Command|Rest]) ->
-
-
-    ?LOG_DEBUG(#{match => {Tokens, Patterns}}),
-
-
-
-
     case match_patterns(Tokens, Dict, Patterns) of
         {ok, UpdatedDict} ->
-            ?LOG_DEBUG(#{found_it => yes}),
-
-
-
             {ok, UpdatedDict, Command};
         nomatch ->
-            ?LOG_DEBUG(#{no => 1}),
-
-
             match_command(Tokens, Dict, Rest)
     end.
 

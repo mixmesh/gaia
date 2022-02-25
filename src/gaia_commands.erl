@@ -54,7 +54,7 @@ all() ->
                                              name = PeerName}}) ->
                         ?LOG_INFO(#{onsuccess => yes}),
                         case gaia_serv:start_peer_conversation(
-                               PeerId, read_write) of
+                               PeerId, #{read => true, write => true}) of
                           ok ->
                             Text =
                               [<<"You are now in a call with ">>, PeerName],
@@ -310,11 +310,11 @@ all() ->
                   end
               end},
          %%
-         %% Mute for X
+         %% Mute X
          %%
          #command{
             name = mute,
-            patterns = [["mute", "for", name]],
+            patterns = [["mute", name]],
             onsuccess =
               fun(Dict) ->
                   ?LOG_INFO(#{onsuccess => mute}),
@@ -322,7 +322,8 @@ all() ->
                   case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
                     [#gaia_peer{name = PeerName} = Peer] ->
                       Text =
-                        [<<"Do you want to mute for ">>, PeerName, <<"?">>],
+                        [<<"Do you want to mute yourself for ">>, PeerName,
+                         <<"?">>],
                       ok = say(Text),
                       [{dict, Dict#{peer => Peer}},
                        remove_timeout,
@@ -330,7 +331,7 @@ all() ->
                     [] ->
                       case gaia_fuzzy:match(?l2b(Name), [<<"all">>]) of
                         {ok, _} ->
-                          Text = [<<"Do you want to mute for all?">>],
+                          Text = [<<"Do you want to mute yourself for all?">>],
                           ok = say(Text),
                           [{dict, Dict#{peer => all}},
                            remove_timeout,
@@ -351,7 +352,7 @@ all() ->
                                              name = PeerName}}) ->
                         ?LOG_INFO(#{onsuccess => yes}),
                         case gaia_serv:set_peer_conversation_status(
-                               PeerId, read) of
+                               PeerId, #{write => false}) of
                           ok ->
                             Text = [<<"You are now muted for ">>, PeerName],
                             ok = say(Text),
@@ -366,9 +367,8 @@ all() ->
                           gaia_serv:fold(
                             fun(#gaia_peer{
                                    id = PeerId,
-                                   conversation = {true, Status}}, Acc)
-                                when Status == write orelse
-                                     Status == read_write ->
+                                   conversation = {true, #{write := true}}},
+                                Acc) ->
                                 [PeerId|Acc];
                                (_, Acc) ->
                                 Acc
@@ -376,7 +376,7 @@ all() ->
                         lists:foreach(
                           fun(PeerId) ->
                               _ = gaia_serv:set_peer_conversation_status(
-                                    PeerId, read)
+                                    PeerId, #{write => false})
                           end, NonMutedPeerIds),
                         Text = [<<"You are now muted for all">>],
                         ok = say(Text),
@@ -392,93 +392,11 @@ all() ->
                         leave_command_mode()
                     end}]},
          %%
-         %% Mute for X
-         %%
-         #command{
-            name = mute,
-            patterns = [["mute", "for", name]],
-            onsuccess =
-              fun(Dict) ->
-                  ?LOG_INFO(#{onsuccess => mute}),
-                  Name = maps:get(name, Dict),
-                  case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
-                    [#gaia_peer{name = PeerName} = Peer] ->
-                      Text =
-                        [<<"Do you want to mute for ">>, PeerName, <<"?">>],
-                      ok = say(Text),
-                      [{dict, Dict#{peer => Peer}},
-                       remove_timeout,
-                       {last_say, Text}];
-                    [] ->
-                      case gaia_fuzzy:match(?l2b(Name), [<<"all">>]) of
-                        {ok, _} ->
-                          Text = [<<"Do you want to mute for all?">>],
-                          ok = say(Text),
-                          [{dict, Dict#{peer => all}},
-                           remove_timeout,
-                           {last_say, Text}];
-                        nomatch ->
-                          Text = [Name, <<" is not known. Please try again!">>],
-                          ok = say(Text),
-                          [{cd, '..'}, {last_say, Text}]
-                      end
-                  end
-              end,
-            children =
-              [#command{
-                  name = yes,
-                  patterns = [["yes"], ["yeah"]],
-                  onsuccess =
-                    fun(#{peer := #gaia_peer{id = PeerId,
-                                             name = PeerName}}) ->
-                        ?LOG_INFO(#{onsuccess => yes}),
-                        case gaia_serv:set_peer_conversation_status(
-                               PeerId, read) of
-                          ok ->
-                            Text = [<<"You are now muted for ">>, PeerName],
-                            ok = say(Text),
-                            [{last_say, Text}|leave_command_mode()];
-                          {error, already_set} ->
-                            Text = [<<"You are already muted for ">>, PeerName],
-                            ok = say(Text),
-                            [{last_say, Text}|leave_command_mode()]
-                        end;
-                       (#{peer := all}) ->
-                        NonMutedPeerIds =
-                          gaia_serv:fold(
-                            fun(#gaia_peer{
-                                   id = PeerId,
-                                   conversation = {true, Status}}, Acc)
-                                when Status == write orelse
-                                     Status == read_write ->
-                                [PeerId|Acc];
-                               (_, Acc) ->
-                                Acc
-                            end, []),
-                        lists:foreach(
-                          fun(PeerId) ->
-                              _ = gaia_serv:set_peer_conversation_status(
-                                    PeerId, read)
-                          end, NonMutedPeerIds),
-                        Text = [<<"You are now muted for all">>],
-                        ok = say(Text),
-                        [{last_say, Text}|leave_command_mode()]
-                    end},
-               #command{
-                  name = no,
-                  patterns = [["no"], ["nah"]],
-                  onsuccess =
-                    fun(_Dict) ->
-                        ?LOG_INFO(#{onsuccess => no}),
-                        ok = say(<<"OK">>),
-                        leave_command_mode()
-                    end}]},
-         %%
-         %% Unmute for X
+         %% Unmute X
          %%
          #command{
             name = unmute,
-            patterns = [["unmute", "for", name]],
+            patterns = [["unmute", name]],
             onsuccess =
               fun(Dict) ->
                   ?LOG_INFO(#{onsuccess => unmute}),
@@ -486,7 +404,8 @@ all() ->
                   case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
                     [#gaia_peer{name = PeerName} = Peer] ->
                       Text =
-                        [<<"Do you want to unmute for ">>, PeerName, <<"?">>],
+                        [<<"Do you want to unmute yourself for ">>, PeerName,
+                         <<"?">>],
                       ok = say(Text),
                       [{dict, Dict#{peer => Peer}},
                        remove_timeout,
@@ -494,7 +413,8 @@ all() ->
                     [] ->
                       case gaia_fuzzy:match(?l2b(Name), [<<"all">>]) of
                         {ok, _} ->
-                          Text = [<<"Do you want to unmute for all?">>],
+                          Text =
+                            [<<"Do you want to unmute yourself for all?">>],
                           ok = say(Text),
                           [{dict, Dict#{peer => all}},
                            remove_timeout,
@@ -515,7 +435,7 @@ all() ->
                                              name = PeerName}}) ->
                         ?LOG_INFO(#{onsuccess => yes}),
                         case gaia_serv:set_peer_conversation_status(
-                               PeerId, read) of
+                               PeerId, #{write => true}) of
                           ok ->
                             Text = [<<"You are now unmuted for ">>, PeerName],
                             ok = say(Text),
@@ -531,7 +451,8 @@ all() ->
                           gaia_serv:fold(
                             fun(#gaia_peer{
                                    id = PeerId,
-                                   conversation = {true, read}}, Acc) ->
+                                   conversation = {true, #{write := false}}},
+                                Acc) ->
                                 [PeerId|Acc];
                                (_, Acc) ->
                                 Acc
@@ -539,9 +460,175 @@ all() ->
                         lists:foreach(
                           fun(PeerId) ->
                               _ = gaia_serv:set_peer_conversation_status(
-                                    PeerId, read_write)
+                                    PeerId, #{write => true})
                           end, MutedPeerIds),
                         Text = [<<"You are now unmuted for all">>],
+                        ok = say(Text),
+                        [{last_say, Text}|leave_command_mode()]
+                    end},
+               #command{
+                  name = no,
+                  patterns = [["no"], ["nah"]],
+                  onsuccess =
+                    fun(_Dict) ->
+                        ?LOG_INFO(#{onsuccess => no}),
+                        ok = say(<<"OK">>),
+                        leave_command_mode()
+                    end}]},
+         %%
+         %% Deafen X
+         %%
+         #command{
+            name = deafen,
+            patterns = [["deafen", name]],
+            onsuccess =
+              fun(Dict) ->
+                  ?LOG_INFO(#{onsuccess => deafen}),
+                  Name = maps:get(name, Dict),
+                  case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
+                    [#gaia_peer{name = PeerName} = Peer] ->
+                      Text =
+                        [<<"Do you want to be deaf to ">>, PeerName, <<"?">>],
+                      ok = say(Text),
+                      [{dict, Dict#{peer => Peer}},
+                       remove_timeout,
+                       {last_say, Text}];
+                    [] ->
+                      case gaia_fuzzy:match(?l2b(Name), [<<"all">>]) of
+                        {ok, _} ->
+                          Text = [<<"Do you want to be deaf to all?">>],
+                          ok = say(Text),
+                          [{dict, Dict#{peer => all}},
+                           remove_timeout,
+                           {last_say, Text}];
+                        nomatch ->
+                          Text = [Name, <<" is not known. Please try again!">>],
+                          ok = say(Text),
+                          [{cd, '..'}, {last_say, Text}]
+                      end
+                  end
+              end,
+            children =
+              [#command{
+                  name = yes,
+                  patterns = [["yes"], ["yeah"]],
+                  onsuccess =
+                    fun(#{peer := #gaia_peer{id = PeerId,
+                                             name = PeerName}}) ->
+                        ?LOG_INFO(#{onsuccess => yes}),
+                        case gaia_serv:set_peer_conversation_status(
+                               PeerId, #{read => false}) of
+                          ok ->
+                            Text = [<<"You are now deaf to ">>, PeerName],
+                            ok = say(Text),
+                            [{last_say, Text}|leave_command_mode()];
+                          {error, already_set} ->
+                            Text = [<<"You are already deaf to ">>, PeerName],
+                            ok = say(Text),
+                            [{last_say, Text}|leave_command_mode()]
+                        end;
+                       (#{peer := all}) ->
+                        NonMutedPeerIds =
+                          gaia_serv:fold(
+                            fun(#gaia_peer{
+                                   id = PeerId,
+                                   conversation = {true, #{read := true}}},
+                                Acc) ->
+                                [PeerId|Acc];
+                               (_, Acc) ->
+                                Acc
+                            end, []),
+                        lists:foreach(
+                          fun(PeerId) ->
+                              _ = gaia_serv:set_peer_conversation_status(
+                                    PeerId, #{read => false})
+                          end, NonMutedPeerIds),
+                        Text = [<<"You are now deaf to all">>],
+                        ok = say(Text),
+                        [{last_say, Text}|leave_command_mode()]
+                    end},
+               #command{
+                  name = no,
+                  patterns = [["no"], ["nah"]],
+                  onsuccess =
+                    fun(_Dict) ->
+                        ?LOG_INFO(#{onsuccess => no}),
+                        ok = say(<<"OK">>),
+                        leave_command_mode()
+                    end}]},
+         %%
+         %% Undeafen X
+         %%
+         #command{
+            name = undeafen,
+            patterns = [["undeafen", name]],
+            onsuccess =
+              fun(Dict) ->
+                  ?LOG_INFO(#{onsuccess => unmute}),
+                  Name = maps:get(name, Dict),
+                  case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
+                    [#gaia_peer{name = PeerName} = Peer] ->
+                      Text =
+                        [<<"Do you no longer want to be deaf to ">>, PeerName,
+                         <<"?">>],
+                      ok = say(Text),
+                      [{dict, Dict#{peer => Peer}},
+                       remove_timeout,
+                       {last_say, Text}];
+                    [] ->
+                      case gaia_fuzzy:match(?l2b(Name), [<<"all">>]) of
+                        {ok, _} ->
+                          Text =
+                            [<<"Do you no longer want to be deaf to all?">>],
+                          ok = say(Text),
+                          [{dict, Dict#{peer => all}},
+                           remove_timeout,
+                           {last_say, Text}];
+                        nomatch ->
+                          Text = [Name, <<" is not known. Please try again!">>],
+                          ok = say(Text),
+                          [{cd, '..'}, {last_say, Text}]
+                      end
+                  end
+              end,
+            children =
+              [#command{
+                  name = yes,
+                  patterns = [["yes"], ["yeah"]],
+                  onsuccess =
+                    fun(#{peer := #gaia_peer{id = PeerId,
+                                             name = PeerName}}) ->
+                        ?LOG_INFO(#{onsuccess => yes}),
+                        case gaia_serv:set_peer_conversation_status(
+                               PeerId, #{read => true}) of
+                          ok ->
+                            Text =
+                              [<<"You are no longer deaf to ">>, PeerName],
+                            ok = say(Text),
+                            [{last_say, Text}|leave_command_mode()];
+                          {error, already_set} ->
+                            Text =
+                              [<<"You are already hearing ">>, PeerName],
+                            ok = say(Text),
+                            [{last_say, Text}|leave_command_mode()]
+                        end;
+                       (#{peer := all}) ->
+                        MutedPeerIds =
+                          gaia_serv:fold(
+                            fun(#gaia_peer{
+                                   id = PeerId,
+                                   conversation = {true, #{read := false}}},
+                                Acc) ->
+                                [PeerId|Acc];
+                               (_, Acc) ->
+                                Acc
+                            end, []),
+                        lists:foreach(
+                          fun(PeerId) ->
+                              _ = gaia_serv:set_peer_conversation_status(
+                                    PeerId, #{read => true})
+                          end, MutedPeerIds),
+                        Text = [<<"You are no longer deaf to all">>],
                         ok = say(Text),
                         [{last_say, Text}|leave_command_mode()]
                     end},

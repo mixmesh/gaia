@@ -31,7 +31,7 @@
 -type group_id() :: id().
 -type mode() :: direct | call | ignore.
 -type options() :: [override_busy | known_peers_only].
--type conversation_status() :: read | write | read_write.
+-type conversation_status() :: #{read => boolean(), write => boolean()}.
 -type group_type() :: open | closed.
 -type session_key() :: binary().
 -type conversations() ::
@@ -287,10 +287,13 @@ message_handler(#{parent := Parent,
             case db_lookup_peer(Db, PeerIdOrName) of
                 [#gaia_peer{conversation = {true, ConversationStatus}}] ->
                     {reply, From, {error, already_set}};
-                [#gaia_peer{conversation = {true, _}} = Peer] ->
+                [#gaia_peer{conversation =
+                                {true, CurrentConversationStatus}} = Peer] ->
                     UpdatedPeer =
-                        Peer#gaia_peer{conversation =
-                                           {true, ConversationStatus}},
+                        Peer#gaia_peer{
+                          conversation =
+                              {true, maps:merge(ConversationStatus,
+                                                CurrentConversationStatus)}},
                     true = db_insert(Db, UpdatedPeer),
                     ok = update_network(MyPeerId, Db, Busy),
                     {reply, From, ok};
@@ -477,10 +480,7 @@ find_conversations(Db, _Busy = false) ->
             when RemotePort /= undefined ->
               [{peer, PeerId}|Acc];
          (#gaia_peer{id = PeerId,
-                     conversation = {true, read}}, Acc) ->
-              [{peer, PeerId}|Acc];
-         (#gaia_peer{id = PeerId,
-                     conversation = {true, read_write}}, Acc) ->
+                     conversation = {true, #{read := true}}}, Acc) ->
               [{peer, PeerId}|Acc];
          (#gaia_group{id = GroupId,
                       conversation = true,
@@ -634,7 +634,9 @@ accept_peer(_Busy = true, #gaia_peer{
                              conversation = false} = Peer) ->
     case lists:member(override_busy, Options) of
         true ->
-            UpdatedPeer = Peer#gaia_peer{conversation = {true, read_write}},
+            UpdatedPeer =
+                Peer#gaia_peer{conversation =
+                                   {true, #{read => true, write => true}}},
             ok = gaia_command_serv:conversation_accepted(UpdatedPeer),
             {yes, UpdatedPeer};
         false ->
@@ -645,7 +647,8 @@ accept_peer(_Busy = false, #gaia_peer{mode = call} = Peer) ->
     ok = gaia_command_serv:call(Peer),
     {no, call};
 accept_peer(_Busy = false, #gaia_peer{mode = direct} = Peer) ->
-    UpdatedPeer = Peer#gaia_peer{conversation = {true, read_write}},
+    UpdatedPeer = Peer#gaia_peer{conversation =
+                                     {true, #{read => true, write => true}}},
     ok = gaia_command_serv:conversation_accepted(UpdatedPeer),
     {yes, UpdatedPeer};
 accept_peer(_Busy, Peer) ->

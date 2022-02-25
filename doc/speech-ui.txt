@@ -125,15 +125,12 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
   <- "You are no longer busy"
   <- "You aren't busy"
 
-
-
-
 2.5 Mute
 
-2.5.1 Mute for X
+2.5.1 Mute X
 
--> Mute for X
-  <- Do you want to mute for X?
+-> Mute X
+  <- Do you want to mute yourself for X?
     -> "Yes" or "Yeah"
       <- "You are now muted for X"
         [Leaves command mode]
@@ -147,10 +144,10 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 
 NOTE: X might be "all"
 
-2.5.2 Unmute for X
+2.5.2 Unmute X
 
--> Unmute for X
-  <- Do you want to unmute for X?
+-> Unmute X
+  <- Do you want to unmute yourself for X?
     -> "Yes" or "Yeah"
       <- "You are now unmuted for X"
         [Leaves command mode]
@@ -164,42 +161,46 @@ NOTE: X might be "all"
 
 NOTE: X might be "all"
 
+2.6 Deafen
 
-
-
-
-
-
-
-2.5.2 Unmute for X
-
--> Unmute X
-  -> You are no longer muted for X
-  -> You are not muted for X
-  -> 
-
-
-NOTE: X might be all
-
-2.6 Deafen indviduals
-
-2.6.1 Deafen X
+2.5.1 Deafen X
 
 -> Deafen X
-  -> You have deafened X
-  -> You already deafen X
+  <- Do you want to be deaf to X?
+    -> "Yes" or "Yeah"
+    <- "You are now deaf to X"
+        [Leaves command mode]
+      <- "You are already deaf to X"
+        [Leaves command mode]
+    -> "No" or "Nah"
+      <- "OK"
+        [Leaves command mode]
+  <- "X is not known. Please try again!"
+     [Stays in command mode]
 
-NOTE: X might be all
+NOTE: X might be "all"
 
-2.6.2 Undeafen X
+2.5.2 Undeafen X
 
--> Unmute X
-  -> 
+-> Undeafen X
+  <- Do you no longer be deaf to X?
+    -> "Yes" or "Yeah"
+      <- "You are no longer deaf to X"
+        [Leaves command mode]
+      <- "You are already hearing X"
+        [Leaves command mode]
+    -> "No" or "Nah"
+      <- "OK"
+        [Leaves command mode]
+  <- "X is not known. Please try again!"
+     [Stays in command mode]
 
-  -> You are no deafening X
-  -> You do not deafen X
+NOTE: X might be "all"
 
-NOTE: X might be all
+2.6 Ignore
+
+
+
 
 
 
