@@ -20,8 +20,16 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 * "Busy" or "I'm busy"
 * "Not busy" or "I'm not busy"
 
-* "Mute for X"
-* "Unmute for X"
+* "Mute X"
+* "Unmute X"
+
+* "Deafen X"
+* "Undeafen X"
+
+* "Is X ignored?" or "Do I ignore X?"
+
+
+
 
 2 Commands
 
@@ -110,8 +118,8 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 2.4.1 Am I busy?
 
 -> "Is busy?" or "Am I busy?"
-  <- "Yes"
-  <- "No"
+  <- "Yes, you are busy"
+  <- "No, you are not busy"
 
 2.4.2 I'm busy
 
@@ -123,7 +131,7 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 
 -> "Not busy" or "I'm not busy"
   <- "You are no longer busy"
-  <- "You aren't busy"
+  <- "You are not busy"
 
 2.5 Mute
 
@@ -198,6 +206,28 @@ NOTE: X might be "all"
 NOTE: X might be "all"
 
 2.6 Ignore
+
+2.6.1 Is X ignored?
+
+-> Is X ignored?
+  <- "Yes, X is ignored"
+  <- "No, X is not ignored"
+  <- "X is not known. Please try again!"
+  
+2.6.2 Ignore X
+
+-> Ignore X
+  <- "You now ignore X"
+  <- "You already ignore X"
+  <- "X is not known. Please try again!"
+  
+2.6.3 Do not ignore X   
+
+-> Do not not ignore X
+  <- "You no longer ignore X"
+  <- "You do not ignore X"
+  <- "X is not known. Please try again!"
+
 
 
 
