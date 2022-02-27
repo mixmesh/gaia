@@ -683,6 +683,37 @@ all() ->
                          [{last_say, Text}|leave_command_mode()]
                      end
                  end
+             end),
+         %%
+         %% Do not ignore X
+         %%
+         ask(ignore,
+             [["do", "not", "ignore", name]],
+             fun(Dict) ->
+                 ?LOG_INFO(#{onsuccess => do_not_ignore}),
+                 Name = ?l2b(maps:get(name, Dict)),
+                 case config:lookup([gaia, peers, {name, Name}]) of
+                   not_found ->
+                     Text = [Name, <<" is not known. Please try again!">>],
+                     ok = say(Text),
+                     [{cd, '..'}, {last_say, Text}];
+                   ConfigPeer ->
+                     case config:lookup_children([mode], ConfigPeer) of
+                       [ignore] ->
+                         ok = config:edit_config(
+                                [{gaia,
+                                  [{peers,
+                                    [[{name, Name},
+                                      {mode, <<"call">>}]]}]}]),
+                         Text = [<<"You no longer ignore ">>, Name],
+                         ok = say(Text),
+                         [{last_say, Text}|leave_command_mode()];
+                       _ ->
+                         Text = [<<"You do not ignore ">>, Name],
+                         ok = say(Text),
+                         [{last_say, Text}|leave_command_mode()]
+                     end
+                 end
              end)]}].
 
 ask(Name, AskPatterns, Onsuccess) ->
