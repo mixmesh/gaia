@@ -5,7 +5,7 @@
         {
          id :: gaia_serv:peer_id() | '_',
          name = undefined :: gaia_serv:peer_name() | undefined | '_',
-         mode = undefined :: gaia_serv:mode() | undefined | '_',
+         mode = call :: gaia_serv:mode() | undefined | '_',
          options = [] :: gaia_serv:options() | '_',
          ephemeral = false :: boolean() | '_',
          conversation = false ::

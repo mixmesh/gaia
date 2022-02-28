@@ -380,7 +380,7 @@ message_handler(#{parent := Parent,
                 [] ->
                     {reply, From, {error, no_such_peer}}
             end;
-        config_update = Message ->
+        config_updated = Message ->
             ?LOG_DEBUG(#{message => Message}),
             {ok, NewGroupsOfInterest, NewAllNames} = sync_db(Db),
             ok = update_network(MyPeerId, Db, Busy),

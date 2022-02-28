@@ -27,9 +27,12 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 * "Undeafen X"
 
 * "Is X ignored?" or "Do I ignore X?"
+* "Ignore X"
+* "Do not ignore X"
 
-
-
+* "Has X direct access?"
+* "Give X direct access"
+* "Do not give X direct access"
 
 2 Commands
 
@@ -228,6 +231,46 @@ NOTE: X might be "all"
   <- "You do not ignore X"
   <- "X is not known. Please try again!"
 
+2.7 Direct
+
+2.7.1 Has X direct access?
+
+-> Has X direct access?
+  <- "Yes, X has direct access"
+  <- "No, X has not direct access"
+  <- "X is not known. Please try again!"
+  
+2.7.2 Give X direct access
+
+-> Give X direct access
+  <- "You gave X direct access"
+  <- "You already give X direct access"
+  <- "X is not known. Please try again!"
+  
+2.7.3 Do not give X direct access  
+
+-> Do not give X direct access
+  <- "You now give direct access to X"
+  <- "You do not give X direct access"
+  <- "X is not known. Please try again!"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Let X overide busy
+
+
 
 
 
@@ -240,32 +283,11 @@ Available peers
 
 Current talks
 
-Let X overide busy
-
-Give X direct access
-
-X must call
-
 Available groups
 
 Joined group
 
-Ignore X
-
-No longer ignore X
-
-
-
-direct
-
-if busy
-
-
-
 taling with peers?
-
-
-
 
 joined groups?
 
@@ -273,11 +295,12 @@ available groups?
 
 active groups
 
-
-
 which users?
 
 available users
+
+
+
 
 3. Incoming asynchronous messages:
 
