@@ -10,23 +10,27 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 * "Hi Gaia" or "Command"
 * "Goodbye"
 
+* "List [all] active calls?"
 * "Call X"
 * "Hangup X"
 
+* "List [all] joined groups?
 * "Join X"
 * "Leave X"
 
-* "Is busy?" or "Am I busy?"
-* "Busy" or "I'm busy"
-* "Not busy" or "I'm not busy"
+* "Am I busy?"
+* "I'm busy"
+* "I'm not busy"
 
-* "Mute X"
-* "Unmute X"
+* "Am I muted for X?"
+* "Mute me for X"
+* "Unmute me for X"
 
-* "Deafen X"
-* "Undeafen X"
+* "Am I deaf to X?"
+* "Deafen me to X"
+* "Undeafen me to X"
 
-* "Is X ignored?" or "Do I ignore X?"
+* "Am I ignoring X?"
 * "Ignore X"
 * "Do not ignore X"
 
@@ -34,9 +38,13 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 * "Give X direct access"
 * "Do not give X direct access"
 
+* "Has X high priority?"
+* "Give X high priority"
+* "Do not give X high priority"
+
 2 Commands
 
-2.1 Entering and leaving Gaia command mode:
+2.1 Entering and leaving Gaia command mode
 
 -> "Hi Gaia", "Command"
    [Enters gaia command mode]
@@ -48,9 +56,16 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
    [A beep is played played when you leave command mode]
    NOTE: Can be used at any time when in command mode!!!
 
-2.2 Initiate and hangup calls to individuals
+2.2 Two-party call management
 
-2.2.1 Call X
+2.2.1 List [all] active calls
+
+-> "List [all] active calls"
+  <- "You are not in any active calls"
+  <- "You are in an active call with X"
+  <- "You are in active calls with X, Y and Z"
+    
+2.2.2 Call X
 
 -> "Call X"
   <- "Do you want to call X?"
@@ -58,15 +73,15 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
       <- "You are now in a call with  X"
         [Leaves command mode]
         NOTE: See "Incoming asynchronous messages" below
-      <- "You are already in a call with X"
+      <- "Hey! You are already in a call with X"
         [Leaves command mode]
     -> "No" or "Nah"
        <- "OK"
          [Leaves command mode]
-  <- "X is not known. Please try again!"
+  <- "Hey! X is not known. Please try again!"
      [Stays in command mode]
 
-2.2.2 Hang-up X
+2.2.3 Hang-up X
 
 -> "Hang up X"
   <- "Do you want hangup X?"
@@ -74,233 +89,233 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
       <- "You are no longer in a call with X"
         [Leaves command mode]
         NOTE: See "Incoming asynchronous messages" below
-      <- "You are not in a call with X"
+      <- "Hey! You are not in a call with X"
         [Leaves command mode]
     -> "No" or "Nah"
        <- "OK"
          [Leaves command mode]
-  <- "X is not known. Please try again!"
+  <- "Hey! X is not known. Please try again!"
      [Stays in command mode]
 
-2.3 Join and leave groups
+2.3 Multi-party group management
 
-2.3.1 Join X
+2.3.1 List [all] joined groups?"
+
+-> "List [all] joined groups?"
+  <- "You have not joined any groups"
+  <- "You have joined the group X"
+  <- "You have joined the groups X, Y and Z"
+
+2.3.2 Join X
 
 -> "Join X"
   <- "Do you want to join X?"
     -> "Yes" or "Yeah"
-      <- "You are now an active member of X"
+      <- "You are now an active member of group X"
         [Leaves command mode]
         NOTE: See "Incoming asynchronous messages" below
-      <- "You are already an active member of X"
+      <- "Hey! You are already an active member of X"
         [Leaves command mode]
     -> "No" or "Nah"
        <- "OK"
          [Leaves command mode]
-  <- "X is not known. Please try again!"
+  <- "Hey! Group X is not known. Please try again!"
      [Stays in command mode]
 
-2.3.2 Leave X
+2.3.3 Leave X
 
 -> "Leave X"
   <- "Do you want leave X?"
     -> "Yes" or "Yeah"
-      <- "You are no longer active in X"
+      <- "You are no longer an active member active of group X"
         [Leaves command mode]
         NOTE: See "Incoming asynchronous messages" below
-      <- "You are not an active member of X"
+      <- "Hey! You are not an active member of group X"
         [Leaves command mode]
     -> "No" or "Nah"
        <- "OK"
          [Leaves command mode]
-  <- "X is not known. Please try again!"
+  <- "Hey! Group X is not known. Please try again!"
      [Stays in command mode]
 
-2.4 Busy
+2.4 Busy management
 
 2.4.1 Am I busy?
 
--> "Is busy?" or "Am I busy?"
+-> "Am I busy?"
   <- "Yes, you are busy"
   <- "No, you are not busy"
 
 2.4.2 I'm busy
 
--> "Busy" or "I'm busy"
+-> "I'm busy"
   <- "You are now busy"
-  <- "You are already busy"
+  <- "Hey! You are already busy"
 
 2.4.3 I'm not busy
 
--> "Not busy" or "I'm not busy"
+-> "I'm not busy"
   <- "You are no longer busy"
-  <- "You are not busy"
+  <- "Hey! You are not busy"
 
-2.5 Mute
+2.5 Mute management
 
-2.5.1 Mute X
+2.5.1 "Am I muted for X?"
 
--> Mute X
-  <- Do you want to mute yourself for X?
+-> "Am I muted for X?
+  <- "Yes, you are muted for X"
+  <- "No, you are not muted for X"
+  <- "Hey! You are neither in a call nor in an active group with X"
+  <- "Hey! X is not known. Please try again!"
+
+NOTE: X might be "all"
+
+2.5.2 Mute me for X
+
+-> "Mute me for X"
+  <- "Do you want to mute yourself for X?"
     -> "Yes" or "Yeah"
       <- "You are now muted for X"
         [Leaves command mode]
-      <- "You are already muted for X"
+      <- "Hey! You are already muted for X"
         [Leaves command mode]
     -> "No" or "Nah"
       <- "OK"
         [Leaves command mode]
-  <- "X is not known. Please try again!"
+  <- "Hey! X is not known. Please try again!"
      [Stays in command mode]
 
 NOTE: X might be "all"
 
-2.5.2 Unmute X
+2.5.3 Unmute me for X
 
--> Unmute X
-  <- Do you want to unmute yourself for X?
+-> "Unmute me for X"
+  <- "Do you want to unmute yourself for X?"
     -> "Yes" or "Yeah"
       <- "You are now unmuted for X"
         [Leaves command mode]
-      <- "You are already unmuted for X"
+      <- "Hey! You are not muted for X"
         [Leaves command mode]
     -> "No" or "Nah"
       <- "OK"
         [Leaves command mode]
-  <- "X is not known. Please try again!"
+  <- "Hey! X is not known. Please try again!"
      [Stays in command mode]
 
 NOTE: X might be "all"
 
-2.6 Deafen
+2.6 Deafen management
 
-2.5.1 Deafen X
+2.6.1 "Am I deaf to X?"
 
--> Deafen X
-  <- Do you want to be deaf to X?
+-> "Am I deaf to X?
+  <- "Yes, you are deaf to X"
+  <- "No, you are not deaf to X"
+  <- "Hey! You are neither in a call nor in an active group with X"
+  <- "Hey! X is not known. Please try again!"
+
+2.6.2 "Deafen me to X"
+
+-> "Deafen me to X"
+  <- "Do you want to be deaf to X?"
     -> "Yes" or "Yeah"
-    <- "You are now deaf to X"
+      <- "You are now deaf to X"
         [Leaves command mode]
-      <- "You are already deaf to X"
+      <- "Hey! You are already deaf to X"
         [Leaves command mode]
     -> "No" or "Nah"
       <- "OK"
         [Leaves command mode]
-  <- "X is not known. Please try again!"
+  <- "Hey! X is not known. Please try again!"
      [Stays in command mode]
 
 NOTE: X might be "all"
 
-2.5.2 Undeafen X
+2.6.3 Undeafen me to X
 
--> Undeafen X
-  <- Do you no longer be deaf to X?
+-> "Undeafen me to X"
+  <- "Do you no longer be deaf to X?"
     -> "Yes" or "Yeah"
       <- "You are no longer deaf to X"
         [Leaves command mode]
-      <- "You are already hearing X"
+      <- "Hey! You are not deaf to X"
         [Leaves command mode]
     -> "No" or "Nah"
       <- "OK"
         [Leaves command mode]
-  <- "X is not known. Please try again!"
+  <- "Hey! X is not known. Please try again!"
      [Stays in command mode]
 
 NOTE: X might be "all"
 
-2.6 Ignore
+2.7 Ignore management
 
-2.6.1 Is X ignored?
+2.7.1 Is X ignored?
 
--> Is X ignored?
+-> "Am I ignoring X?"
   <- "Yes, X is ignored"
   <- "No, X is not ignored"
-  <- "X is not known. Please try again!"
+  <- "Hey! X is not known. Please try again!"
   
-2.6.2 Ignore X
+2.7.2 Ignore X
 
--> Ignore X
+-> "Ignore X"
   <- "You now ignore X"
-  <- "You already ignore X"
-  <- "X is not known. Please try again!"
+  <- "Hey! You already ignore X"
+  <- "Hey! X is not known. Please try again!"
   
-2.6.3 Do not ignore X   
+2.7.3 Do not ignore X   
 
--> Do not not ignore X
+-> "Do not not ignore X"
   <- "You no longer ignore X"
   <- "You do not ignore X"
-  <- "X is not known. Please try again!"
+  <- "Hey! X is not known. Please try again!"
 
-2.7 Direct
+2.8 Direct management
 
-2.7.1 Has X direct access?
+2.8.1 Has X direct access?
 
--> Has X direct access?
+-> "Has X direct access?"
   <- "Yes, X has direct access"
   <- "No, X has not direct access"
-  <- "X is not known. Please try again!"
+  <- "Hey! X is not known. Please try again!"
   
-2.7.2 Give X direct access
+2.8.2 Give direct access to X
 
--> Give X direct access
-  <- "You gave X direct access"
-  <- "You already give X direct access"
-  <- "X is not known. Please try again!"
+-> "Give direct access to X"
+  <- "You gave direct access to X"
+  <- "Hey! You already give direct access to X"
+  <- "Hey! X is not known. Please try again!"
   
-2.7.3 Do not give X direct access  
+2.8.3 Do not give direct access to X  
 
--> Do not give X direct access
-  <- "You now give direct access to X"
-  <- "You do not give X direct access"
-  <- "X is not known. Please try again!"
+-> "Do not give direct access to X"
+  <- "You no longer give direct access to X"
+  <- "You do not give direct access to X"
+  <- "Hey! X is not known. Please try again!"
 
+2.9 Priority management
 
+2.9.1 Has X high priority?
 
+-> "Has X high priority?"
+  <- "Yes, X has high priority"
+  <- "No, X does not have high priority"
+  <- "Hey! X is not known. Please try again!"
+  
+2.9.2 Give X high priority
 
+-> "Give X high priority"
+  <- "You gave X high priority"
+  <- "Hey! You already give X high priority"
+  <- "Hey! X is not known. Please try again!"
+  
+2.9.3 Do not give X high priority
 
-
-
-
-
-
-
-
-
-
-
-Let X overide busy
-
-
-
-
-
-
-
-
-
-
-Available peers
-
-Current talks
-
-Available groups
-
-Joined group
-
-taling with peers?
-
-joined groups?
-
-available groups?
-
-active groups
-
-which users?
-
-available users
-
-
-
+-> "Do not give X high priority"
+  <- "You no longer give X high priority"
+  <- "Hey! You do not give X high priority"
+  <- "Hey! X is not known. Please try again!"
 
 3. Incoming asynchronous messages:
 

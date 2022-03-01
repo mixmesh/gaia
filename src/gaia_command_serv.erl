@@ -5,7 +5,8 @@
          peer_up/1, peer_down/1,
          conversation_accepted/1, conversation_rejected/2,
          call/1,
-         negotiation_failed/2]).
+         negotiation_failed/2,
+         format_items/1]).
 -export([message_handler/1]).
 
 -include_lib("apptools/include/serv.hrl").
