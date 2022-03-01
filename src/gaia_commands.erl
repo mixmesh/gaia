@@ -441,11 +441,11 @@ group with ">>,
                leave_command_mode()
            end),
          %%
-         %% Unmute X
+         %% Unmute me for X
          %%
          ask_yes_no(
            unmute,
-           [["unmute", name]],
+           [["unmute", "me", "for", name]],
            fun(Dict) ->
                ?LOG_INFO(#{onsuccess => unmute}),
                Name = maps:get(name, Dict),
@@ -1026,7 +1026,8 @@ ask_yes_no(Name, AskPatterns, AskOnsuccess, YesOnsuccess, NoOnsuccess) ->
 
 enter_command_mode() ->
   ?LOG_DEBUG(#{enter_command_mode => now}),
-  ok = mute(),
+  %% FIXME
+  %%ok = gaia_network_sender_serv:disable(),
   ok = beep(enter_command_mode),
   [].
 %[{set_timeout, 4000, fun leave_command_mode/1}].
@@ -1038,13 +1039,15 @@ say(Text) ->
 leave_command_mode() ->
   ?LOG_DEBUG(#{leave_command_mode => now}),
   ok = beep(leave_command_mode),
-  unmute(),
+  %% FIXME
+  %%ok = gaia_network_sender_serv:enable(),
   [{cd, []}, {dict, #{}}].
 
 leave_command_mode(CommandState) ->
   ?LOG_DEBUG(#{leave_command_mode => now2}),
   ok = beep(leave_command_mode),
-  ok = unmute(),
+  %% FIXME
+  %%ok = gaia_network_sender_serv:enable(),
   CommandState#{path => [], dict => #{}}.
 
 beep(enter_command_mode) ->
@@ -1054,11 +1057,3 @@ beep(enter_command_mode) ->
   ok;
 beep(leave_command_mode) ->
   alsa_wave:leave().
-
-mute() ->
-  ?LOG_DEBUG(#{mute => now}),
-  ok.
-
-unmute() ->
-  ?LOG_DEBUG(#{unmute => now}),
-  ok.
