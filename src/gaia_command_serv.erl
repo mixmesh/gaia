@@ -399,7 +399,7 @@ handle_command(Text, #{parent := Parent,
                 _ ->
                     case match_patterns(Tokens, #{}, [["goodbye"]]) of
                         {ok, _} ->
-                            gaia_commands:leave_command_mode(CommandState);
+                            leave_command_mode(CommandState);
                         nomatch ->
                             case match_patterns(Tokens, #{}, [["what?"]]) of
                                 {ok, _} ->
@@ -462,6 +462,10 @@ match_pattern([Token|RemainingTokens], Dict, [PatternToken|Rest]) ->
         nomatch ->
             nomatch
     end.
+
+leave_command_mode(CommandState) ->
+    _ = gaia_commands:leave_command_mode(),
+    CommandState#{path => [], dict => #{}}.
 
 update_path(Path, Name, SuccessResult) ->
     case lists:keysearch(cd, 1, SuccessResult) of

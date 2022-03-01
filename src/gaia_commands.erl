@@ -1,6 +1,6 @@
 %% -*- erlang-indent-level: 2 -*-
 -module(gaia_commands).
--export([all/0, leave_command_mode/1]).
+-export([all/0, leave_command_mode/0]).
 
 -include_lib("kernel/include/logger.hrl").
 -include_lib("apptools/include/shorthand.hrl").
@@ -1000,6 +1000,17 @@ group with ">>,
              end)]}].
 
 %%
+%% Export: leave_command_mode
+%%
+
+leave_command_mode() ->
+  ?LOG_DEBUG(#{leave_command_mode => now}),
+  ok = beep(leave_command_mode),
+  %% FIXME
+  %%ok = gaia_network_sender_serv:enable(),
+  [{cd, []}, {dict, #{}}].
+
+%%
 %% Command utilities
 %%
 
@@ -1035,20 +1046,6 @@ enter_command_mode() ->
 say(Text) ->
   _ = flite:say(Text, [{latency, 60}]),
   ok.
-
-leave_command_mode() ->
-  ?LOG_DEBUG(#{leave_command_mode => now}),
-  ok = beep(leave_command_mode),
-  %% FIXME
-  %%ok = gaia_network_sender_serv:enable(),
-  [{cd, []}, {dict, #{}}].
-
-leave_command_mode(CommandState) ->
-  ?LOG_DEBUG(#{leave_command_mode => now2}),
-  ok = beep(leave_command_mode),
-  %% FIXME
-  %%ok = gaia_network_sender_serv:enable(),
-  CommandState#{path => [], dict => #{}}.
 
 beep(enter_command_mode) ->
   ok = alsa_wave:enter(),
