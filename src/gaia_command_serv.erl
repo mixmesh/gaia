@@ -1,12 +1,11 @@
 -module(gaia_command_serv).
 -export([start_link/1, stop/0]).
--export([local_public_groups/1, remote_public_groups/2,
-         groups_of_interest_updated/2,
-         peer_up/1, peer_down/1,
-         conversation_accepted/1, conversation_rejected/2,
-         call/1,
-         negotiation_failed/2,
-         format_items/1]).
+-export([groups_of_interest_updated/2, peer_up/1, peer_down/1]).
+%% Initiated from REST service
+-export([conversation_accepted/1, conversation_rejected/2, call/1]).
+%% Initiated from REST client
+-export([negotiation_failed/2]).
+-export([say/1, beep/1, format_items/1]).
 -export([message_handler/1]).
 
 -include_lib("apptools/include/serv.hrl").
@@ -22,8 +21,7 @@
 %% Exported: start_link
 %%
 
--spec start_link(boolean()) ->
-          serv:spawn_server_result().
+-spec start_link(boolean()) -> serv:spawn_server_result().
 
 start_link(AudioSourceCallback) ->
     ?spawn_server(fun(Parent) -> init(Parent, AudioSourceCallback) end,
@@ -38,28 +36,6 @@ start_link(AudioSourceCallback) ->
 
 stop() ->
     serv:call(?MODULE, stop).
-
-%%
-%% Exported: local_public_groups
-%%
-
--spec local_public_groups([gaia_serv:group_id()]) -> ok.
-
-local_public_groups([]) ->
-    ok;
-local_public_groups(PublicGroupIds) ->
-    serv:cast(?MODULE, {local_public_groups, PublicGroupIds}).
-
-%%
-%% Exported: remote_public_groups
-%%
-
--spec remote_public_groups(gaia_serv:peer_name(), [gaia_serv:group_id()]) -> ok.
-
-remote_public_groups(_PeerName, []) ->
-    ok;
-remote_public_groups(PeerName, PublicGroupIds) ->
-    serv:cast(?MODULE, {remote_public_groups, PeerName, PublicGroupIds}).
 
 %%
 %% Exported: groups_of_interest_updated
@@ -130,6 +106,50 @@ negotiation_failed(PeerName, Reason) ->
     serv:cast(?MODULE, {negotiation_failed, PeerName, Reason}).
 
 %%
+%% Exported: say
+%%
+
+-spec say(binary() | iolist()) -> ok.
+
+say(Text) ->
+    _ = flite:say(Text, [{latency, 60}]),
+    ok.
+
+%%
+%% Exported: beep
+%%
+
+-spec beep(enter_command_mode | leave_command_mode | event) -> ok.
+
+beep(enter_command_mode) ->
+    ok = alsa_wave:enter(),
+    %% FIXME: lower volume and implement a alsa_wavw:{start,stop}_loop/1
+    %%spawn(fun() -> alsa_wave:mute() end),
+    ok;
+beep(leave_command_mode) ->
+
+  alsa_wave:leave();
+beep(event) ->
+    %% FIXME:Make a unique sound
+    alsa_wave:enter().
+
+%%
+%% Exported: format_items
+%%
+
+-spec format_items([binary()]) -> iolist().
+
+format_items([Item]) ->
+    Item;
+format_items([Item|Rest]) ->
+    [Item|format_remaining_items(Rest)].
+
+format_remaining_items([Item]) ->
+    [<<" and ">>, Item];
+format_remaining_items([Item|Rest]) ->
+    [<<", ">>, Item|format_remaining_items(Rest)].
+
+%%
 %% Server
 %%
 
@@ -180,61 +200,31 @@ message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
             ?LOG_DEBUG(#{call => Call}),
             ok = gaia_nif:stop(),
             {stop, From, ok};
-        {cast, {local_public_groups, PublicGroupIds} = Cast} ->
-            ?LOG_DEBUG(#{cast => Cast}),
-            case PublicGroupIds of
-                [GroupId] ->
-                    [#gaia_group{name = GroupName}] = gaia_serv:lookup(GroupId),
-                    Text = [<<"You broadcast the group ">>, GroupName],
-                    NewLocalCallback = say(LocalCallback, Text),
-                    {noreply, State#{local_callback => NewLocalCallback}};
-                GroupIds ->
-                    GroupNames = get_group_names(GroupIds),
-                    Text = [<<"You broadcast the groups ">>,
-                            format_items(GroupNames)],
-                    NewLocalCallback = say(LocalCallback, Text),
-                    {noreply, State#{local_callback => NewLocalCallback}}
-            end;
-        {cast, {remote_public_groups, PeerName, PublicGroupIds} = Cast} ->
-            ?LOG_DEBUG(#{cast => Cast}),
-            case PublicGroupIds of
-                [GroupId] ->
-                    [#gaia_group{name = GroupName}] = gaia_serv:lookup(GroupId),
-                    Text = [PeerName, <<" broadcasts the group ">>, GroupName],
-                    NewLocalCallback = say(LocalCallback, Text),
-                    {noreply, State#{local_callback => NewLocalCallback}};
-                GroupIds ->
-                    case get_group_names(GroupIds) of
-                        [] ->
-                            noreply;
-                        GroupNames ->
-                            Text = [PeerName, <<" broadcasts the groups ">>,
-                                    format_items(GroupNames)],
-                            NewLocalCallback = say(LocalCallback, Text),
-                            {noreply,
-                             State#{local_callback => NewLocalCallback}}
-                        end
-            end;
         {cast, {groups_of_interest_updated, PeerName, GroupNamesOfInterest}} ->
             case GroupNamesOfInterest of
                 [GroupName] ->
-                    Text = [PeerName, <<" updated ">>, GroupName],
+                    ok = beep(event),
+                    Text = [<<"Hey! ">>, PeerName, <<" updated group ">>,
+                            GroupName],
                     NewLocalCallback = say(LocalCallback, Text),
                     {noreply, State#{local_callback => NewLocalCallback}};
                 GroupNames ->
-                    Text = [PeerName, <<" updated: ">>,
+                    ok = beep(event),
+                    Text = [<<"Hey! ">>, PeerName, <<" updated: ">>,
                             format_items(GroupNames)],
                     NewLocalCallback = say(LocalCallback, Text),
                     {noreply, State#{local_callback => NewLocalCallback}}
             end;
         {cast, {peer_up, #gaia_peer{name = PeerName}} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
-            Text = [PeerName, <<" appeared">>],
+            ok = beep(event),
+            Text = [<<"Hey! ">>, PeerName, <<" is now online">>],
             NewLocalCallback = say(LocalCallback, Text),
             {noreply, State#{local_callback => NewLocalCallback}};
         {cast, {peer_down, #gaia_peer{name = PeerName}} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
-            Text = [PeerName, <<" disappeared">>],
+            ok = beep(event),
+            Text = [<<"Hey! ">>, PeerName, <<" is no longer online">>],
             NewLocalCallback = say(LocalCallback, Text),
             {noreply, State#{local_callback => NewLocalCallback}};
         {cast, {conversation_accepted,
@@ -311,36 +301,12 @@ message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
 
 say(_LocalCallback = undefined, Text) ->
     ok = gaia_audio_source_serv:trigger_callback({last_say, Text}),
-    _ = say(Text),
+    ok = say(Text),
     undefined;
 say(LocalCallback, Text) ->
     NewLocalCallback = LocalCallback({last_say, Text}),
-    _ = say(Text),
+    ok = say(Text),
     NewLocalCallback.
-
-say(Text) ->
-    _ = flite:say(Text, [{latency, 60}]),
-    ok.
-
-get_group_names([]) ->
-    [];
-get_group_names([GroupId|Rest]) ->
-    case gaia_serv:lookup(GroupId) of
-        [#gaia_group{name = GroupName}] ->
-            [GroupName|get_group_names(Rest)];
-        _ ->
-            get_group_names(Rest)
-    end.
-
-format_items([Item]) ->
-    Item;
-format_items([Item|Rest]) ->
-    [Item|format_remaining_items(Rest)].
-
-format_remaining_items([Item]) ->
-    [<<" and ">>, Item];
-format_remaining_items([Item|Rest]) ->
-    [<<", ">>, Item|format_remaining_items(Rest)].
 
 create_callback(VoskRecognizer, VoskTransform, CommandState) ->
     fun({last_say, Text}) ->

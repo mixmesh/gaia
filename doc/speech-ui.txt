@@ -319,4 +319,9 @@ NOTE: X might be "all"
 
 3. Incoming asynchronous messages:
 
+* "Hey! X is now online"
+* "Hey! X is no longer online"
+* "Hey! X updated group Y"
+
+
 ??? X is busy/not-available/You could not connect to X.
