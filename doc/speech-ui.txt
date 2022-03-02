@@ -64,7 +64,7 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
   <- "You are not in any active calls"
   <- "You are in an active call with X"
   <- "You are in active calls with X, Y and Z"
-    
+
 2.2.2 Call X
 
 -> "Call X"
@@ -109,7 +109,7 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 2.3.2 Join X
 
 -> "Join X"
-  <- "Do you want to join X?"
+  <- "Do you want to join group X?"
     -> "Yes" or "Yeah"
       <- "You are now an active member of group X"
         [Leaves command mode]
@@ -125,7 +125,7 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 2.3.3 Leave X
 
 -> "Leave X"
-  <- "Do you want leave X?"
+  <- "Do you want leave group X?"
     -> "Yes" or "Yeah"
       <- "You are no longer an active member active of group X"
         [Leaves command mode]
@@ -256,15 +256,15 @@ NOTE: X might be "all"
   <- "Yes, X is ignored"
   <- "No, X is not ignored"
   <- "Hey! X is not known. Please try again!"
-  
+
 2.7.2 Ignore X
 
 -> "Ignore X"
   <- "You now ignore X"
   <- "Hey! You already ignore X"
   <- "Hey! X is not known. Please try again!"
-  
-2.7.3 Do not ignore X   
+
+2.7.3 Do not ignore X
 
 -> "Do not not ignore X"
   <- "You no longer ignore X"
@@ -279,19 +279,19 @@ NOTE: X might be "all"
   <- "Yes, X has direct access"
   <- "No, X has not direct access"
   <- "Hey! X is not known. Please try again!"
-  
+
 2.8.2 Give direct access to X
 
 -> "Give direct access to X"
   <- "You gave direct access to X"
   <- "Hey! You already give direct access to X"
   <- "Hey! X is not known. Please try again!"
-  
-2.8.3 Do not give direct access to X  
+
+2.8.3 Do not give direct access to X
 
 -> "Do not give direct access to X"
   <- "You no longer give direct access to X"
-  <- "You do not give direct access to X"
+  <- "Hey! You do not give direct access to X"
   <- "Hey! X is not known. Please try again!"
 
 2.9 Priority management
@@ -302,14 +302,14 @@ NOTE: X might be "all"
   <- "Yes, X has high priority"
   <- "No, X does not have high priority"
   <- "Hey! X is not known. Please try again!"
-  
+
 2.9.2 Give X high priority
 
 -> "Give X high priority"
   <- "You gave X high priority"
   <- "Hey! You already give X high priority"
   <- "Hey! X is not known. Please try again!"
-  
+
 2.9.3 Do not give X high priority
 
 -> "Do not give X high priority"

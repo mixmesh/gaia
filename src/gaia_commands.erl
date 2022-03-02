@@ -1,6 +1,6 @@
 %% -*- erlang-indent-level: 2 -*-
 -module(gaia_commands).
--export([all/0, leave_command_mode/0]).
+-export([all/0, leave_command_mode/1]).
 
 -include_lib("kernel/include/logger.hrl").
 -include_lib("apptools/include/shorthand.hrl").
@@ -178,7 +178,8 @@ all() ->
                Name = maps:get(name, Dict),
                case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
                  [#gaia_group{name = GroupName} = Group] ->
-                   Text = [<<"Do you want to join ">>, GroupName, <<"?">>],
+                   Text = [<<"Do you want to join group ">>, GroupName,
+                           <<"?">>],
                    ok = say(Text),
                    [{dict, Dict#{group => Group}},
                     remove_timeout,
@@ -221,7 +222,8 @@ all() ->
                Name = maps:get(name, Dict),
                case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
                  [#gaia_group{name = GroupName} = Group] ->
-                   Text = [<<"Do you want to leave ">>, GroupName, <<"?">>],
+                   Text = [<<"Do you want to leave group ">>, GroupName,
+                           <<"?">>],
                    ok = say(Text),
                    [{dict, Dict#{group => Group}},
                     remove_timeout,
@@ -889,7 +891,7 @@ group with ">>,
                          [{last_say, Text}|leave_command_mode()];
                        _ ->
                          Text =
-                           [<<"You do not give direct access to ">>, Name],
+                           [<<"Hey! You do not give direct access to ">>, Name],
                          ok = say(Text),
                          [{last_say, Text}|leave_command_mode()]
                      end
@@ -1003,12 +1005,14 @@ group with ">>,
 %% Export: leave_command_mode
 %%
 
-leave_command_mode() ->
-  ?LOG_DEBUG(#{leave_command_mode => now}),
-  ok = beep(leave_command_mode),
+leave_command_mode(CommandState) ->
+  ok = do_leave_command_mode(),
+  CommandState#{path => [], dict => #{}}.
+
+do_leave_command_mode() ->
+  ok = beep(leave_command_mode).
   %% FIXME
   %%ok = gaia_network_sender_serv:enable(),
-  [{cd, []}, {dict, #{}}].
 
 %%
 %% Command utilities
@@ -1042,6 +1046,10 @@ enter_command_mode() ->
   ok = beep(enter_command_mode),
   [].
 %[{set_timeout, 4000, fun leave_command_mode/1}].
+
+leave_command_mode() ->
+  ok = do_leave_command_mode(),
+  [{cd, []}, {dict, #{}}].
 
 say(Text) ->
   _ = flite:say(Text, [{latency, 60}]),

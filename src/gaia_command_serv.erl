@@ -379,12 +379,10 @@ handle_command(Text, #{parent := Parent,
                        timeout_timer := TimeoutTimer,
                        last_say := LastSay} = CommandState) ->
     Commands = get_commands(Path, AllCommands),
-    ?LOG_INFO(#{match_commands => {string:lexemes(Text, " "), Dict, Commands}}),
     Tokens = string:lexemes(Text, " "),
+    ?LOG_INFO(#{match_commands => {Tokens, Dict, Commands}}),
     case match_command(Tokens, Dict, Commands) of
         {ok, UpdatedDict, #command{name = Name, onsuccess = OnSuccess}} ->
-
-
             Result = OnSuccess(UpdatedDict),
             CommandState#
                 {path => update_path(Path, Name, Result),
@@ -399,7 +397,7 @@ handle_command(Text, #{parent := Parent,
                 _ ->
                     case match_patterns(Tokens, #{}, [["goodbye"]]) of
                         {ok, _} ->
-                            leave_command_mode(CommandState);
+                            gaia_commands:leave_command_mode(CommandState);
                         nomatch ->
                             case match_patterns(Tokens, #{}, [["what?"]]) of
                                 {ok, _} ->
@@ -462,10 +460,6 @@ match_pattern([Token|RemainingTokens], Dict, [PatternToken|Rest]) ->
         nomatch ->
             nomatch
     end.
-
-leave_command_mode(CommandState) ->
-    _ = gaia_commands:leave_command_mode(),
-    CommandState#{path => [], dict => #{}}.
 
 update_path(Path, Name, SuccessResult) ->
     case lists:keysearch(cd, 1, SuccessResult) of
