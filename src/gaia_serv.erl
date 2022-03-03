@@ -540,14 +540,18 @@ negotiate_with_peers(MyPeerId, Db, [{peer, PeerId}|Rest]) ->
     case gaia_rest_client:start_peer_negotiation(
            MyPeerId, {IpAddress, RestPort}, LocalPort) of
         {ok, NewRemotePort} ->
+            ok = gaia_command_serv:negotiation_succeeded(PeerName),
             true = db_insert(Db, Peer#gaia_peer{remote_port = NewRemotePort}),
             negotiate_with_peers(MyPeerId, Db, Rest);
         calling ->
-            gaia_command_serv:negotiation_failed(PeerName, calling);
+            ok = gaia_command_serv:negotiation_failed(PeerName, calling),
+            negotiate_with_peers(MyPeerId, Db, Rest);
         busy ->
-            gaia_command_serv:negotiation_failed(PeerName, busy);
+            ok = gaia_command_serv:negotiation_failed(PeerName, busy),
+            negotiate_with_peers(MyPeerId, Db, Rest);
         not_available ->
-            gaia_command_serv:negotiation_failed(PeerName, not_available);
+            ok = gaia_command_serv:negotiation_failed(PeerName, not_available),
+            negotiate_with_peers(MyPeerId, Db, Rest);
         {error, Reason} ->
             ?LOG_ERROR(#{{rest_service_client, start_peer_negotiation} =>
                              Reason}),

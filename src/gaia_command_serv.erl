@@ -4,7 +4,7 @@
 %% Initiated from REST service
 -export([conversation_accepted/1, conversation_rejected/2, call/1]).
 %% Initiated from REST client
--export([negotiation_failed/2]).
+-export([negotiation_succeeded/1, negotiation_failed/2]).
 -export([say/1, beep/1, format_items/1]).
 -export([message_handler/1]).
 
@@ -93,6 +93,16 @@ conversation_rejected(Peer, Reason) ->
 
 call(Peer) ->
     serv:cast(?MODULE, {call, Peer}).
+
+%%
+%% Exported: negotiation_succeeded
+%%
+
+-spec negotiation_succeeded(gaia_serv:peer_name()) ->
+          ok.
+
+negotiation_succeeded(PeerName) ->
+    serv:cast(?MODULE, {negotiation_succeeded, PeerName}).
 
 %%
 %% Exported: negotiation_failed
@@ -257,6 +267,11 @@ message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
                 trigger_callback(NewLocalCallback,
                                  {cd, [hi, call], #{name => PeerName}}),
             {noreply, State#{local_callback => UpdatedLocalCallback}};
+        {cast, {negotiation_succeeded, PeerName} = Cast} ->
+            ?LOG_DEBUG(#{cast => Cast}),
+            Text = [<<"Hey! You are now in contact with ">>, PeerName],
+            NewLocalCallback = say(LocalCallback, Text),
+            {noreply, State#{local_callback => NewLocalCallback}};
         {cast, {negotiation_failed, PeerName, Reason} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
             case Reason of
