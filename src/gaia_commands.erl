@@ -159,9 +159,9 @@ all() ->
                      [] ->
                        <<"You have not joined any groups">>;
                      [GroupName] ->
-                       [<<"You have joined the group ">>, GroupName];
+                       [<<"You have joined group ">>, GroupName];
                      _ ->
-                       [<<"You have joined the groups ">>,
+                       [<<"You have joined groups ">>,
                         gaia_command_serv:format_items(GroupNames)]
                    end,
                  ok = gaia_command_serv:say(Text),

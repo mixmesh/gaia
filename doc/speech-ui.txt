@@ -103,8 +103,8 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 
 -> "List [all] joined groups?"
   <- "You have not joined any groups"
-  <- "You have joined the group X"
-  <- "You have joined the groups X, Y and Z"
+  <- "You have joined group X"
+  <- "You have joined groups X, Y and Z"
 
 2.3.2 Join X
 
