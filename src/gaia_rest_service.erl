@@ -169,7 +169,7 @@ peer_negotiation_post(
                                 "Calling";
                             busy ->
                                 "Busy";
-                            _ ->
+                            not_available ->
                                 "Not Available"
                         end,
                     {error, {no_access, NoAccessBody}}

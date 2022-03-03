@@ -176,9 +176,7 @@ generate_artificial_id(PeerName) ->
 %%
 
 -spec handle_peer_negotiation(peer_id(), inet:port_number()) ->
-          {ok, inet:port_number()} |
-          {error, ignore | no_nodis_address | call | busy | not_available |
-           no_such_peer}.
+          {ok, inet:port_number()} | {error, call | busy | not_available}.
 
 handle_peer_negotiation(PeerId, RemotePort) ->
     serv:call(?MODULE, {handle_peer_negotiation, PeerId, RemotePort}).
@@ -359,8 +357,19 @@ message_handler(#{parent := Parent,
             case db_lookup_peer_by_id(Db, PeerId) of
                 [#gaia_peer{name = PeerName} = Peer] ->
                     case accept_peer(Busy, Peer) of
-                        {no, Reason} ->
-                            {reply, From, {error, Reason}};
+                        {no, call} ->
+                            ok = gaia_command_serv:call(Peer),
+                            {reply, From, {error, call}};
+                        {no, busy} ->
+                            ok = gaia_command_serv:conversation_rejected(
+                                   Peer, busy),
+                            {reply, From, {error, busy}};
+                        {no, skip} ->
+                            {reply, From, {error, not_available}};
+                        {no, no_nodis_address} ->
+                            {reply, From, {error, not_available}};
+                        {no, ignore} ->
+                            {reply, From, {error, not_available}};
                         {yes, UpdatedPeer} ->
                             true = db_insert(Db, UpdatedPeer#gaia_peer{
                                                    remote_port = RemotePort}),
@@ -368,17 +377,18 @@ message_handler(#{parent := Parent,
                             case db_lookup_peer_by_id(Db, PeerId) of
                                 [#gaia_peer{local_port = undefined}] ->
                                     ?LOG_DEBUG(#{no_local_port_created =>
-                                                 {MyPeerName, PeerName}}),
+                                                     {MyPeerName, PeerName}}),
                                     {reply, From, {error, not_available}};
                                 [#gaia_peer{local_port = LocalPort}] ->
                                     ?LOG_DEBUG(#{local_port_created =>
-                                                 {MyPeerName, PeerName},
-                                             local_port => LocalPort}),
+                                                     {MyPeerName, PeerName},
+                                                 local_port => LocalPort}),
+                                    ok = gaia_command_serv:conversation_accepted(Peer),
                                     {reply, From, {ok, LocalPort}}
                             end
                     end;
                 [] ->
-                    {reply, From, {error, no_such_peer}}
+                    {reply, From, {error, not_available}}
             end;
         config_updated = Message ->
             ?LOG_DEBUG(#{message => Message}),
@@ -610,22 +620,18 @@ update_network_sender(Db, Conversations) ->
 
 accept_peer(_Busy,
             #gaia_peer{conversation = {true, _ConversationStatus}} = Peer) ->
-    ok = gaia_command_serv:conversation_accepted(Peer),
     {yes, Peer};
-accept_peer(_Busy, #gaia_peer{mode = ignore} = Peer) ->
-    ok = gaia_command_serv:conversation_rejected(Peer, ignore),
+accept_peer(_Busy, #gaia_peer{mode = ignore}) ->
     {no, ignore};
 accept_peer(_Busy, #gaia_peer{nodis_address = undefined}) ->
     {no, no_nodis_address};
 accept_peer(_Busy = true, #gaia_peer{mode = call,
                                      options = Options,
-                                     conversation = false} = Peer) ->
+                                     conversation = false}) ->
     case lists:member(override_busy, Options) of
         true ->
-            ok = gaia_command_serv:call(Peer),
             {no, call};
         false ->
-            ok = gaia_command_serv:conversation_rejected(Peer, busy),
             {no, busy}
     end;
 accept_peer(_Busy = true, #gaia_peer{
@@ -640,20 +646,17 @@ accept_peer(_Busy = true, #gaia_peer{
             ok = gaia_command_serv:conversation_accepted(UpdatedPeer),
             {yes, UpdatedPeer};
         false ->
-            ok = gaia_command_serv:conversation_rejected(Peer, busy),
             {no, busy}
     end;
-accept_peer(_Busy = false, #gaia_peer{mode = call} = Peer) ->
-    ok = gaia_command_serv:call(Peer),
+accept_peer(_Busy = false, #gaia_peer{mode = call}) ->
     {no, call};
 accept_peer(_Busy = false, #gaia_peer{mode = direct} = Peer) ->
     UpdatedPeer = Peer#gaia_peer{conversation =
                                      {true, #{read => true, write => true}}},
     ok = gaia_command_serv:conversation_accepted(UpdatedPeer),
     {yes, UpdatedPeer};
-accept_peer(_Busy, Peer) ->
-    ok = gaia_command_serv:conversation_rejected(Peer, not_available),
-    {no, not_available}.
+accept_peer(_Busy, _Peer) ->
+    {no, skip}.
 
 %%
 %% Nodis handling

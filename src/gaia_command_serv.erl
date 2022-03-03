@@ -80,7 +80,7 @@ conversation_accepted(Peer) ->
 %% Exported: conversation_rejected
 %%
 
--spec conversation_rejected(#gaia_peer{}, busy | ignore | not_available) -> ok.
+-spec conversation_rejected(#gaia_peer{}, busy) -> ok.
 
 conversation_rejected(Peer, Reason) ->
     serv:cast(?MODULE, {conversation_rejected, Peer, Reason}).
@@ -127,7 +127,6 @@ beep(enter_command_mode) ->
     %%spawn(fun() -> alsa_wave:mute() end),
     ok;
 beep(leave_command_mode) ->
-
   alsa_wave:leave();
 beep(event) ->
     %% FIXME:Make a unique sound
@@ -203,13 +202,11 @@ message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
         {cast, {groups_of_interest_updated, PeerName, GroupNamesOfInterest}} ->
             case GroupNamesOfInterest of
                 [GroupName] ->
-                    ok = beep(event),
                     Text = [<<"Hey! ">>, PeerName, <<" updated group ">>,
                             GroupName],
                     NewLocalCallback = say(LocalCallback, Text),
                     {noreply, State#{local_callback => NewLocalCallback}};
                 GroupNames ->
-                    ok = beep(event),
                     Text = [<<"Hey! ">>, PeerName, <<" updated: ">>,
                             format_items(GroupNames)],
                     NewLocalCallback = say(LocalCallback, Text),
@@ -217,13 +214,11 @@ message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
             end;
         {cast, {peer_up, #gaia_peer{name = PeerName}} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
-            ok = beep(event),
             Text = [<<"Hey! ">>, PeerName, <<" is now online">>],
             NewLocalCallback = say(LocalCallback, Text),
             {noreply, State#{local_callback => NewLocalCallback}};
         {cast, {peer_down, #gaia_peer{name = PeerName}} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
-            ok = beep(event),
             Text = [<<"Hey! ">>, PeerName, <<" is no longer online">>],
             NewLocalCallback = say(LocalCallback, Text),
             {noreply, State#{local_callback => NewLocalCallback}};
@@ -233,44 +228,48 @@ message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
             ?LOG_DEBUG(#{cast => Cast}),
             case Conversation of
                 {true, #{read := true, write := true}} ->
-                    Text = [<<"You now listen *and* talk to ">>, PeerName],
+                    Text = [<<"Hey! You now listen and talk to ">>, PeerName],
                     NewLocalCallback = say(LocalCallback, Text),
                     {noreply, State#{local_callback => NewLocalCallback}};
                 {true, #{read := true}} ->
-                    Text = [<<"You now listen to ">>, PeerName],
+                    Text = [<<"Hey! You now only listen to ">>, PeerName],
                     NewLocalCallback = say(LocalCallback, Text),
                     {noreply, State#{local_callback => NewLocalCallback}};
                 {true, #{write := true}} ->
-                    Text = [<<"You now talk to ">>, PeerName],
+                    Text = [<<"Hey! You now only talk to ">>, PeerName],
                     NewLocalCallback = say(LocalCallback, Text),
                     {noreply, State#{local_callback => NewLocalCallback}};
                 false ->
                     noreply
             end;
         {cast, {conversation_rejected, #gaia_peer{name = PeerName},
-                _Reason} = Cast} ->
+                busy} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
-            Text = [<<"Conversation with ">>, PeerName, <<" rejected">>],
+            Text = [<<"Hey! A call from ">>, PeerName, <<"was rejected">>],
             NewLocalCallback = say(LocalCallback, Text),
             {noreply, State#{local_callback => NewLocalCallback}};
         {cast, {call, #gaia_peer{name = PeerName}} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
-            Text = [PeerName, <<" is calling. Do you want to answer?">>],
+            Text = [<<"Hey! ">>, PeerName,
+                    <<" is calling. Do you want to answer?">>],
             NewLocalCallback = say(LocalCallback, Text),
-            {noreply, State#{local_callback => NewLocalCallback}};
+            UpdatedLocalCallback =
+                trigger_callback(NewLocalCallback,
+                                 {cd, [hi, call], #{name => PeerName}}),
+            {noreply, State#{local_callback => UpdatedLocalCallback}};
         {cast, {negotiation_failed, PeerName, Reason} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
             case Reason of
                 calling ->
-                    Text = [<<"Calling ">>, PeerName, <<"now">>],
+                    Text = [<<"Hey! You are now calling ">>, PeerName],
                     NewLocalCallback = say(LocalCallback, Text),
                     {noreply, State#{local_callback => NewLocalCallback}};
                 busy ->
-                    Text = [PeerName, <<" is busy">>],
+                    Text = [<<"Hey! ">>, PeerName, <<" is busy">>],
                     NewLocalCallback = say(LocalCallback, Text),
                     {noreply, State#{local_callback => NewLocalCallback}};
                 not_available ->
-                    Text = [PeerName, <<" is not available">>],
+                    Text = [<<"Hey! ">>, PeerName, <<" is not available">>],
                     NewLocalCallback = say(LocalCallback, Text),
                     {noreply, State#{local_callback => NewLocalCallback}}
             end;
@@ -282,16 +281,10 @@ message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
             {system, From, Request};
         {command_timeout, TimeoutCallback} = Message ->
             ?LOG_DEBUG(#{message => Message}),
-            case LocalCallback of
-                undefined ->
-                    ok = gaia_audio_source_serv:trigger_callback(
-                           {remove_timeout, TimeoutCallback}),
-                    noreply;
-                _ ->
-                    NewLocalCallback =
-                        LocalCallback({remove_timeout, TimeoutCallback}),
-                    {noreply, State#{local_callback => NewLocalCallback}}
-            end;
+            NewLocalCallback =
+                trigger_callback(LocalCallback,
+                                 {remove_timeout, TimeoutCallback}),
+            {noreply, State#{local_callback => NewLocalCallback}};
         {'EXIT', Parent, Reason} ->
             exit(Reason);
         UnknownMessage ->
@@ -299,14 +292,16 @@ message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
             noreply
     end.
 
-say(_LocalCallback = undefined, Text) ->
-    ok = gaia_audio_source_serv:trigger_callback({last_say, Text}),
-    ok = say(Text),
+trigger_callback(undefined, Term) ->
+    gaia_audio_source_serv:trigger_callback(Term),
     undefined;
+trigger_callback(LocalCallback, Term) ->
+    LocalCallback(Term).
+
 say(LocalCallback, Text) ->
-    NewLocalCallback = LocalCallback({last_say, Text}),
+    ok = beep(event),
     ok = say(Text),
-    NewLocalCallback.
+    trigger_callback(LocalCallback, {last_say, Text}).
 
 create_callback(VoskRecognizer, VoskTransform, CommandState) ->
     fun({last_say, Text}) ->
@@ -316,6 +311,9 @@ create_callback(VoskRecognizer, VoskTransform, CommandState) ->
             NewCommandState = Callback(CommandState),
             create_callback(VoskRecognizer, VoskTransform,
                             NewCommandState#{timeout_timer => undefined});
+       ({cd, Path, Dict}) ->
+            create_callback(VoskRecognizer, VoskTransform,
+                            CommandState#{path => Path, dict => Dict});
        (Packet) when is_binary(Packet) ->
             case vosk:recognizer_accept_waveform(
                    VoskRecognizer, VoskTransform(Packet)) of

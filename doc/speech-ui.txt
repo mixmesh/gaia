@@ -322,6 +322,16 @@ NOTE: X might be "all"
 * "Hey! X is now online"
 * "Hey! X is no longer online"
 * "Hey! X updated group Y"
+* "Hey! X is calling. Do you want to answer?"
+* "Hey! A call from X was rejected"
+* "Hey! You now listen and talk to X"
+* "Hey! You now only listen to X"
+* "Hey! You now only talk to X"
+* "Hey! You are now calling X"
+* "Hey! X is busy"
+* "Hey! X is not available"
+
+
 
 
 ??? X is busy/not-available/You could not connect to X.
