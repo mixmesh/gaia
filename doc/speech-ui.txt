@@ -330,8 +330,3 @@ NOTE: X might be "all"
 * "Hey! You are now calling X"
 * "Hey! X is busy"
 * "Hey! X is not available"
-
-
-
-
-??? X is busy/not-available/You could not connect to X.
