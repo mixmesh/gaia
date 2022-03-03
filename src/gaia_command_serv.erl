@@ -123,11 +123,11 @@ say(Text) ->
 
 beep(enter_command_mode) ->
     ok = alsa_wave:enter(),
-    %% FIXME: lower volume and implement a alsa_wavw:{start,stop}_loop/1
+    %% FIXME: lower volume and implement a alsa_wave:{start,stop}_loop/1
     %%spawn(fun() -> alsa_wave:mute() end),
     ok;
 beep(leave_command_mode) ->
-  alsa_wave:leave();
+    alsa_wave:leave();
 beep(event) ->
     %% FIXME:Make a unique sound
     alsa_wave:enter().
