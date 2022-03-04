@@ -701,12 +701,9 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                 lists:foldl(
                   fun(#group_of_interest{id = GroupId, admin = Admin}, Acc)
                         when Admin == NewPeerId ->
-                          [OldGroup] = db_lookup_group_by_id(Db, GroupId),
                           case gaia_rest_client:get_group(
                                  MyPeerId, Admin, {IpAddress, NewRestPort},
                                  GroupId) of
-                              {ok, OldGroup} ->
-                                  Acc;
                               {ok, #gaia_group{name = GroupName} = Group} ->
                                   ?LOG_INFO(#{insert_group => Group}),
                                   true = db_insert(Db, Group),
