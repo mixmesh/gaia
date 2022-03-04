@@ -5,7 +5,7 @@
 -export([conversation_accepted/1, conversation_rejected/2, call/1]).
 %% Initiated from REST client
 -export([negotiation_succeeded/1, negotiation_failed/2]).
--export([say/1, beep/1, format_items/1]).
+-export([say/1, beep/1, format_items/1, serve_only_me/0, serve_all/0]).
 -export([message_handler/1]).
 
 -include_lib("apptools/include/serv.hrl").
@@ -141,6 +141,20 @@ beep(leave_command_mode) ->
 beep(event) ->
     %% FIXME:Make a unique sound
     alsa_wave:enter().
+
+%%
+%% Exported: serve_only_me
+%%
+
+serve_only_me() ->
+    serv:cast(?MODULE, serve_only_me).
+
+%%
+%% Exported: serve_all
+%%
+
+serve_all() ->
+    serv:cast(?MODULE, serve_all).
 
 %%
 %% Exported: format_items
@@ -288,6 +302,14 @@ message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
                     NewLocalCallback = say(LocalCallback, Text),
                     {noreply, State#{local_callback => NewLocalCallback}}
             end;
+        {cast, serve_only_me = Cast} ->
+            ?LOG_DEBUG(#{cast => Cast}),
+            ok = gaia_audio_source_serv:serve_only_me(),
+            noreply;
+        {cast, serve_all = Cast} ->
+            ?LOG_DEBUG(#{cast => Cast}),
+            ok = gaia_audio_source_serv:serve_all(),
+            noreply;
         {subscription_packet, Packet} when LocalCallback /= undefined ->
             NewLocalCallback = LocalCallback(Packet),
             {noreply, State#{local_callback => NewLocalCallback}};
@@ -336,12 +358,19 @@ create_callback(VoskRecognizer, VoskTransform, CommandState) ->
                     create_callback(VoskRecognizer, VoskTransform,
                                     CommandState);
                 1 ->
-                    #{"text" := Text} = vosk:recognizer_result(VoskRecognizer),
-                    ?LOG_INFO(#{vosk_text => Text}),
-                    NewCommandState = handle_command(Text, CommandState),
-                    _ = vosk:recognizer_reset(VoskRecognizer),
-                    create_callback(VoskRecognizer, VoskTransform,
-                                    NewCommandState);
+                    case vosk:recognizer_result(VoskRecognizer) of
+                        #{"text" := ""} ->
+                            _ = vosk:recognizer_reset(VoskRecognizer),
+                            create_callback(VoskRecognizer, VoskTransform,
+                                            CommandState);
+                        #{"text" := Text} ->
+                            ?LOG_INFO(#{vosk_text => Text}),
+                            NewCommandState =
+                                handle_command(Text, CommandState),
+                            _ = vosk:recognizer_reset(VoskRecognizer),
+                            create_callback(VoskRecognizer, VoskTransform,
+                                            NewCommandState)
+                    end;
 		-1 ->
                     ?LOG_ERROR("Vosk failed!"),
 		    _ = vosk:recognizer_reset(VoskRecognizer),
@@ -359,7 +388,7 @@ handle_command(Text, #{parent := Parent,
                        last_say := LastSay} = CommandState) ->
     Commands = get_commands(Path, AllCommands),
     Tokens = string:lexemes(Text, " "),
-    ?LOG_INFO(#{match_commands => {Tokens, Dict, Commands}}),
+    %%?LOG_INFO(#{match_commands => {Tokens, Dict, Commands}}),
     case match_command(Tokens, Dict, Commands) of
         {ok, UpdatedDict, #command{name = Name, onsuccess = OnSuccess}} ->
             Result = OnSuccess(UpdatedDict),

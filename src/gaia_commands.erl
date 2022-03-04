@@ -1006,13 +1006,9 @@ group with ">>,
 %%
 
 leave_command_mode(CommandState) ->
-  ok = do_leave_command_mode(),
+  ok = gaia_command_serv:beep(leave_command_mode),
+  ok = gaia_command_serv:serve_all(),
   CommandState#{path => [], dict => #{}}.
-
-do_leave_command_mode() ->
-  ok = gaia_command_serv:beep(leave_command_mode).
-  %% FIXME
-  %%ok = gaia_network_sender_serv:enable(),
 
 %%
 %% Command utilities
@@ -1041,12 +1037,12 @@ ask_yes_no(Name, AskPatterns, AskOnsuccess, YesOnsuccess, NoOnsuccess) ->
 
 enter_command_mode() ->
   ?LOG_DEBUG(#{enter_command_mode => now}),
-  %% FIXME
-  %%ok = gaia_network_sender_serv:disable(),
   ok = gaia_command_serv:beep(enter_command_mode),
+  ok = gaia_command_serv:serve_only_me(),
   [].
 %[{set_timeout, 4000, fun leave_command_mode/1}].
 
 leave_command_mode() ->
-  ok = do_leave_command_mode(),
+  ok = gaia_command_serv:beep(leave_command_mode),
+  ok = gaia_command_serv:serve_all(),
   [{cd, []}, {dict, #{}}].

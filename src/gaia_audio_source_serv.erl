@@ -1,6 +1,8 @@
 -module(gaia_audio_source_serv).
 -export([start_link/0, start_link/1,
-	 stop/0, subscribe/0, subscribe/1, unsubscribe/0, trigger_callback/1]).
+	 stop/0, subscribe/0, subscribe/1, unsubscribe/0,
+         trigger_callback/1,
+         serve_only_me/0, serve_all/0]).
 -export([message_handler/1]).
 
 -include_lib("apptools/include/serv.hrl").
@@ -51,6 +53,20 @@ unsubscribe() ->
 
 trigger_callback(Term) ->
     serv:cast(?MODULE, {trigger_callback, self(), Term}).
+
+%%
+%% Exported: serve_only_me
+%%
+
+serve_only_me() ->
+    serv:cast(?MODULE, {serve_only_me, self()}).
+
+%%
+%% Exported: serve_all
+%%
+
+serve_all() ->
+    serv:cast(?MODULE, serve_all).
 
 %%
 %% Server
@@ -118,6 +134,14 @@ message_handler(#{parent := Parent,
                 false ->
                     noreply
             end;
+        {cast, {serve_only_me, Pid} = Cast} ->
+            ?LOG_DEBUG(#{cast => Cast}),
+            AudioProducerPid ! {serve_only_me, Pid},
+            noreply;
+        {cast, serve_all = Cast} ->
+            ?LOG_DEBUG(#{cast => Cast}),
+            AudioProducerPid ! serve_all,
+            noreply;
         {'DOWN', _Ref, process, Pid, Info} ->
             ?LOG_DEBUG(#{subscriber_down => Info}),
             UpdatedSubscribers = lists:keydelete(Pid, 1, Subscribers),
@@ -154,7 +178,7 @@ audio_producer_init(Params) ->
 	 {buffer_size, BufferSizeInFrames}],
     ?LOG_DEBUG(#{wanted_hw_params => WantedHwParams}),
     AlsaHandle = force_open_alsa(PcmName, WantedHwParams),
-    audio_producer(AlsaHandle, PeriodSizeInFrames, []).
+    audio_producer(AlsaHandle, PeriodSizeInFrames, [], all).
 
 force_open_alsa(PcmName, WantedHwParams) ->
     case alsa:open(PcmName, capture, WantedHwParams, []) of
@@ -174,15 +198,54 @@ force_open_alsa(PcmName, WantedHwParams) ->
             force_open_alsa(PcmName, WantedHwParams)
     end.
 
-audio_producer(AlsaHandle, PeriodSizeInFrames, []) ->
+audio_producer(AlsaHandle, PeriodSizeInFrames, [], ServeWho) ->
     receive
         {subscribers, Subscribers} ->
-            audio_producer(AlsaHandle, PeriodSizeInFrames, Subscribers)
+            audio_producer(AlsaHandle, PeriodSizeInFrames, Subscribers,
+                           ServeWho)
     end;
-audio_producer(AlsaHandle, PeriodSizeInFrames, CurrentSubscribers) ->
-    Subscribers =
-        receive
-            {subscribers, UpdatedSubscribers} ->
+audio_producer(AlsaHandle, PeriodSizeInFrames, CurrentSubscribers,
+               CurrentServeWho) ->
+    {Subscribers, ServeWho} =
+        handle_audio_producer_commands(CurrentSubscribers, CurrentServeWho),
+    case alsa:read(AlsaHandle, PeriodSizeInFrames) of
+        {ok, Packet} when is_binary(Packet) ->
+            MergedSubscribers =
+                lists:map(
+                  fun({Pid, _MonitorRef, bang} = Subscriber)
+                        when Pid == ServeWho orelse ServeWho == all ->
+                          Pid ! {subscription_packet, Packet},
+                          Subscriber;
+                     ({Pid, MonitorRef, Callback})
+                        when Pid == ServeWho orelse ServeWho == all ->
+                          NewCallback = Callback(Packet),
+                          {Pid, MonitorRef, NewCallback};
+                     (Subscriber) ->
+                          Subscriber
+                  end, Subscribers),
+            audio_producer(AlsaHandle, PeriodSizeInFrames, MergedSubscribers,
+                           ServeWho);
+        {ok, overrun} ->
+            ?LOG_WARNING(#{reason => overrun}),
+            audio_producer(AlsaHandle, PeriodSizeInFrames, Subscribers,
+                           ServeWho);
+        {ok, suspend_event} ->
+            ?LOG_WARNING(#{reason => suspend_event}),
+            audio_producer(AlsaHandle, PeriodSizeInFrames, Subscribers,
+                           ServeWho);
+        {error, Reason} ->
+            ?LOG_ERROR(#{function => {alsa, read, 2},
+                         reason => alsa:strerror(Reason)}),
+            timer:sleep(?ALSA_PUSHBACK_TIMEOUT_IN_MS),
+            audio_producer(AlsaHandle, PeriodSizeInFrames, Subscribers,
+                           ServeWho)
+    end.
+
+handle_audio_producer_commands(CurrentSubscribers, CurrentServeWho) ->
+    receive
+        {subscribers, UpdatedSubscribers} = Command ->
+            ?LOG_DEBUG(#{audio_producer_command => Command}),
+            Subscribers =
                 lists:map(
                   fun({Pid, MonitorRef, NewCallback} = Subscriber) ->
                           case lists:keysearch(Pid, 1, CurrentSubscribers) of
@@ -193,31 +256,15 @@ audio_producer(AlsaHandle, PeriodSizeInFrames, CurrentSubscribers) ->
                               false ->
                                   Subscriber
                           end
-                  end, UpdatedSubscribers)
-        after
-            0 ->
-                CurrentSubscribers
-        end,
-    case alsa:read(AlsaHandle, PeriodSizeInFrames) of
-        {ok, Packet} when is_binary(Packet) ->
-            MergedSubscribers =
-                lists:map(fun({Pid, _MonitorRef, bang} = Subscriber) ->
-                                  Pid ! {subscription_packet, Packet},
-                                  Subscriber;
-                             ({Pid, MonitorRef, Callback}) ->
-                                  NewCallback = Callback(Packet),
-                                  {Pid, MonitorRef, NewCallback}
-                          end, Subscribers),
-            audio_producer(AlsaHandle, PeriodSizeInFrames, MergedSubscribers);
-        {ok, overrun} ->
-            ?LOG_WARNING(#{reason => overrun}),
-            audio_producer(AlsaHandle, PeriodSizeInFrames, Subscribers);
-        {ok, suspend_event} ->
-            ?LOG_WARNING(#{reason => suspend_event}),
-            audio_producer(AlsaHandle, PeriodSizeInFrames, Subscribers);
-        {error, Reason} ->
-            ?LOG_ERROR(#{function => {alsa, read, 2},
-                         reason => alsa:strerror(Reason)}),
-            timer:sleep(?ALSA_PUSHBACK_TIMEOUT_IN_MS),
-            audio_producer(AlsaHandle, PeriodSizeInFrames, Subscribers)
+                  end, UpdatedSubscribers),
+            handle_audio_producer_commands(Subscribers, CurrentServeWho);
+        {serve_only_me, Pid} = Command ->
+            ?LOG_DEBUG(#{audio_producer_command => Command}),
+            handle_audio_producer_commands(CurrentSubscribers, Pid);
+        serve_all = Command ->
+            ?LOG_DEBUG(#{audio_producer_command => Command}),
+            handle_audio_producer_commands(CurrentSubscribers, all)
+    after
+        0 ->
+            {CurrentSubscribers, CurrentServeWho}
     end.
