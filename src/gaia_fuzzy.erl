@@ -34,8 +34,7 @@
 
 match(S, Canonicals) ->
     do_match(
-      S, Canonicals,
-      [fun exact/2, fun abbreviation/2, fun levenshtein/2, fun tokens/2]).
+      S, Canonicals, [fun exact/2, fun levenshtein/2, fun tokens/2]).
 
 
 -spec match(binary(), [binary()], matchers() | all) -> nomatch | {ok, binary()}.

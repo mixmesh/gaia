@@ -262,7 +262,8 @@ all() ->
          %% Am I busy?
          %%
          ask(am_i_busy,
-             [["am", "i", "busy"]],
+             [["am", "i", "busy"],
+              ["am", "i", "bc"]],
              fun(_Dict) ->
                  ?LOG_INFO(#{onsuccess => am_i_busy}),
                  case gaia_serv:busy() of
@@ -280,7 +281,10 @@ all() ->
          %% I'm busy
          %%
          ask(busy,
-             [["i'm", "busy"]],
+             [["i'm", "busy"],
+              ["i'm", "bc"],
+              ["i", "am", "busy"],
+              ["i", "am", "bc"]],
              fun(_Dict) ->
                  ?LOG_INFO(#{onsuccess => busy}),
                  case gaia_serv:busy() of
@@ -299,7 +303,10 @@ all() ->
          %% I'm not busy
          %%
          ask(not_busy,
-             [["i'm", "not", "busy"]],
+             [["i'm", "not", "busy"],
+              ["i'm", "not", "bc"],
+              ["i", "am", "not", "busy"],
+              ["i", "am", "not", "bc"]],
              fun(_Dict) ->
                  ?LOG_INFO(#{onsuccess => busy}),
                  case gaia_serv:busy() of
@@ -443,11 +450,11 @@ group with ">>,
                leave_command_mode()
            end),
          %%
-         %% Unmute me for X
+         %% Do not mute me for X
          %%
          ask_yes_no(
            unmute,
-           [["unmute", "me", "for", name]],
+           [["do", "not", "me", "for", name]],
            fun(Dict) ->
                ?LOG_INFO(#{onsuccess => unmute}),
                Name = maps:get(name, Dict),
@@ -831,7 +838,7 @@ group with ">>,
                  end
              end),
          %%
-         %% Give X direct access
+         %% Give direct access to X
          %%
          ask(give_direct_access,
              [["give", "direct", "access", "to", name]],
@@ -927,10 +934,10 @@ group with ">>,
                  end
              end),
          %%
-         %% Give X high priority
+         %% Give high priority to X
          %%
          ask(give_high_priority,
-             [["give", name, "high", "priority"]],
+             [["give", "high", "priority", "to", name]],
              fun(Dict) ->
                  ?LOG_INFO(#{onsuccess => give_high_priority}),
                  Name = ?l2b(maps:get(name, Dict)),
@@ -963,10 +970,10 @@ group with ">>,
                  end
              end),
          %%
-         %% Do not give X high priority
+         %% Do not give high priorityto X
          %%
          ask(do_not_give_high_priority,
-             [["do", "not", "give", name, "high", "priority"]],
+             [["do", "not", "give", "high", "priority", "to", name]],
              fun(Dict) ->
                  ?LOG_INFO(#{onsuccess => do_not_git_high_priority}),
                  Name = ?l2b(maps:get(name, Dict)),

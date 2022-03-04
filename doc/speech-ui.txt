@@ -24,7 +24,7 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 
 * "Am I muted for X?"
 * "Mute me for X"
-* "Unmute me for X"
+* "Do not mute me for X"
 
 * "Am I deaf to X?"
 * "Deafen me to X"
@@ -35,12 +35,12 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 * "Do not ignore X"
 
 * "Has X direct access?"
-* "Give X direct access"
-* "Do not give X direct access"
+* "Give direct access to X"
+* "Do not give direct access to X"
 
 * "Has X high priority?"
-* "Give X high priority"
-* "Do not give X high priority"
+* "Give high priority to X"
+* "Do not give high priority to X"
 
 2 Commands
 
