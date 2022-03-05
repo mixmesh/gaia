@@ -363,6 +363,10 @@ create_callback(VoskRecognizer, VoskTransform, CommandState) ->
                             _ = vosk:recognizer_reset(VoskRecognizer),
                             create_callback(VoskRecognizer, VoskTransform,
                                             CommandState);
+                        #{"text" := "huh"} ->
+                            _ = vosk:recognizer_reset(VoskRecognizer),
+                            create_callback(VoskRecognizer, VoskTransform,
+                                            CommandState);
                         #{"text" := Text} ->
                             ?LOG_INFO(#{vosk_text => Text}),
                             NewCommandState =
