@@ -26,8 +26,8 @@ all() ->
          %% List [all] active calls?
          %%
          ask(list_active_calls,
-             [["list", "active", "calls"],
-              ["list", "all", "active", "calls"]],
+             [[["list", "least"], "active", ["calls", "cause"]],
+              [["list", "least"], "all", "active", ["calls", "cause"]]],
              fun(_Dict) ->
                  ?LOG_INFO(#{onsuccess => list_active_calls}),
                  PeerNames =
@@ -262,8 +262,7 @@ all() ->
          %% Am I busy?
          %%
          ask(am_i_busy,
-             [["am", "i", "busy"],
-              ["am", "i", "bc"]],
+             [["am", "i", ["busy", "bc"]]],
              fun(_Dict) ->
                  ?LOG_INFO(#{onsuccess => am_i_busy}),
                  case gaia_serv:busy() of
@@ -281,10 +280,8 @@ all() ->
          %% I'm busy
          %%
          ask(busy,
-             [["i'm", "busy"],
-              ["i'm", "bc"],
-              ["i", "am", "busy"],
-              ["i", "am", "bc"]],
+             [["i'm", ["busy", "bc"]],
+              ["i", "am", ["busy", "bc"]]],
              fun(_Dict) ->
                  ?LOG_INFO(#{onsuccess => busy}),
                  case gaia_serv:busy() of
@@ -303,10 +300,8 @@ all() ->
          %% I'm not busy
          %%
          ask(not_busy,
-             [["i'm", "not", "busy"],
-              ["i'm", "not", "bc"],
-              ["i", "am", "not", "busy"],
-              ["i", "am", "not", "bc"]],
+             [["i'm", "not", ["busy", "bc"]],
+              ["i", "am", "not", ["busy", "bc"]]],
              fun(_Dict) ->
                  ?LOG_INFO(#{onsuccess => busy}),
                  case gaia_serv:busy() of
@@ -970,7 +965,7 @@ group with ">>,
                  end
              end),
          %%
-         %% Do not give high priorityto X
+         %% Do not give high priority to X
          %%
          ask(do_not_give_high_priority,
              [["do", "not", "give", "high", "priority", "to", name]],

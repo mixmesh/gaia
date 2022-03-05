@@ -451,10 +451,22 @@ match_patterns(Tokens, Dict, [_|Rest]) ->
 
 match_pattern([], Dict, []) ->
     {ok, Dict};
-match_pattern([Token|RemainingTokens], Dict, [PatternVariable|Rest])
+match_pattern([Token|RemainingTokens], Dict,
+              [PatternVariable|RemainingPatterns])
   when is_atom(PatternVariable) ->
-    match_pattern(RemainingTokens, Dict#{PatternVariable => Token}, Rest);
-match_pattern([Token|RemainingTokens], Dict, [PatternToken|Rest]) ->
+    match_pattern(RemainingTokens, Dict#{PatternVariable => Token},
+                  RemainingPatterns);
+match_pattern([Token|RemainingTokens], Dict,
+              [[Pattern|_] = AlternativePatterns|RemainingPatterns])
+  when is_list(Pattern) orelse is_atom(Pattern) ->
+    case check_alternative_patterns(Token, Dict, AlternativePatterns) of
+        {ok, NewDict} ->
+            match_pattern(RemainingTokens, NewDict, RemainingPatterns);
+        nomatch ->
+            nomatch
+    end;
+match_pattern([Token|RemainingTokens], Dict,
+              [PatternToken|RemainingPatterns]) ->
     Matchers =
         if
             length(Token) < 4 ->
@@ -464,9 +476,19 @@ match_pattern([Token|RemainingTokens], Dict, [PatternToken|Rest]) ->
         end,
     case gaia_fuzzy:match(?l2b(Token), [?l2b(PatternToken)], Matchers) of
         {ok, _} ->
-            match_pattern(RemainingTokens, Dict, Rest);
+            match_pattern(RemainingTokens, Dict, RemainingPatterns);
         nomatch ->
             nomatch
+    end.
+
+check_alternative_patterns(_Token, _Dict, []) ->
+    nomatch;
+check_alternative_patterns(Token, Dict, [Pattern|Rest]) ->
+    case match_pattern([Token], Dict, [Pattern]) of
+        {ok, NewDict} ->
+            {ok, NewDict};
+        nomatch ->
+            check_alternative_patterns(Token, Dict, Rest)
     end.
 
 update_path(Path, Name, SuccessResult) ->
