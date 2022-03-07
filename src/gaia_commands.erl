@@ -63,6 +63,10 @@ all() ->
                Name = maps:get(name, Dict),
                case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
                  [#gaia_peer{name = PeerName} = Peer] ->
+
+                   io:format("PEER: ~p\n", [Peer]),
+
+
                    Text = [<<"Do you want to call contact ">>, PeerName,
                            <<"?">>],
                    ok = gaia_command_serv:say(Text),
@@ -87,6 +91,10 @@ all() ->
                  {error, already_started} ->
                    Text = [<<"Hey! You are already in a call with contact ">>,
                            PeerName],
+                   ok = gaia_command_serv:say(Text),
+                   [{last_say, Text}|leave_command_mode()];
+                 {error, not_online} ->
+                   Text = [<<"Hey! Contact ">>, PeerName, <<" is not online">>],
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()]
                end
@@ -1044,10 +1052,11 @@ group with ">>,
                  end
              end),
          %%
-         %% Which contacts are online?
+         %% Which [contacts] are online?
          %%
          ask(online_contacts,
-             [["which", "contacts", "are", "online"]],
+             [["which", "are", "online"],
+              ["which", "contacts", "are", "online"]],
              fun(_Dict) ->
                  ?LOG_INFO(#{onsuccess => online_contacts}),
                  OnlinePeerNames =

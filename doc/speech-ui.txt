@@ -321,9 +321,9 @@ NOTE: X might be "all"
 
 2.10 Contacts
 
-2.10.1 Which contacts are online?
+2.10.1 Which [contacts] are online?
 
--> "Which contacts are online?"
+-> "Which [contacts] are online?"
   <- "No contacts are online"
   <- "Contact X is online"
   <- "The contacts X, Y and Z are online"

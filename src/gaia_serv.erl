@@ -240,6 +240,8 @@ message_handler(#{parent := Parent,
                       ConversationStatus} = Call} ->
             ?LOG_DEBUG(#{call => Call}),
             case db_lookup_peer(Db, PeerIdOrName) of
+                [#gaia_peer{nodis_address = undefined}] ->
+                    {reply, From, {error, not_online}};
                 [#gaia_peer{conversation = {true, _ConversationStatus}}] ->
                     {reply, From, {error, already_started}};
                 [Peer] ->
