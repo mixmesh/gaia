@@ -492,6 +492,9 @@ find_conversations(Db, _Busy = false) ->
          (#gaia_peer{id = PeerId,
                      conversation = {true, #{read := true}}}, Acc) ->
               [{peer, PeerId}|Acc];
+         (#gaia_peer{id = PeerId,
+                     conversation = {true, #{write := true}}}, Acc) ->
+              [{peer, PeerId}|Acc];
          (#gaia_group{id = GroupId,
                       conversation = true,
                       multicast_ip_address = MulticastIpAddress,
@@ -556,6 +559,7 @@ negotiate_with_peers(MyPeerId, Db, [{peer, PeerId}|Rest]) ->
         {error, Reason} ->
             ?LOG_ERROR(#{{rest_service_client, start_peer_negotiation} =>
                              Reason}),
+            ok = gaia_command_serv:negotiation_failed(PeerName, error),
             UpdatedPeer = Peer#gaia_peer{conversation = false},
             true = db_insert(Db, UpdatedPeer),
             negotiate_with_peers(MyPeerId, Db, Rest)

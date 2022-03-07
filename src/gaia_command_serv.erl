@@ -109,7 +109,7 @@ negotiation_succeeded(PeerName) ->
 %%
 
 -spec negotiation_failed(gaia_serv:peer_name(),
-                         calling | busy | not_available) ->
+                         calling | busy | not_available | error) ->
           ok.
 
 negotiation_failed(PeerName, Reason) ->
@@ -299,6 +299,10 @@ message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
                     {noreply, State#{local_callback => NewLocalCallback}};
                 not_available ->
                     Text = [<<"Hey! ">>, PeerName, <<" is not available">>],
+                    NewLocalCallback = say(LocalCallback, Text),
+                    {noreply, State#{local_callback => NewLocalCallback}};
+                error ->
+                    Text = [<<"Hey! ">>, PeerName, <<" did not respond">>],
                     NewLocalCallback = say(LocalCallback, Text),
                     {noreply, State#{local_callback => NewLocalCallback}}
             end;
