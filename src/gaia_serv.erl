@@ -465,7 +465,7 @@ update_network(MyPeerId, Db, Busy) ->
 
 update_network(MyPeerId, Db, Busy, Negotiate) ->
     Conversations = find_conversations(Db, Busy),
-    ?LOG_DEBUG(#{conversations => Conversations}),
+    ?LOG_DEBUG(#{'UPDATE_NETWORK' => {conversations, Conversations}}),
     ok = update_network_receiver(Db, Conversations),
     if
         Negotiate ->
@@ -537,6 +537,7 @@ negotiate_with_peers(MyPeerId, Db, [{peer, PeerId}|Rest]) ->
                 rest_port = RestPort,
                 local_port = LocalPort} = Peer] =
         db_lookup_peer_by_id(Db, PeerId),
+    ?LOG_DEBUG(#{'NEGOTIATE_WITH_PEERS' => {name, PeerName}}),
     case gaia_rest_client:start_peer_negotiation(
            MyPeerId, {IpAddress, RestPort}, LocalPort) of
         {ok, NewRemotePort} ->
@@ -723,6 +724,7 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                             rest_port = RestPort} = Peer]
                   when NodisAddress /= NewNodisAddress andalso
                        RestPort /= NewRestPort ->
+                    ?LOG_DEBUG(#{'CHANGE_PEER' => new_nodis_address_or_rest_port}),
                     UpdatedPeer =
                         Peer#gaia_peer{nodis_address = NewNodisAddress,
                                        remote_port = undefined,
@@ -732,11 +734,14 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                     gaia_command_serv:groups_of_interest_updated(
                       PeerName, GroupNamesOfInterest);
                 [#gaia_peer{name = PeerName}] ->
+                    ?LOG_DEBUG(#{'CHANGE_PEER' => same_nodis_address_or_rest_port}),
                     gaia_command_serv:groups_of_interest_updated(
                       PeerName, GroupNamesOfInterest);
                 [_] ->
+                    ?LOG_DEBUG(#{'CHANGE_PEER' => ignoring_peer}),
                     ok;
                 [] ->
+                    ?LOG_DEBUG(#{'CHANGE_PEER' => epehemeral_peer}),
                     EphemeralPeer =
                         #gaia_peer{
                            id = NewPeerId,
