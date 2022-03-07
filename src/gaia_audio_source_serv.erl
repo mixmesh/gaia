@@ -198,47 +198,50 @@ force_open_alsa(PcmName, WantedHwParams) ->
             force_open_alsa(PcmName, WantedHwParams)
     end.
 
-audio_producer(AlsaHandle, PeriodSizeInFrames, [], ServeWho) ->
+audio_producer(AlsaHandle, PeriodSizeInFrames, [], CurrentServeWho) ->
     receive
         {subscribers, Subscribers} ->
             audio_producer(AlsaHandle, PeriodSizeInFrames, Subscribers,
-                           ServeWho)
+                           CurrentServeWho)
     end;
 audio_producer(AlsaHandle, PeriodSizeInFrames, CurrentSubscribers,
                CurrentServeWho) ->
-    {Subscribers, ServeWho} =
-        handle_audio_producer_commands(CurrentSubscribers, CurrentServeWho),
-    case alsa:read(AlsaHandle, PeriodSizeInFrames) of
-        {ok, Packet} when is_binary(Packet) ->
-            MergedSubscribers =
-                lists:map(
-                  fun({Pid, _MonitorRef, bang} = Subscriber)
-                        when Pid == ServeWho orelse ServeWho == all ->
-                          Pid ! {subscription_packet, Packet},
-                          Subscriber;
-                     ({Pid, MonitorRef, Callback})
-                        when Pid == ServeWho orelse ServeWho == all ->
-                          NewCallback = Callback(Packet),
-                          {Pid, MonitorRef, NewCallback};
-                     (Subscriber) ->
-                          Subscriber
-                  end, Subscribers),
-            audio_producer(AlsaHandle, PeriodSizeInFrames, MergedSubscribers,
-                           ServeWho);
-        {ok, overrun} ->
-            ?LOG_WARNING(#{reason => overrun}),
-            audio_producer(AlsaHandle, PeriodSizeInFrames, Subscribers,
-                           ServeWho);
-        {ok, suspend_event} ->
-            ?LOG_WARNING(#{reason => suspend_event}),
-            audio_producer(AlsaHandle, PeriodSizeInFrames, Subscribers,
-                           ServeWho);
-        {error, Reason} ->
-            ?LOG_ERROR(#{function => {alsa, read, 2},
-                         reason => alsa:strerror(Reason)}),
-            timer:sleep(?ALSA_PUSHBACK_TIMEOUT_IN_MS),
-            audio_producer(AlsaHandle, PeriodSizeInFrames, Subscribers,
-                           ServeWho)
+    case handle_audio_producer_commands(CurrentSubscribers, CurrentServeWho) of
+        {[], ServeWho} ->
+            audio_producer(AlsaHandle, PeriodSizeInFrames, [], ServeWho);
+        {Subscribers, ServeWho} ->
+            case alsa:read(AlsaHandle, PeriodSizeInFrames) of
+                {ok, Packet} when is_binary(Packet) ->
+                    MergedSubscribers =
+                        lists:map(
+                          fun({Pid, _MonitorRef, bang} = Subscriber)
+                                when Pid == ServeWho orelse ServeWho == all ->
+                                  Pid ! {subscription_packet, Packet},
+                                  Subscriber;
+                             ({Pid, MonitorRef, Callback})
+                                when Pid == ServeWho orelse ServeWho == all ->
+                                  NewCallback = Callback(Packet),
+                                  {Pid, MonitorRef, NewCallback};
+                             (Subscriber) ->
+                                  Subscriber
+                          end, Subscribers),
+                    audio_producer(AlsaHandle, PeriodSizeInFrames,
+                                   MergedSubscribers, ServeWho);
+                {ok, overrun} ->
+                    ?LOG_WARNING(#{reason => overrun}),
+                    audio_producer(AlsaHandle, PeriodSizeInFrames, Subscribers,
+                                   ServeWho);
+                {ok, suspend_event} ->
+                    ?LOG_WARNING(#{reason => suspend_event}),
+                    audio_producer(AlsaHandle, PeriodSizeInFrames, Subscribers,
+                                   ServeWho);
+                {error, Reason} ->
+                    ?LOG_ERROR(#{function => {alsa, read, 2},
+                                 reason => alsa:strerror(Reason)}),
+                    timer:sleep(?ALSA_PUSHBACK_TIMEOUT_IN_MS),
+                    audio_producer(AlsaHandle, PeriodSizeInFrames, Subscribers,
+                                   ServeWho)
+            end
     end.
 
 handle_audio_producer_commands(CurrentSubscribers, CurrentServeWho) ->
