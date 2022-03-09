@@ -122,7 +122,8 @@ negotiation_failed(PeerName, Reason) ->
 -spec say(binary() | iolist()) -> ok.
 
 say(Text) ->
-    _ = flite:say(Text, [{latency, 60}]),
+    %% FIXME: enable flite!!!
+    %%_ = flite:say(Text, [{latency, 60}]),
     ok.
 
 %%
@@ -131,6 +132,9 @@ say(Text) ->
 
 -spec beep(enter_command_mode | leave_command_mode | event) -> ok.
 
+%% FIXME: enable beep!!!
+beep(_) ->
+    ok;
 beep(enter_command_mode) ->
     ok = alsa_wave:enter(),
     %% FIXME: lower volume and implement a alsa_wave:{start,stop}_loop/1
@@ -308,11 +312,13 @@ message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
             end;
         {cast, serve_only_me = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
-            ok = gaia_audio_source_serv:serve_only_me(),
+            %% FIXME: enable serve only!!!
+            %%ok = gaia_audio_source_serv:serve_only_me()
             noreply;
         {cast, serve_all = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
-            ok = gaia_audio_source_serv:serve_all(),
+            %% FIXME: enable serve only!!!
+            %%ok = gaia_audio_source_serv:serve_all(),
             noreply;
         {subscription_packet, Packet} when LocalCallback /= undefined ->
             NewLocalCallback = LocalCallback(Packet),
