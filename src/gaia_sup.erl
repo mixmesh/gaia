@@ -67,5 +67,6 @@ init([]) ->
           [GaiaServ,
            GaiaRestService,
            GaiaAudioSourceServ,
-           GaiaNetworkSenderServ,
-           GaiaCommandServ]}}.
+           GaiaNetworkSenderServ
+%           GaiaCommandServ
+          ]}}.
