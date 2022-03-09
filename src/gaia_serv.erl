@@ -1,7 +1,8 @@
 -module(gaia_serv).
 -export([start_link/5, stop/0]).
 -export([busy/0, busy/1,
-         start_peer_conversation/2, stop_peer_conversation/1,
+         start_peer_conversation/1, start_peer_conversation/2,
+         stop_peer_conversation/1,
          set_peer_conversation_status/2,
          start_group_conversation/1, stop_group_conversation/1,
          lookup/1, fold/2,
@@ -94,6 +95,9 @@ busy(Busy) ->
 -spec start_peer_conversation(
         peer_id() | {name, peer_name()}, conversation_status()) ->
           ok | {error, no_such_peer | already_started}.
+
+start_peer_conversation(PeerIdOrName) ->
+    start_peer_conversation(PeerIdOrName, #{read => write, write => true}).
 
 start_peer_conversation(PeerIdOrName, ConversationStatus) ->
     serv:call(?MODULE, {start_peer_conversation, PeerIdOrName,
@@ -367,10 +371,14 @@ message_handler(#{parent := Parent,
                                    Peer, busy),
                             {reply, From, {error, busy}};
                         {no, skip} ->
+                            ?LOG_DEBUG(#{handle_peer_negotiation => skip}),
                             {reply, From, {error, not_available}};
                         {no, no_nodis_address} ->
+                            ?LOG_DEBUG(#{handle_peer_negotiation =>
+                                             no_nodis_address}),
                             {reply, From, {error, not_available}};
                         {no, ignore} ->
+                            ?LOG_DEBUG(#{handle_peer_negotiation => ignore}),
                             {reply, From, {error, not_available}};
                         {yes, UpdatedPeer} ->
                             true = db_insert(Db, UpdatedPeer#gaia_peer{
@@ -390,6 +398,7 @@ message_handler(#{parent := Parent,
                             end
                     end;
                 [] ->
+                    ?LOG_DEBUG(#{handle_peer_negotiation => no_such_peer}),
                     {reply, From, {error, not_available}}
             end;
         config_updated = Message ->
