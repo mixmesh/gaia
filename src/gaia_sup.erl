@@ -62,7 +62,7 @@ init([]) ->
                     [PeerId, true, UseOpusCodec]}},
     GaiaCommandServ =
 	#{id => gaia_command_serv,
-          start => {gaia_command_serv, start_link, [true]}},
+          start => {gaia_command_serv, start_link, [false]}},
     {ok, {#{strategy => one_for_all},
           [GaiaServ,
            GaiaRestService,

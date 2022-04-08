@@ -94,10 +94,10 @@ busy(Busy) ->
 
 -spec start_peer_conversation(
         peer_id() | {name, peer_name()}, conversation_status()) ->
-          ok | {error, no_such_peer | already_started}.
+          ok | {error, not_online | no_such_peer | already_started}.
 
 start_peer_conversation(PeerIdOrName) ->
-    start_peer_conversation(PeerIdOrName, #{read => write, write => true}).
+    start_peer_conversation(PeerIdOrName, #{read => true, write => true}).
 
 start_peer_conversation(PeerIdOrName, ConversationStatus) ->
     serv:call(?MODULE, {start_peer_conversation, PeerIdOrName,

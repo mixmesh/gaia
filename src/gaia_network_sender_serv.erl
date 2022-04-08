@@ -163,9 +163,9 @@ send_packet(PeerId, _OpusEncoder, Socket, Seqnum, Flags, ConversationAddresses,
               case gen_udp:send(Socket, IpAddress, Port, Buf) of
                   ok ->
                       ok;
-                  {error, _Reason} ->
-%                      ?LOG_ERROR(#{function => {gen_udp, send, 4},
-%                                   reason => file:format_error(Reason)}),
+                  {error, Reason} ->
+                      ?LOG_ERROR(#{function => {gen_udp, send, 4},
+                                   reason => file:format_error(Reason)}),
                       ok
               end
       end, ConversationAddresses).

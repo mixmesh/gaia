@@ -88,13 +88,17 @@ all() ->
                    Text = [<<"You are now in a call with contact ">>, PeerName],
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
+                 {error, not_online} ->
+                   Text = [<<"Hey! Contact ">>, PeerName, <<" is not online">>],
+                   ok = gaia_command_serv:say(Text),
+                   [{last_say, Text}|leave_command_mode()];
+                 {error, no_such_peer} ->
+                   Text = [<<"Hey! Contact ">>, PeerName, <<" is unknown">>],
+                   ok = gaia_command_serv:say(Text),
+                   [{last_say, Text}|leave_command_mode()];
                  {error, already_started} ->
                    Text = [<<"Hey! You are already in a call with contact ">>,
                            PeerName],
-                   ok = gaia_command_serv:say(Text),
-                   [{last_say, Text}|leave_command_mode()];
-                 {error, not_online} ->
-                   Text = [<<"Hey! Contact ">>, PeerName, <<" is not online">>],
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()]
                end

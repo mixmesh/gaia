@@ -218,10 +218,17 @@ audio_producer(AlsaHandle, PeriodSizeInFrames, CurrentSubscribers,
                                 when Pid == ServeWho orelse ServeWho == all ->
                                   Pid ! {subscription_packet, Packet},
                                   Subscriber;
-                             ({Pid, MonitorRef, Callback})
+                             ({Pid, MonitorRef, Callback} = Subscriber)
                                 when Pid == ServeWho orelse ServeWho == all ->
-                                  NewCallback = Callback(Packet),
-                                  {Pid, MonitorRef, NewCallback};
+                                  try Callback(Packet) of
+                                      NewCallback ->
+                                          {Pid, MonitorRef, NewCallback}
+                                  catch
+                                      _:Reason ->
+                                          ?LOG_ERROR(
+                                             #{callback_failure => Reason}),
+                                          Subscriber
+                                  end;
                              (Subscriber) ->
                                   Subscriber
                           end, Subscribers),
@@ -252,9 +259,12 @@ handle_audio_producer_commands(CurrentSubscribers, CurrentServeWho) ->
                 lists:map(
                   fun({Pid, MonitorRef, NewCallback} = Subscriber) ->
                           case lists:keysearch(Pid, 1, CurrentSubscribers) of
+                              {value, {Pid, MonitorRef, bang}} ->
+                                  Subscriber;
                               {value, {Pid, MonitorRef, Callback}} ->
-                                  %% NOTE: All this to reuse the already
-                                  %% running seqnum
+                                  %% NOTE: This used by the callback in
+                                  %% gaia_network_sernder_serv.erl to reuse
+                                  %% an already running seqnum
                                   {Pid, MonitorRef, NewCallback(Callback)};
                               false ->
                                   Subscriber

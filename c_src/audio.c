@@ -161,7 +161,7 @@ void audio_print_parameters(audio_info_t *audio_info, char *who) {
 
 int audio_read(audio_info_t *audio_info, uint8_t *data,
                snd_pcm_uframes_t nframes) {
-    snd_pcm_uframes_t frames = snd_pcm_readi(audio_info->pcm, data, nframes);
+    snd_pcm_sframes_t frames = snd_pcm_readi(audio_info->pcm, data, nframes);
     if (frames < 0) {
         ERRORF("snd_pcm_readi: Failed to read from audio device: %s",
                snd_strerror(frames));
@@ -179,12 +179,13 @@ int audio_non_blocking_write(audio_info_t *audio_info, uint8_t *data,
                              snd_pcm_uframes_t nframes) {
     int err;
     ssize_t frame_size_in_bytes = snd_pcm_frames_to_bytes(audio_info->pcm, 1);
-    snd_pcm_uframes_t written_frames = 0;
+    snd_pcm_sframes_t written_frames = 0;
     while (written_frames < nframes) {
         snd_pcm_uframes_t frames =
             snd_pcm_writei(audio_info->pcm,
                            &data[written_frames * frame_size_in_bytes],
                            nframes - written_frames);
+        /*
         if (-EAGAIN) {
             int count;
             if ((count = snd_pcm_poll_descriptors_count(audio_info->pcm)) < 0) {
@@ -207,10 +208,13 @@ int audio_non_blocking_write(audio_info_t *audio_info, uint8_t *data,
                 }
             } while (!(revents & POLLOUT));
         } else if (frames < 0) {
-            ERRORF("snd_pcm_readi: Failed to write to audio device: %s",
+        */
+
+        if (frames < 0) {
+            ERRORF("snd_pcm_writei: Failed to write to audio device: %s",
                    snd_strerror(frames));
             if ((err = snd_pcm_recover(audio_info->pcm, frames, 0)) < 0) {
-                ERRORF("snd_pcm_readi: Failed to recover audio device: %s",
+                ERRORF("snd_pcm_writei: Failed to recover audio device: %s",
                        snd_strerror(frames));
                 return err;
             }
