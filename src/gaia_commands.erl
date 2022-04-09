@@ -63,19 +63,13 @@ all() ->
                Name = maps:get(name, Dict),
                case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
                  [#gaia_peer{name = PeerName} = Peer] ->
-
-                   io:format("PEER: ~p\n", [Peer]),
-
-
-                   Text = [<<"Do you want to call contact ">>, PeerName,
-                           <<"?">>],
+                   Text = [<<"Do you want to call ">>, PeerName, <<"?">>],
                    ok = gaia_command_serv:say(Text),
                    [{dict, Dict#{peer => Peer}},
                     remove_timeout,
                     {last_say, Text}];
                  [] ->
-                   Text = [<<"Hey! Contact ">>, Name,
-                           <<" is not known. Please try again!">>],
+                   Text = [Name, <<" is not known. Please try again!">>],
                    ok = gaia_command_serv:say(Text),
                    [{cd, '..'}, {last_say, Text}]
                end
@@ -85,19 +79,19 @@ all() ->
                case gaia_serv:start_peer_conversation(
                       PeerId, #{read => true, write => true}) of
                  ok ->
-                   Text = [<<"You are now in a call with contact ">>, PeerName],
+                   Text = [<<"Connecting to...">>, PeerName],
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
                  {error, not_online} ->
-                   Text = [<<"Hey! Contact ">>, PeerName, <<" is not online">>],
+                   Text = [PeerName, <<" is not online">>],
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
                  {error, no_such_peer} ->
-                   Text = [<<"Hey! Contact ">>, PeerName, <<" is unknown">>],
+                   Text = [PeerName, <<" is unknown">>],
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
                  {error, already_started} ->
-                   Text = [<<"Hey! You are already in a call with contact ">>,
+                   Text = [<<"You are already connected to ">>,
                            PeerName],
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()]

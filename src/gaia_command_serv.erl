@@ -270,7 +270,7 @@ message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
         {cast, {conversation_rejected, #gaia_peer{name = PeerName},
                 busy} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
-            Text = [<<"Hey! A call from ">>, PeerName, <<"was rejected">>],
+            Text = [<<"Hey! A call from ">>, PeerName, <<" was rejected">>],
             NewLocalCallback = say(LocalCallback, Text),
             {noreply, State#{local_callback => NewLocalCallback}};
         {cast, {call, #gaia_peer{name = PeerName}} = Cast} ->
