@@ -72,20 +72,26 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 -> "Call [contact] X"
   <- "Do you want to call X?"
     -> "Yes" or "Yeah"
-      <- "Connecting to X..."
+      <- "You are now calling X..."
         [Leaves command mode]
         NOTE: See "Incoming asynchronous messages" below
       <- "X is not online"
         [Leaves command mode]
       <- "X is unknown"
         [Leaves command mode]
-      <- "You are already connected with X"
+      <- "You are already in a call with X"
         [Leaves command mode]
     -> "No" or "Nah"
        <- "OK"
          [Leaves command mode]
   <- "X is not known. Please try again!"
      [Stays in command mode]
+
+
+
+
+
+
 
 2.2.3 Hang-up [contact] X
 
@@ -337,12 +343,13 @@ NOTE: X might be "all"
 * "Hey! X is now online"
 * "Hey! X is no longer online"
 * "Hey! X updated group Y"
-* "Hey! X is calling. Do you want to answer?"
+* "Hey! X is pinging you. Do you want to answer?"
 * "Hey! A call from X was rejected"
 * "Hey! You now listen and talk to X"
 * "Hey! You now only listen to X"
 * "Hey! You now only talk to X"
-* "Hey! You are now in contact with X"
-* "Hey! You are now calling X"
+* "Hey! You are now in a call with X"
+* "Hey! You are now pinging X"
 * "Hey! X is busy"
 * "Hey! X is not available"
+* "Hey! X did not respond"

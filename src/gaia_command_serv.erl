@@ -276,7 +276,7 @@ message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
         {cast, {call, #gaia_peer{name = PeerName}} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
             Text = [<<"Hey! ">>, PeerName,
-                    <<" is calling. Do you want to answer?">>],
+                    <<" is pinging you. Do you want to answer?">>],
             NewLocalCallback = say(LocalCallback, Text),
             UpdatedLocalCallback =
                 trigger_callback(NewLocalCallback,
@@ -284,14 +284,14 @@ message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
             {noreply, State#{local_callback => UpdatedLocalCallback}};
         {cast, {negotiation_succeeded, PeerName} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
-            Text = [<<"Hey! You are now in contact with ">>, PeerName],
+            Text = [<<"Hey! You are now in a call with ">>, PeerName],
             NewLocalCallback = say(LocalCallback, Text),
             {noreply, State#{local_callback => NewLocalCallback}};
         {cast, {negotiation_failed, PeerName, Reason} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
             case Reason of
                 calling ->
-                    Text = [<<"Hey! You are now calling ">>, PeerName],
+                    Text = [<<"Hey! You are now pinging ">>, PeerName],
                     NewLocalCallback = say(LocalCallback, Text),
                     {noreply, State#{local_callback => NewLocalCallback}};
                 busy ->
