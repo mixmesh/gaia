@@ -122,6 +122,7 @@ negotiation_failed(PeerName, Reason) ->
 -spec say(binary() | iolist()) -> ok.
 
 say(Text) ->
+    ?LOG_INFO(#{say => Text}),
     _ = flite:say(Text, [{latency, 60}]),
     ok.
 
