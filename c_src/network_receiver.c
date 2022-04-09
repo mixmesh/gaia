@@ -241,7 +241,9 @@ gaia-id");
         while (!kill_network_receiver) {
             // Wait for incoming socket data (or timeout)
             int sockfd = set_fds(&readfds);
-            assert(sockfd != -1);
+            if (sockfd == -1) {
+                break;
+            }
             struct timeval timeout = wait_for_incoming_audio_timeout;
             int nfds = select(sockfd + 1, &readfds, 0, 0, &timeout);
             if (nfds < 0) {
