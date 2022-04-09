@@ -169,7 +169,7 @@ entry %u but got %u (%u will be reused as %u!)",
                 if ((err = audio_non_blocking_write(
                                audio_info, playback_packet,
                                PERIOD_SIZE_IN_FRAMES)) < 0) {
-                    ERRORF("audio_non_blocking_write: %s", snd_strerror(err));
+                    DEBUGF("audio_non_blocking_write: %s", snd_strerror(err));
                 }
             }
 
