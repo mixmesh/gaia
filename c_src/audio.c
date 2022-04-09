@@ -211,10 +211,10 @@ int audio_non_blocking_write(audio_info_t *audio_info, uint8_t *data,
         */
 
         if (frames < 0) {
-            ERRORF("snd_pcm_writei: Failed to write to audio device: %s",
+            DEBUGF("snd_pcm_writei: Failed to write to audio device: %s",
                    snd_strerror(frames));
-            if ((err = snd_pcm_recover(audio_info->pcm, frames, 0)) < 0) {
-                ERRORF("snd_pcm_writei: Failed to recover audio device: %s",
+            if ((err = snd_pcm_recover(audio_info->pcm, frames, 1)) < 0) {
+                DEBUGF("snd_pcm_writei: Failed to recover audio device: %s",
                        snd_strerror(frames));
                 return err;
             }
