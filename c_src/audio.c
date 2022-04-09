@@ -179,9 +179,9 @@ int audio_non_blocking_write(audio_info_t *audio_info, uint8_t *data,
                              snd_pcm_uframes_t nframes) {
     int err;
     ssize_t frame_size_in_bytes = snd_pcm_frames_to_bytes(audio_info->pcm, 1);
-    snd_pcm_sframes_t written_frames = 0;
+    snd_pcm_uframes_t written_frames = 0;
     while (written_frames < nframes) {
-        snd_pcm_uframes_t frames =
+        snd_pcm_sframes_t frames =
             snd_pcm_writei(audio_info->pcm,
                            &data[written_frames * frame_size_in_bytes],
                            nframes - written_frames);
