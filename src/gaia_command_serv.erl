@@ -302,7 +302,8 @@ message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
         {cast, {conversation_stopped,
                 #gaia_peer{name = PeerName}} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
-            Text = [<<"Hey! You no longer nor listen neither talk to ">>, PeerName],
+            Text = [<<"Hey! You no longer neither listen nor talk to ">>,
+                    PeerName],
             NewLocalCallback = say(LocalCallback, Text),
             {noreply, State#{local_callback => NewLocalCallback}};
         {cast, {conversation_rejected, #gaia_peer{name = PeerName},
