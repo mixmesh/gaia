@@ -7,7 +7,7 @@
          start_group_conversation/1, stop_group_conversation/1,
          lookup/1, fold/2,
          generate_artificial_id/1,
-         handle_peer_negotiation/2]).
+         handle_start_of_conversation/2]).
 -export([message_handler/1]).
 -export_type([name/0, peer_name/0, group_name/0,
               id/0, peer_id/0, group_id/0,
@@ -176,14 +176,14 @@ generate_artificial_id(PeerName) ->
     binary:decode_unsigned(binary:part(PeerName, {byte_size(PeerName), -4})).
 
 %%
-%% Exported: handle_peer_negotiation
+%% Exported: handle_start_of_conversation
 %%
 
--spec handle_peer_negotiation(peer_id(), inet:port_number()) ->
+-spec handle_start_of_conversation(peer_id(), inet:port_number()) ->
           {ok, inet:port_number()} | {error, call | busy | not_available}.
 
-handle_peer_negotiation(PeerId, RemotePort) ->
-    serv:call(?MODULE, {handle_peer_negotiation, PeerId, RemotePort}).
+handle_start_of_conversation(PeerId, RemotePort) ->
+    serv:call(?MODULE, {handle_start_of_conversation, PeerId, RemotePort}).
 
 %%
 %% Server
@@ -260,27 +260,30 @@ message_handler(#{parent := Parent,
             end;
         {call, From, {stop_peer_conversation, all} = Call} ->
             ?LOG_DEBUG(#{call => Call}),
-            ok = db_fold(
-                   fun(#gaia_peer{
-                          conversation = {true, _ConversationStatus}} = Peer,
-                       Acc) ->
-                           true = db_insert(Db, Peer#gaia_peer{
-                                                  conversation = false}),
-                           Acc;
-                      (_, Acc) ->
-                           Acc
-                   end, ok, Db),
-            ok = update_network(MyPeerId, Db, Busy),
+            StoppedPeerIds =
+                db_fold(
+                  fun(#gaia_peer{
+                         id = StoppedPeerId,
+                         conversation = {true, _ConversationStatus}} = Peer,
+                      Acc) ->
+                          true = db_insert(Db, Peer#gaia_peer{
+                                                 conversation = false}),
+                          [StoppedPeerId|Acc];
+                     (_, Acc) ->
+                          Acc
+                  end, [], Db),
+            ok = update_network(MyPeerId, Db, Busy, true, StoppedPeerIds),
             {reply, From, ok};
         {call, From, {stop_peer_conversation, PeerIdOrName} = Call} ->
             ?LOG_DEBUG(#{call => Call}),
             case db_lookup_peer(Db, PeerIdOrName) of
                 [#gaia_peer{conversation = false}] ->
                     {reply, From, {error, already_stopped}};
-                [Peer] ->
+                [#gaia_peer{id = StoppedPeerId} = Peer] ->
                     UpdatedPeer = Peer#gaia_peer{conversation = false},
                     true = db_insert(Db, UpdatedPeer),
-                    ok = update_network(MyPeerId, Db, Busy),
+                    ok = update_network(
+                           MyPeerId, Db, Busy, true, [StoppedPeerId]),
                     {reply, From, ok};
                 [] ->
                     {reply, From, {error, no_such_peer}}
@@ -358,7 +361,8 @@ message_handler(#{parent := Parent,
         {call, From, {fold, Fun, Acc0} = Call} ->
             ?LOG_DEBUG(#{call => Call}),
             {reply, From, db_fold(Fun, Acc0, Db)};
-        {call, From, {handle_peer_negotiation, PeerId, RemotePort} = Call} ->
+        {call, From,
+         {handle_start_of_conversation, PeerId, RemotePort} = Call} ->
             ?LOG_DEBUG(#{call => Call}),
             case db_lookup_peer_by_id(Db, PeerId) of
                 [#gaia_peer{name = PeerName} = Peer] ->
@@ -371,19 +375,19 @@ message_handler(#{parent := Parent,
                                    Peer, busy),
                             {reply, From, {error, busy}};
                         {no, skip} ->
-                            ?LOG_DEBUG(#{handle_peer_negotiation => skip}),
+                            ?LOG_DEBUG(#{handle_start_of_conversation => skip}),
                             {reply, From, {error, not_available}};
                         {no, no_nodis_address} ->
-                            ?LOG_DEBUG(#{handle_peer_negotiation =>
+                            ?LOG_DEBUG(#{handle_start_of_conversation =>
                                              no_nodis_address}),
                             {reply, From, {error, not_available}};
                         {no, ignore} ->
-                            ?LOG_DEBUG(#{handle_peer_negotiation => ignore}),
+                            ?LOG_DEBUG(#{handle_start_of_conversation => ignore}),
                             {reply, From, {error, not_available}};
                         {yes, UpdatedPeer} ->
                             true = db_insert(Db, UpdatedPeer#gaia_peer{
                                                    remote_port = RemotePort}),
-                            ok = update_network(MyPeerId, Db, Busy, false),
+                            ok = update_network(MyPeerId, Db, Busy, false, []),
                             case db_lookup_peer_by_id(Db, PeerId) of
                                 [#gaia_peer{local_port = undefined}] ->
                                     ?LOG_DEBUG(#{no_local_port_created =>
@@ -398,7 +402,7 @@ message_handler(#{parent := Parent,
                             end
                     end;
                 [] ->
-                    ?LOG_DEBUG(#{handle_peer_negotiation => no_such_peer}),
+                    ?LOG_DEBUG(#{handle_start_of_conversation => no_such_peer}),
                     {reply, From, {error, not_available}}
             end;
         config_updated = Message ->
@@ -472,18 +476,24 @@ message_handler(#{parent := Parent,
 %%
 
 update_network(MyPeerId, Db, Busy) ->
-    update_network(MyPeerId, Db, Busy, _Negotiate = true).
+    update_network(MyPeerId, Db, Busy, _StartOfConversations = true, _StoppedPeerIds = []).
 
-update_network(MyPeerId, Db, Busy, Negotiate) ->
+update_network(MyPeerId, Db, Busy, StartOfConversations, StoppedPeerIds) ->
     Conversations = find_conversations(Db, Busy),
     ?LOG_DEBUG(#{'UPDATE_NETWORK' => {conversations, Conversations}}),
     ok = update_network_receiver(Db, Conversations),
     if
-        Negotiate ->
-            ok = negotiate_with_peers(MyPeerId, Db, Conversations);
+        StartOfConversations ->
+            ok = start_of_conversations(MyPeerId, Db, Conversations);
         true ->
-            skip_negotation
+            ok
     end,
+    %% case StoppedPeerIds of
+    %%     [] ->
+    %%         ok;
+    %%     _ ->
+    %%         ok = stop_of_conversations(StoppedPeerIds)
+    %% end,
     update_network_sender(Db, Conversations).
 
 find_conversations(_Db, _Busy = true) ->
@@ -540,40 +550,40 @@ update_network_receiver(Db, Conversations) ->
               ok
       end, LocalPorts).
 
-negotiate_with_peers(_MyPeerId, _Db, []) ->
+start_of_conversations(_MyPeerId, _Db, []) ->
     ok;
-negotiate_with_peers(
+start_of_conversations(
   MyPeerId, Db, [{group, _GroupId, _MulticastIpAddress, _GroupPort}|Rest]) ->
-    negotiate_with_peers(MyPeerId, Db, Rest);
-negotiate_with_peers(MyPeerId, Db, [{peer, PeerId}|Rest]) ->
+    start_of_conversations(MyPeerId, Db, Rest);
+start_of_conversations(MyPeerId, Db, [{peer, PeerId}|Rest]) ->
     [#gaia_peer{name = PeerName,
                 nodis_address = {IpAddress, _SyncPort},
                 rest_port = RestPort,
                 local_port = LocalPort} = Peer] =
         db_lookup_peer_by_id(Db, PeerId),
-    ?LOG_DEBUG(#{'NEGOTIATE_WITH_PEERS' => {name, PeerName}}),
-    case gaia_rest_client:start_peer_negotiation(
+    ?LOG_DEBUG(#{'START_OF_CONVERSATIONS' => {name, PeerName}}),
+    case gaia_rest_client:start_of_conversation(
            MyPeerId, {IpAddress, RestPort}, LocalPort) of
         {ok, NewRemotePort} ->
             ok = gaia_command_serv:negotiation_succeeded(PeerName),
             true = db_insert(Db, Peer#gaia_peer{remote_port = NewRemotePort}),
-            negotiate_with_peers(MyPeerId, Db, Rest);
+            start_of_conversations(MyPeerId, Db, Rest);
         calling ->
             ok = gaia_command_serv:negotiation_failed(PeerName, calling),
-            negotiate_with_peers(MyPeerId, Db, Rest);
+            start_of_conversations(MyPeerId, Db, Rest);
         busy ->
             ok = gaia_command_serv:negotiation_failed(PeerName, busy),
-            negotiate_with_peers(MyPeerId, Db, Rest);
+            start_of_conversations(MyPeerId, Db, Rest);
         not_available ->
             ok = gaia_command_serv:negotiation_failed(PeerName, not_available),
-            negotiate_with_peers(MyPeerId, Db, Rest);
+            start_of_conversations(MyPeerId, Db, Rest);
         {error, Reason} ->
             ?LOG_ERROR(#{{rest_service_client, start_peer_negotiation} =>
                              Reason}),
             ok = gaia_command_serv:negotiation_failed(PeerName, error),
             UpdatedPeer = Peer#gaia_peer{conversation = false},
             true = db_insert(Db, UpdatedPeer),
-            negotiate_with_peers(MyPeerId, Db, Rest)
+            start_of_conversations(MyPeerId, Db, Rest)
     end.
 
 update_network_sender(Db, Conversations) ->

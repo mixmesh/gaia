@@ -1,5 +1,5 @@
 -module(gaia_rest_client).
--export([start_peer_negotiation/3, get_group/4]).
+-export([start_of_conversation/3, get_group/4]).
 
 -include_lib("kernel/include/logger.hrl").
 -include_lib("apptools/include/shorthand.hrl").
@@ -8,12 +8,12 @@
 -define(HTTPC_TIMEOUT, 2000).
 
 %%
-%% Exported: start_peer_negotiation
+%% Exported: start_of_conversation
 %%
 
--spec start_peer_negotiation(gaia_serv:peer_id(),
-                             {inet:ip_address(), inet:port_number()},
-                             inet:port_number()) ->
+-spec start_of_conversation(gaia_serv:peer_id(),
+                            {inet:ip_address(), inet:port_number()},
+                            inet:port_number()) ->
           {ok, inet:port_number()} | calling | busy | not_available |
           {error,
            {invalid_response_body, jsone:json_value()} |
@@ -22,9 +22,9 @@
            {invalid_response, Response :: term()} |
            {http_error, Reason :: term()}}.
 
-start_peer_negotiation(MyPeerId, Address, LocalPort) ->
+start_of_conversation(MyPeerId, Address, LocalPort) ->
     RequestBody = encode_json(#{<<"port">> => LocalPort}),
-    case request(MyPeerId, Address, "peer-negotiation", RequestBody, post) of
+    case request(MyPeerId, Address, "start-of-conversation", RequestBody, post) of
         {ok, {{_Version, 200, _ReasonPhrase}, _Headers, ResponseBody}} ->
             try jsone:decode(ResponseBody) of
                 #{<<"port">> := Port} when is_integer(Port) ->

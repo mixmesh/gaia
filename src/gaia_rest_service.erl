@@ -135,7 +135,7 @@ encode_members(PeerId, Members) ->
 handle_http_post(Socket, Request, Body, _Options) ->
     Url = Request#http_request.uri,
     case string:tokens(Url#url.path, "/") of
-	["peer-negotiation"] ->
+	["start-of-conversation"] ->
             Response =
                 case rest_util:parse_body(
                        Request, Body,
@@ -143,7 +143,7 @@ handle_http_post(Socket, Request, Body, _Options) ->
                     {error, _Reason} ->
                         {error, bad_request, "Invalid JSON format"};
                     #{<<"port">> := Port} when is_integer(Port) ->
-                        peer_negotiation_post(Request, Port);
+                        start_of_conversation_post(Request, Port);
                     _ ->
                         ?LOG_ERROR(#{invalid_request_body => Body}),
                         {error, bad_request, "Invalid request body"}
@@ -154,15 +154,15 @@ handle_http_post(Socket, Request, Body, _Options) ->
 	    rest_util:response(Socket, Request, {error, not_found})
     end.
 
-peer_negotiation_post(
+start_of_conversation_post(
   #http_request{headers = #http_chdr{other = Headers}}, RemotePort) ->
     case get_gaia_headers(Headers) of
         {PeerId, _Nonce, _HMAC} when PeerId /= not_set ->
-            case gaia_serv:handle_peer_negotiation(PeerId, RemotePort) of
+            case gaia_serv:handle_start_of_conversation(PeerId, RemotePort) of
                 {ok, LocalPort} ->
                     {ok, {format, #{<<"port">> => LocalPort}}};
                 {error, Reason} ->
-                    ?LOG_INFO(#{peer_negotiation_rejected => Reason}),
+                    ?LOG_INFO(#{start_of_conversation_rejected => Reason}),
                     NoAccessBody =
                         case Reason of
                             call ->
