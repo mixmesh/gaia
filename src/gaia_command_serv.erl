@@ -1,12 +1,15 @@
 -module(gaia_command_serv).
 -export([start_link/1, stop/0]).
 -export([groups_of_interest_updated/2, peer_up/1, peer_down/1]).
-%% Initiated from REST service
--export([conversation_accepted/1, conversation_rejected/2, call/1]).
-%% Initiated from REST client
--export([negotiation_succeeded/1, negotiation_failed/2]).
 -export([say/1, beep/1, format_items/1, serve_only_me/0, serve_all/0]).
 -export([message_handler/1]).
+%% Initiated from REST service
+-export([conversation_started/1, conversation_stopped/1,
+         conversation_rejected/2,
+         call/1]).
+%% Initiated from REST client
+-export([start_of_conversation_succeeded/1, start_of_conversation_failed/2,
+         stop_of_conversation_succeeded/1, stop_of_conversation_failed/2]).
 
 -include_lib("apptools/include/serv.hrl").
 -include_lib("apptools/include/shorthand.hrl").
@@ -68,13 +71,22 @@ peer_down(Peer) ->
     serv:cast(?MODULE, {peer_down, Peer}).
 
 %%
-%% Exported: conversation_accepted
+%% Exported: conversation_started
 %%
 
--spec conversation_accepted(#gaia_peer{}) -> ok.
+-spec conversation_started(#gaia_peer{}) -> ok.
 
-conversation_accepted(Peer) ->
-    serv:cast(?MODULE, {conversation_accepted, Peer}).
+conversation_started(Peer) ->
+    serv:cast(?MODULE, {conversation_started, Peer}).
+
+%%
+%% Exported: conversation_stopped
+%%
+
+-spec conversation_stopped(#gaia_peer{}) -> ok.
+
+conversation_stopped(Peer) ->
+    serv:cast(?MODULE, {conversation_stopped, Peer}).
 
 %%
 %% Exported: conversation_rejected
@@ -95,25 +107,45 @@ call(Peer) ->
     serv:cast(?MODULE, {call, Peer}).
 
 %%
-%% Exported: negotiation_succeeded
+%% Exported: start_of_conversation_succeeded
 %%
 
--spec negotiation_succeeded(gaia_serv:peer_name()) ->
+-spec start_of_conversation_succeeded(gaia_serv:peer_name()) ->
           ok.
 
-negotiation_succeeded(PeerName) ->
-    serv:cast(?MODULE, {negotiation_succeeded, PeerName}).
+start_of_conversation_succeeded(PeerName) ->
+    serv:cast(?MODULE, {start_of_conversation_succeeded, PeerName}).
 
 %%
-%% Exported: negotiation_failed
+%% Exported: start_of_conversation_failed
 %%
 
--spec negotiation_failed(gaia_serv:peer_name(),
-                         calling | busy | not_available | error) ->
+-spec start_of_conversation_failed(
+        gaia_serv:peer_name(), calling | busy | not_available | error) ->
           ok.
 
-negotiation_failed(PeerName, Reason) ->
-    serv:cast(?MODULE, {negotiation_failed, PeerName, Reason}).
+start_of_conversation_failed(PeerName, Reason) ->
+    serv:cast(?MODULE, {start_of_conversation_failed, PeerName, Reason}).
+
+%%
+%% Exported: stop_of_conversation_succeeded
+%%
+
+-spec stop_of_conversation_succeeded(gaia_serv:peer_name()) ->
+          ok.
+
+stop_of_conversation_succeeded(PeerName) ->
+    serv:cast(?MODULE, {stop_of_conversation_succeeded, PeerName}).
+
+%%
+%% Exported: stop_of_conversation_failed
+%%
+
+-spec stop_of_conversation_failed(gaia_serv:peer_name(), error) ->
+          ok.
+
+stop_of_conversation_failed(PeerName, Reason) ->
+    serv:cast(?MODULE, {stop_of_conversation_failed, PeerName, Reason}).
 
 %%
 %% Exported: say
@@ -247,7 +279,7 @@ message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
             Text = [<<"Hey! ">>, PeerName, <<" is no longer online">>],
             NewLocalCallback = say(LocalCallback, Text),
             {noreply, State#{local_callback => NewLocalCallback}};
-        {cast, {conversation_accepted,
+        {cast, {conversation_started,
                 #gaia_peer{name = PeerName,
                            conversation = Conversation}} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
@@ -267,6 +299,12 @@ message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
                 false ->
                     noreply
             end;
+        {cast, {conversation_stopped,
+                #gaia_peer{name = PeerName}} = Cast} ->
+            ?LOG_DEBUG(#{cast => Cast}),
+            Text = [<<"Hey! You no longer nor listen neither talk to ">>, PeerName],
+            NewLocalCallback = say(LocalCallback, Text),
+            {noreply, State#{local_callback => NewLocalCallback}};
         {cast, {conversation_rejected, #gaia_peer{name = PeerName},
                 busy} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
@@ -282,12 +320,12 @@ message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
                 trigger_callback(NewLocalCallback,
                                  {cd, [hi, call], #{name => PeerName}}),
             {noreply, State#{local_callback => UpdatedLocalCallback}};
-        {cast, {negotiation_succeeded, PeerName} = Cast} ->
+        {cast, {start_of_conversation_succeeded, PeerName} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
             Text = [<<"Hey! You are now in a call with ">>, PeerName],
             NewLocalCallback = say(LocalCallback, Text),
             {noreply, State#{local_callback => NewLocalCallback}};
-        {cast, {negotiation_failed, PeerName, Reason} = Cast} ->
+        {cast, {start_of_conversation_failed, PeerName, Reason} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
             case Reason of
                 calling ->
@@ -307,6 +345,16 @@ message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
                     NewLocalCallback = say(LocalCallback, Text),
                     {noreply, State#{local_callback => NewLocalCallback}}
             end;
+        {cast, {stop_of_conversation_succeeded, PeerName} = Cast} ->
+            ?LOG_DEBUG(#{cast => Cast}),
+            Text = [<<"Hey! You are no longer in a call with ">>, PeerName],
+            NewLocalCallback = say(LocalCallback, Text),
+            {noreply, State#{local_callback => NewLocalCallback}};
+        {cast, {stop_of_conversation_failed, PeerName, error} = Cast} ->
+            ?LOG_DEBUG(#{cast => Cast}),
+            Text = [<<"Hey! ">>, PeerName, <<" did not respond">>],
+            NewLocalCallback = say(LocalCallback, Text),
+            {noreply, State#{local_callback => NewLocalCallback}};
         {cast, serve_only_me = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
             %% FIXME: enable serve only!!!

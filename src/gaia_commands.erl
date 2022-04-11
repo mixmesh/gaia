@@ -91,8 +91,7 @@ all() ->
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
                  {error, already_started} ->
-                   Text = [<<"You are already in a call with ">>,
-                           PeerName],
+                   Text = [<<"You are already in a call with ">>, PeerName],
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()]
                end
@@ -194,7 +193,7 @@ all() ->
                     remove_timeout,
                     {last_say, Text}];
                  [] ->
-                   Text = [<<"Hey! Group ">>, Name,
+                   Text = [<<"Group ">>, Name,
                            <<" is not known. Please try again!">>],
                    ok = gaia_command_serv:say(Text),
                    [{cd, '..'}, {last_say, Text}]
@@ -209,9 +208,8 @@ all() ->
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
                  {error, already_started} ->
-                   Text =
-                     [<<"Hey! You are already an active member of group ">>,
-                      GroupName],
+                   Text = [<<"You are already an active member of group ">>,
+                           GroupName],
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()]
                end
@@ -240,7 +238,7 @@ all() ->
                     remove_timeout,
                     {last_say, Text}];
                  [] ->
-                   Text = [<<"Hey! Group ">>, Name,
+                   Text = [<<"Group ">>, Name,
                            <<" is not known. Please try again!">>],
                    ok = gaia_command_serv:say(Text),
                    [{cd, '..'}, {last_say, Text}]
@@ -258,7 +256,7 @@ all() ->
                    ?LOG_ERROR(#{unexpected_return_value => no_such_group}),
                    leave_command_mode();
                  {error, already_stopped} ->
-                   Text = [<<"Hey! You are not an active member of group ">>,
+                   Text = [<<"You are not an active member of group ">>,
                            GroupName],
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()]
@@ -297,7 +295,7 @@ all() ->
                  ?LOG_INFO(#{onsuccess => busy}),
                  case gaia_serv:busy() of
                    true ->
-                     Text = <<"Hey! You are already busy">>,
+                     Text = <<"You are already busy">>,
                      ok = gaia_command_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()];
                    false ->
@@ -317,7 +315,7 @@ all() ->
                  ?LOG_INFO(#{onsuccess => busy}),
                  case gaia_serv:busy() of
                    false ->
-                     Text = <<"Hey! You are not busy">>,
+                     Text = <<"You are not busy">>,
                      ok = gaia_command_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()];
                    true ->
@@ -339,19 +337,17 @@ all() ->
                  case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
                    [#gaia_peer{name = PeerName,
                                conversation = {true, #{write := false}}}] ->
-                     Text = [<<"Yes, you are muted for contact ">>, PeerName],
+                     Text = [<<"Yes, you are muted for ">>, PeerName],
                      ok = gaia_command_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()];
                    [#gaia_peer{name = PeerName,
                                conversation = {true, #{write := true}}}] ->
-                     Text = [<<"No, you are not muted for contact ">>,
-                             PeerName],
+                     Text = [<<"No, you are not muted for ">>, PeerName],
                      ok = gaia_command_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()];
                    [#gaia_peer{name = PeerName,
                                conversation = false}] ->
-                     Text =
-                       [<<"Hey! You are neither in a call nor in an active \
+                     Text = [<<"You are neither in a call nor in an active \
 group with ">>,
                         PeerName],
                      ok = gaia_command_serv:say(Text),
@@ -370,18 +366,16 @@ group with ">>,
                              end, true),
                          case MutedForAll of
                            true ->
-                             Text = <<"Yes, you are muted for all contacts">>,
+                             Text = <<"Yes, you are muted for all">>,
                              ok = gaia_command_serv:say(Text),
                              [{last_say, Text}|leave_command_mode()];
                            false ->
-                             Text =
-                               <<"No, you are not muted for all contacts">>,
+                             Text = <<"No, you are not muted for all">>,
                              ok = gaia_command_serv:say(Text),
                              [{last_say, Text}|leave_command_mode()]
                          end;
                        nomatch ->
-                         Text = [<<"Hey! Contact ">>, Name,
-                                 <<" is not known. Please try again!">>],
+                         Text = [Name, <<" is not known. Please try again!">>],
                          ok = gaia_command_serv:say(Text),
                          [{cd, '..'}, {last_say, Text}]
                      end
@@ -399,8 +393,8 @@ group with ">>,
                Name = maps:get(name, Dict),
                case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
                  [#gaia_peer{name = PeerName} = Peer] ->
-                   Text = [<<"Do you want to mute yourself for contact ">>,
-                           PeerName, <<"?">>],
+                   Text = [<<"Do you want to mute yourself for ">>, PeerName,
+                           <<"?">>],
                    ok = gaia_command_serv:say(Text),
                    [{dict, Dict#{peer => Peer}},
                     remove_timeout,
@@ -408,15 +402,13 @@ group with ">>,
                  [] ->
                    case gaia_fuzzy:match(?l2b(Name), [<<"all">>]) of
                      {ok, _} ->
-                       Text =
-                         [<<"Do you want to mute yourself for all contacts?">>],
+                       Text = [<<"Do you want to mute yourself for all?">>],
                        ok = gaia_command_serv:say(Text),
                        [{dict, Dict#{peer => all}},
                         remove_timeout,
                         {last_say, Text}];
                      nomatch ->
-                       Text = [<<"Hey! Contact ">>, Name,
-                               <<" is not known. Please try again!">>],
+                       Text = [Name, <<" is not known. Please try again!">>],
                        ok = gaia_command_serv:say(Text),
                        [{cd, '..'}, {last_say, Text}]
                    end
@@ -427,12 +419,11 @@ group with ">>,
                case gaia_serv:set_peer_conversation_status(
                       PeerId, #{write => false}) of
                  ok ->
-                   Text = [<<"You are now muted for contact ">>, PeerName],
+                   Text = [<<"You are now muted for ">>, PeerName],
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
                  {error, already_set} ->
-                   Text = [<<"Hey! You are already muted for contact ">>,
-                           PeerName],
+                   Text = [<<"You are already muted for ">>, PeerName],
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()]
                end;
@@ -452,7 +443,7 @@ group with ">>,
                      _ = gaia_serv:set_peer_conversation_status(
                            PeerId, #{write => false})
                  end, NonMutedPeerIds),
-               Text = [<<"You are now muted for all contacts">>],
+               Text = [<<"You are now muted for all">>],
                ok = gaia_command_serv:say(Text),
                [{last_say, Text}|leave_command_mode()]
            end,
@@ -473,8 +464,8 @@ group with ">>,
                Name = maps:get(name, Dict),
                case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
                  [#gaia_peer{name = PeerName} = Peer] ->
-                   Text = [<<"Do you want to unmute yourself for contact ">>,
-                           PeerName, <<"?">>],
+                   Text = [<<"Do you want to unmute yourself for ">>, PeerName,
+                           <<"?">>],
                    ok = gaia_command_serv:say(Text),
                    [{dict, Dict#{peer => Peer}},
                     remove_timeout,
@@ -482,15 +473,13 @@ group with ">>,
                  [] ->
                    case gaia_fuzzy:match(?l2b(Name), [<<"all">>]) of
                      {ok, _} ->
-                       Text =
-                         [<<"Do you want to unmute yourself for all contacts?">>],
+                       Text = [<<"Do you want to unmute yourself for all?">>],
                        ok = gaia_command_serv:say(Text),
                        [{dict, Dict#{peer => all}},
                         remove_timeout,
                         {last_say, Text}];
                      nomatch ->
-                       Text = [<<"Hey! Contact ">>, Name,
-                               <<" is not known. Please try again!">>],
+                       Text = [Name, <<" is not known. Please try again!">>],
                        ok = gaia_command_serv:say(Text),
                        [{cd, '..'}, {last_say, Text}]
                    end
@@ -501,11 +490,11 @@ group with ">>,
                case gaia_serv:set_peer_conversation_status(
                       PeerId, #{write => true}) of
                  ok ->
-                   Text = [<<"You are now unmuted for contact ">>, PeerName],
+                   Text = [<<"You are now unmuted for ">>, PeerName],
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
                  {error, already_set} ->
-                   Text = [<<"Hey! You are not muted for contact ">>, PeerName],
+                   Text = [<<"You are not muted for ">>, PeerName],
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()]
                end;
@@ -525,7 +514,7 @@ group with ">>,
                      _ = gaia_serv:set_peer_conversation_status(
                            PeerId, #{write => true})
                  end, MutedPeerIds),
-               Text = [<<"You are now unmuted for all contacts">>],
+               Text = [<<"You are now unmuted for all">>],
                ok = gaia_command_serv:say(Text),
                [{last_say, Text}|leave_command_mode()]
            end,
@@ -546,20 +535,19 @@ group with ">>,
                  case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
                    [#gaia_peer{name = PeerName,
                                conversation = {true, #{read := false}}}] ->
-                     Text = [<<"Yes, you are deaf to contact ">>, PeerName],
+                     Text = [<<"Yes, you are deaf to ">>, PeerName],
                      ok = gaia_command_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()];
                    [#gaia_peer{name = PeerName,
                                conversation = {true, #{read := true}}}] ->
-                     Text = [<<"No, you are not deaf to contact ">>, PeerName],
+                     Text = [<<"No, you are not deaf to ">>, PeerName],
                      ok = gaia_command_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()];
                    [#gaia_peer{name = PeerName,
                                conversation = false}] ->
-                     Text =
-                       [<<"Hey! You are neither in a call nor in an active \
+                     Text = [<<"You are neither in a call nor in an active \
 group with ">>,
-                        PeerName],
+                             PeerName],
                      ok = gaia_command_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()];
                    [] ->
@@ -576,17 +564,16 @@ group with ">>,
                              end, true),
                          case DeafToAll of
                            true ->
-                             Text = <<"Yes, you are deaf to all contacts">>,
+                             Text = <<"Yes, you are deaf to all">>,
                              ok = gaia_command_serv:say(Text),
                              [{last_say, Text}|leave_command_mode()];
                            false ->
-                             Text = <<"No, you are not deaf to all contacts">>,
+                             Text = <<"No, you are not deaf to all">>,
                              ok = gaia_command_serv:say(Text),
                              [{last_say, Text}|leave_command_mode()]
                          end;
                        nomatch ->
-                         Text = [<<"Hey! Contact ">>, Name,
-                                 <<" is not known. Please try again!">>],
+                         Text = [Name, <<" is not known. Please try again!">>],
                          ok = gaia_command_serv:say(Text),
                          [{cd, '..'}, {last_say, Text}]
                      end
@@ -604,8 +591,7 @@ group with ">>,
                Name = maps:get(name, Dict),
                case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
                  [#gaia_peer{name = PeerName} = Peer] ->
-                   Text = [<<"Do you want to be deaf to contact ">>, PeerName,
-                           <<"?">>],
+                   Text = [<<"Do you want to be deaf to ">>, PeerName, <<"?">>],
                    ok = gaia_command_serv:say(Text),
                    [{dict, Dict#{peer => Peer}},
                     remove_timeout,
@@ -613,14 +599,13 @@ group with ">>,
                  [] ->
                    case gaia_fuzzy:match(?l2b(Name), [<<"all">>]) of
                      {ok, _} ->
-                       Text = [<<"Do you want to be deaf to all contacts?">>],
+                       Text = [<<"Do you want to be deaf to all?">>],
                        ok = gaia_command_serv:say(Text),
                        [{dict, Dict#{peer => all}},
                         remove_timeout,
                         {last_say, Text}];
                      nomatch ->
-                       Text = [<<"Hey! Contact ">>, Name,
-                               <<" is not known. Please try again!">>],
+                       Text = [Name, <<" is not known. Please try again!">>],
                        ok = gaia_command_serv:say(Text),
                        [{cd, '..'}, {last_say, Text}]
                    end
@@ -631,12 +616,11 @@ group with ">>,
                case gaia_serv:set_peer_conversation_status(
                       PeerId, #{read => false}) of
                  ok ->
-                   Text = [<<"You are now deaf to contact ">>, PeerName],
+                   Text = [<<"You are now deaf to ">>, PeerName],
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
                  {error, already_set} ->
-                   Text = [<<"Hey! You are already deaf to contact ">>,
-                           PeerName],
+                   Text = [<<"You are already deaf to ">>, PeerName],
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()]
                end;
@@ -656,7 +640,7 @@ group with ">>,
                      _ = gaia_serv:set_peer_conversation_status(
                            PeerId, #{read => false})
                  end, NonMutedPeerIds),
-               Text = [<<"You are now deaf to all contacts">>],
+               Text = [<<"You are now deaf to all">>],
                ok = gaia_command_serv:say(Text),
                [{last_say, Text}|leave_command_mode()]
            end,
@@ -677,8 +661,8 @@ group with ">>,
                Name = maps:get(name, Dict),
                case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
                  [#gaia_peer{name = PeerName} = Peer] ->
-                   Text = [<<"Do you no longer want to be deaf to contact ">>,
-                           PeerName, <<"?">>],
+                   Text = [<<"Do you no longer want to be deaf to ">>, PeerName,
+                           <<"?">>],
                    ok = gaia_command_serv:say(Text),
                    [{dict, Dict#{peer => Peer}},
                     remove_timeout,
@@ -686,15 +670,13 @@ group with ">>,
                  [] ->
                    case gaia_fuzzy:match(?l2b(Name), [<<"all">>]) of
                      {ok, _} ->
-                       Text =
-                         [<<"Do you no longer want to be deaf to all contacts?">>],
+                       Text = [<<"Do you no longer want to be deaf to all?">>],
                        ok = gaia_command_serv:say(Text),
                        [{dict, Dict#{peer => all}},
                         remove_timeout,
                         {last_say, Text}];
                      nomatch ->
-                       Text = [<<"Hey! Contact ">>, Name,
-                               <<" is not known. Please try again!">>],
+                       Text = [Name, <<" is not known. Please try again!">>],
                        ok = gaia_command_serv:say(Text),
                        [{cd, '..'}, {last_say, Text}]
                    end
@@ -706,11 +688,11 @@ group with ">>,
                case gaia_serv:set_peer_conversation_status(
                       PeerId, #{read => true}) of
                  ok ->
-                   Text = [<<"You are no longer deaf to contact ">>, PeerName],
+                   Text = [<<"You are no longer deaf to ">>, PeerName],
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
                  {error, already_set} ->
-                   Text = [<<"Hey! You are not deaf to contact ">>, PeerName],
+                   Text = [<<"You are not deaf to ">>, PeerName],
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()]
                end;
@@ -729,7 +711,7 @@ group with ">>,
                      _ = gaia_serv:set_peer_conversation_status(
                            PeerId, #{read => true})
                  end, MutedPeerIds),
-               Text = [<<"You are no longer deaf to all contacts">>],
+               Text = [<<"You are no longer deaf to all">>],
                ok = gaia_command_serv:say(Text),
                [{last_say, Text}|leave_command_mode()]
            end,
@@ -749,19 +731,17 @@ group with ">>,
                  Name = maps:get(name, Dict),
                  case config:lookup([gaia, peers, {name, ?l2b(Name)}]) of
                    not_found ->
-                     Text = [<<"Hey! contact ">>, Name,
-                             <<" is not known. Please try again!">>],
+                     Text = [Name, <<" is not known. Please try again!">>],
                      ok = gaia_command_serv:say(Text),
                      [{cd, '..'}, {last_say, Text}];
                    ConfigPeer ->
                      case config:lookup_children([mode], ConfigPeer) of
                        [ignore] ->
-                         Text = [<<"Yes, contact ">>, Name, <<" is ignored">>],
+                         Text = [<<"Yes, ">>, Name, <<" is ignored">>],
                          ok = gaia_command_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()];
                        _ ->
-                         Text = [<<"No, contact ">>, Name,
-                                 <<" is not ignored">>],
+                         Text = [<<"No, ">>, Name, <<" is not ignored">>],
                          ok = gaia_command_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()]
                      end
@@ -778,14 +758,13 @@ group with ">>,
                  Name = ?l2b(maps:get(name, Dict)),
                  case config:lookup([gaia, peers, {name, Name}]) of
                    not_found ->
-                     Text = [<<"Hey! Contact ">>, Name,
-                             <<" is not known. Please try again!">>],
+                     Text = [Name, <<" is not known. Please try again!">>],
                      ok = gaia_command_serv:say(Text),
                      [{cd, '..'}, {last_say, Text}];
                    ConfigPeer ->
                      case config:lookup_children([mode], ConfigPeer) of
                        [ignore] ->
-                         Text = [<<"Hey! You already ignore contact ">>, Name],
+                         Text = [<<"You already ignore ">>, Name],
                          ok = gaia_command_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()];
                        _ ->
@@ -794,7 +773,7 @@ group with ">>,
                                   [{peers,
                                     [[{name, Name},
                                       {mode, <<"ignore">>}]]}]}]),
-                         Text = [<<"You now ignore contact ">>, Name],
+                         Text = [<<"You now ignore ">>, Name],
                          ok = gaia_command_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()]
                      end
@@ -811,8 +790,7 @@ group with ">>,
                  Name = ?l2b(maps:get(name, Dict)),
                  case config:lookup([gaia, peers, {name, Name}]) of
                    not_found ->
-                     Text = [<<"Hey! Contact ">>, Name,
-                             <<" is not known. Please try again!">>],
+                     Text = [Name, <<" is not known. Please try again!">>],
                      ok = gaia_command_serv:say(Text),
                      [{cd, '..'}, {last_say, Text}];
                    ConfigPeer ->
@@ -823,11 +801,11 @@ group with ">>,
                                   [{peers,
                                     [[{name, Name},
                                       {mode, <<"call">>}]]}]}]),
-                         Text = [<<"You no longer ignore contact ">>, Name],
+                         Text = [<<"You no longer ignore ">>, Name],
                          ok = gaia_command_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()];
                        _ ->
-                         Text = [<<"You do not ignore contact ">>, Name],
+                         Text = [<<"You do not ignore ">>, Name],
                          ok = gaia_command_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()]
                      end
@@ -844,21 +822,18 @@ group with ">>,
                  Name = maps:get(name, Dict),
                  case config:lookup([gaia, peers, {name, ?l2b(Name)}]) of
                    not_found ->
-                     Text = [<<"Hey! Contact ">>, Name,
-                             <<" is not known. Please try again!">>],
+                     Text = [Name, <<" is not known. Please try again!">>],
                      ok = gaia_command_serv:say(Text),
                      [{cd, '..'}, {last_say, Text}];
                    ConfigPeer ->
                      case config:lookup_children([mode], ConfigPeer) of
                        [direct] ->
-                         Text = [<<"Yes, contact ">>, Name,
-                                 <<" has direct access">>],
+                         Text = [<<"Yes, ">>, Name, <<" has direct access">>],
                          ok = gaia_command_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()];
                        _ ->
                          Text =
-                           [<<"No, contact ">>, Name,
-                            <<" has not direct access">>],
+                           [<<"No, ">>, Name, <<" has not direct access">>],
                          ok = gaia_command_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()]
                      end
@@ -875,16 +850,14 @@ group with ">>,
                  Name = ?l2b(maps:get(name, Dict)),
                  case config:lookup([gaia, peers, {name, Name}]) of
                    not_found ->
-                     Text = [<<"Hey! Contact ">>, Name,
-                             <<" is not known. Please try again!">>],
+                     Text = [Name, <<" is not known. Please try again!">>],
                      ok = gaia_command_serv:say(Text),
                      [{cd, '..'}, {last_say, Text}];
                    ConfigPeer ->
                      case config:lookup_children([mode], ConfigPeer) of
                        [direct] ->
-                         Text =
-                           [<<"Hey! You already give direct access to contact ">>,
-                            Name],
+                         Text = [<<"You already give direct access to ">>,
+                                 Name],
                          ok = gaia_command_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()];
                        _ ->
@@ -893,8 +866,7 @@ group with ">>,
                                   [{peers,
                                     [[{name, Name},
                                       {mode, <<"direct">>}]]}]}]),
-                         Text = [<<"You gave direct access to contact ">>,
-                                 Name],
+                         Text = [<<"You gave direct access to ">>, Name],
                          ok = gaia_command_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()]
                      end
@@ -911,8 +883,7 @@ group with ">>,
                  Name = ?l2b(maps:get(name, Dict)),
                  case config:lookup([gaia, peers, {name, Name}]) of
                    not_found ->
-                     Text = [<<"Hey! Contact ">>, Name,
-                             <<" is not known. Please try again!">>],
+                     Text = [Name, <<" is not known. Please try again!">>],
                      ok = gaia_command_serv:say(Text),
                      [{cd, '..'}, {last_say, Text}];
                    ConfigPeer ->
@@ -923,15 +894,13 @@ group with ">>,
                                   [{peers,
                                     [[{name, Name},
                                       {mode, <<"call">>}]]}]}]),
-                         Text =
-                           [<<"You no longer give direct access to contact ">>,
-                            Name],
+                         Text = [<<"You no longer give direct access to ">>,
+                                 Name],
                          ok = gaia_command_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()];
                        _ ->
-                         Text =
-                           [<<"Hey! You do not give direct access to contact ">>,
-                            Name],
+                         Text = [<<"You do not give direct access to ">>,
+                                 Name],
                          ok = gaia_command_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()]
                      end
@@ -948,21 +917,18 @@ group with ">>,
                  Name = maps:get(name, Dict),
                  case config:lookup([gaia, peers, {name, ?l2b(Name)}]) of
                    not_found ->
-                     Text = [<<"Hey! Contact ">>, Name,
-                             <<" is not known. Please try again!">>],
+                     Text = [Name, <<" is not known. Please try again!">>],
                      ok = gaia_command_serv:say(Text),
                      [{cd, '..'}, {last_say, Text}];
                    ConfigPeer ->
                      case config:lookup_children([mode], ConfigPeer) of
                        [direct] ->
-                         Text = [<<"Yes, contact ">>, Name,
-                                 <<" has high priority">>],
+                         Text = [<<"Yes, ">>, Name, <<" has high priority">>],
                          ok = gaia_command_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()];
                        _ ->
-                         Text =
-                           [<<"No, contact ">>, Name,
-                            <<" does not have high priority">>],
+                         Text = [<<"No, ">>, Name,
+                                 <<" does not have high priority">>],
                          ok = gaia_command_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()]
                      end
@@ -979,15 +945,14 @@ group with ">>,
                  Name = ?l2b(maps:get(name, Dict)),
                  case config:lookup([gaia, peers, {name, Name}]) of
                    not_found ->
-                     Text = [<<"Hey! Contact ">>, Name,
-                             <<" is not known. Please try again!">>],
+                     Text = [Name, <<" is not known. Please try again!">>],
                      ok = gaia_command_serv:say(Text),
                      [{cd, '..'}, {last_say, Text}];
                    ConfigPeer ->
                      [Options] = config:lookup_children([options], ConfigPeer),
                      case lists:member(override_busy, Options) of
                        true ->
-                         Text = [<<"Hey! You already give contact ">>, Name,
+                         Text = [<<"You already give ">>, Name,
                                  <<" high priority">>],
                          ok = gaia_command_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()];
@@ -999,8 +964,7 @@ group with ">>,
                                       {options, [<<"override_busy">>|
                                                  [?a2b(Option) ||
                                                    Option <- Options]]}]]}]}]),
-                         Text = [<<"You gave contact ">>, Name,
-                                 <<" high priority">>],
+                         Text = [<<"You gave ">>, Name, <<" high priority">>],
                          ok = gaia_command_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()]
                      end
@@ -1017,8 +981,7 @@ group with ">>,
                  Name = ?l2b(maps:get(name, Dict)),
                  case config:lookup([gaia, peers, {name, Name}]) of
                    not_found ->
-                     Text = [<<"Hey! Contact ">>, Name,
-                             <<" is not known. Please try again!">>],
+                     Text = [Name, <<" is not known. Please try again!">>],
                      ok = gaia_command_serv:say(Text),
                      [{cd, '..'}, {last_say, Text}];
                    ConfigPeer ->
@@ -1032,14 +995,13 @@ group with ">>,
                                       {options,
                                        lists:delete(override_busy,
                                                     Options)}]]}]}]),
-                         Text = [<<"You no longer give contact ">>, Name,
+                         Text = [<<"You no longer give ">>, Name,
                                  <<" high priority">>],
                          ok = gaia_command_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()];
                        true ->
-                         Text =
-                           [<<"Hey! You do not give contact ">>, Name,
-                            <<" high priority">>],
+                         Text = [<<"You do not give ">>, Name,
+                                 <<" high priority">>],
                          ok = gaia_command_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()]
                      end
@@ -1064,16 +1026,15 @@ group with ">>,
                      end, []),
                  case OnlinePeerNames of
                    [] ->
-                     Text = <<"No contacts are online">>,
+                     Text = <<"No one is online">>,
                      ok = gaia_command_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()];
                    [PeerName] ->
-                     Text = [<<"Contact ">>, PeerName, <<" is online">>],
+                     Text = [PeerName, <<" is online">>],
                      ok = gaia_command_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()];
                    _ ->
-                     Text = [<<"The contacts ">>,
-                             gaia_command_serv:format_items(OnlinePeerNames),
+                     Text = [gaia_command_serv:format_items(OnlinePeerNames),
                              <<" are online">>],
                      ok = gaia_command_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()]

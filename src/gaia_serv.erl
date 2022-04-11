@@ -7,7 +7,8 @@
          start_group_conversation/1, stop_group_conversation/1,
          lookup/1, fold/2,
          generate_artificial_id/1,
-         handle_start_of_conversation/2]).
+         handle_start_of_conversation/2,
+         handle_stop_of_conversation/1]).
 -export([message_handler/1]).
 -export_type([name/0, peer_name/0, group_name/0,
               id/0, peer_id/0, group_id/0,
@@ -184,6 +185,16 @@ generate_artificial_id(PeerName) ->
 
 handle_start_of_conversation(PeerId, RemotePort) ->
     serv:call(?MODULE, {handle_start_of_conversation, PeerId, RemotePort}).
+
+%%
+%% Exported: handle_stop_of_conversation
+%%
+
+-spec handle_stop_of_conversation(peer_id()) ->
+          ok | {error, no_such_call | no_such_peer}.
+
+handle_stop_of_conversation(PeerId) ->
+    serv:call(?MODULE, {handle_stop_of_conversation, PeerId}).
 
 %%
 %% Server
@@ -366,7 +377,7 @@ message_handler(#{parent := Parent,
             ?LOG_DEBUG(#{call => Call}),
             case db_lookup_peer_by_id(Db, PeerId) of
                 [#gaia_peer{name = PeerName} = Peer] ->
-                    case accept_peer(Busy, Peer) of
+                    case begin_conversation(Busy, Peer) of
                         {no, call} ->
                             ok = gaia_command_serv:call(Peer),
                             {reply, From, {error, call}};
@@ -397,13 +408,28 @@ message_handler(#{parent := Parent,
                                     ?LOG_DEBUG(#{local_port_created =>
                                                      {MyPeerName, PeerName},
                                                  local_port => LocalPort}),
-                                    ok = gaia_command_serv:conversation_accepted(Peer),
+                                    ok = gaia_command_serv:conversation_started(Peer),
                                     {reply, From, {ok, LocalPort}}
                             end
                     end;
                 [] ->
                     ?LOG_DEBUG(#{handle_start_of_conversation => no_such_peer}),
                     {reply, From, {error, not_available}}
+            end;
+        {call, From, {handle_stop_of_conversation, PeerId} = Call} ->
+            ?LOG_DEBUG(#{call => Call}),
+            case db_lookup_peer_by_id(Db, PeerId) of
+                [Peer] ->
+                    case end_conversation(Peer) of
+                        no ->
+                            {reply, From, {error, no_such_call}};
+                        yes ->
+                            ok = update_network(MyPeerId, Db, Busy, false, []),
+                            {reply, From, ok}
+                    end;
+                [] ->
+                    ?LOG_DEBUG(#{handle_start_of_conversation => no_such_peer}),
+                    {reply, From, {error, no_such_peer}}
             end;
         config_updated = Message ->
             ?LOG_DEBUG(#{message => Message}),
@@ -488,12 +514,12 @@ update_network(MyPeerId, Db, Busy, StartOfConversations, StoppedPeerIds) ->
         true ->
             ok
     end,
-    %% case StoppedPeerIds of
-    %%     [] ->
-    %%         ok;
-    %%     _ ->
-    %%         ok = stop_of_conversations(StoppedPeerIds)
-    %% end,
+    case StoppedPeerIds of
+        [] ->
+            ok;
+        _ ->
+            ok = stop_of_conversations(MyPeerId, Db, StoppedPeerIds)
+    end,
     update_network_sender(Db, Conversations).
 
 find_conversations(_Db, _Busy = true) ->
@@ -565,25 +591,45 @@ start_of_conversations(MyPeerId, Db, [{peer, PeerId}|Rest]) ->
     case gaia_rest_client:start_of_conversation(
            MyPeerId, {IpAddress, RestPort}, LocalPort) of
         {ok, NewRemotePort} ->
-            ok = gaia_command_serv:negotiation_succeeded(PeerName),
+            ok = gaia_command_serv:start_of_conversation_succeeded(PeerName),
             true = db_insert(Db, Peer#gaia_peer{remote_port = NewRemotePort}),
             start_of_conversations(MyPeerId, Db, Rest);
         calling ->
-            ok = gaia_command_serv:negotiation_failed(PeerName, calling),
+            ok = gaia_command_serv:start_of_conversation_failed(PeerName, calling),
             start_of_conversations(MyPeerId, Db, Rest);
         busy ->
-            ok = gaia_command_serv:negotiation_failed(PeerName, busy),
+            ok = gaia_command_serv:start_of_conversation_failed(PeerName, busy),
             start_of_conversations(MyPeerId, Db, Rest);
         not_available ->
-            ok = gaia_command_serv:negotiation_failed(PeerName, not_available),
+            ok = gaia_command_serv:start_of_conversation_failed(PeerName, not_available),
             start_of_conversations(MyPeerId, Db, Rest);
         {error, Reason} ->
-            ?LOG_ERROR(#{{rest_service_client, start_peer_negotiation} =>
+            ?LOG_ERROR(#{{rest_service_client, start_of_conversation} =>
                              Reason}),
-            ok = gaia_command_serv:negotiation_failed(PeerName, error),
+            ok = gaia_command_serv:start_of_conversation_failed(PeerName, error),
             UpdatedPeer = Peer#gaia_peer{conversation = false},
             true = db_insert(Db, UpdatedPeer),
             start_of_conversations(MyPeerId, Db, Rest)
+    end.
+
+stop_of_conversations(_MyPeerId, _Db, []) ->
+    ok;
+stop_of_conversations(MyPeerId, Db, [PeerId|Rest]) ->
+    [#gaia_peer{name = PeerName,
+                nodis_address = {IpAddress, _SyncPort},
+                rest_port = RestPort}] =
+        db_lookup_peer_by_id(Db, PeerId),
+    ?LOG_DEBUG(#{'STOP_OF_CONVERSATIONS' => {name, PeerName}}),
+    case gaia_rest_client:stop_of_conversation(
+           MyPeerId, {IpAddress, RestPort}) of
+        ok ->
+            ok = gaia_command_serv:stop_of_conversation_succeeded(PeerName),
+            stop_of_conversations(MyPeerId, Db, Rest);
+        {error, Reason} ->
+            ?LOG_ERROR(#{{rest_service_client, stop_of_conversation} =>
+                             Reason}),
+            ok = gaia_command_serv:stop_of_conversation_failed(PeerName, error),
+            stop_of_conversations(MyPeerId, Db, Rest)
     end.
 
 update_network_sender(Db, Conversations) ->
@@ -645,17 +691,17 @@ update_network_sender(Db, Conversations) ->
       lists:usort(ConversationAddresses)).
 
 %%
-%% Peer negotiation
+%% Start of peer conversations
 %%
 
-accept_peer(_Busy,
+begin_conversation(_Busy,
             #gaia_peer{conversation = {true, _ConversationStatus}} = Peer) ->
     {yes, Peer};
-accept_peer(_Busy, #gaia_peer{mode = ignore}) ->
+begin_conversation(_Busy, #gaia_peer{mode = ignore}) ->
     {no, ignore};
-accept_peer(_Busy, #gaia_peer{nodis_address = undefined}) ->
+begin_conversation(_Busy, #gaia_peer{nodis_address = undefined}) ->
     {no, no_nodis_address};
-accept_peer(_Busy = true, #gaia_peer{mode = call,
+begin_conversation(_Busy = true, #gaia_peer{mode = call,
                                      options = Options,
                                      conversation = false}) ->
     case lists:member(override_busy, Options) of
@@ -664,7 +710,7 @@ accept_peer(_Busy = true, #gaia_peer{mode = call,
         false ->
             {no, busy}
     end;
-accept_peer(_Busy = true, #gaia_peer{
+begin_conversation(_Busy = true, #gaia_peer{
                              mode = direct,
                              options = Options,
                              conversation = false} = Peer) ->
@@ -673,20 +719,31 @@ accept_peer(_Busy = true, #gaia_peer{
             UpdatedPeer =
                 Peer#gaia_peer{conversation =
                                    {true, #{read => true, write => true}}},
-            ok = gaia_command_serv:conversation_accepted(UpdatedPeer),
+            ok = gaia_command_serv:conversation_started(UpdatedPeer),
             {yes, UpdatedPeer};
         false ->
             {no, busy}
     end;
-accept_peer(_Busy = false, #gaia_peer{mode = call}) ->
+begin_conversation(_Busy = false, #gaia_peer{mode = call}) ->
     {no, call};
-accept_peer(_Busy = false, #gaia_peer{mode = direct} = Peer) ->
+begin_conversation(_Busy = false, #gaia_peer{mode = direct} = Peer) ->
     UpdatedPeer = Peer#gaia_peer{conversation =
                                      {true, #{read => true, write => true}}},
-    ok = gaia_command_serv:conversation_accepted(UpdatedPeer),
+    ok = gaia_command_serv:conversation_started(UpdatedPeer),
     {yes, UpdatedPeer};
-accept_peer(_Busy, _Peer) ->
+begin_conversation(_Busy, _Peer) ->
     {no, skip}.
+
+%%
+%% Stop of peer conversations
+%%
+
+end_conversation(#gaia_peer{conversation = {true, _ConversationStatus}} = Peer) ->
+    UpdatedPeer = Peer#gaia_peer{conversation = false},
+    ok = gaia_command_serv:conversation_stopped(UpdatedPeer),
+    yes;
+end_conversation(_Peer) ->
+    no.
 
 %%
 %% Nodis handling

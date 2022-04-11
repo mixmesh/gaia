@@ -1,5 +1,5 @@
 -module(gaia_rest_client).
--export([start_of_conversation/3, get_group/4]).
+-export([start_of_conversation/3, stop_of_conversation/2, get_group/4]).
 
 -include_lib("kernel/include/logger.hrl").
 -include_lib("apptools/include/shorthand.hrl").
@@ -41,6 +41,30 @@ start_of_conversation(MyPeerId, Address, LocalPort) ->
             busy;
         {ok, {{_Version, 403, _ReasonPhrase}, _Headers, <<"Not Available">>}} ->
             not_available;
+        {ok, {{_Version, 400, _ReasonPhrase}, _Headers, Reason}} ->
+            {error, {bad_request, Reason}};
+        {ok, Response} ->
+            {error, {invalid_response, Response}};
+        {error, Reason} ->
+            {error, {http_error, Reason}}
+    end.
+
+%%
+%% Exported: stop_of_conversation
+%%
+
+-spec stop_of_conversation(gaia_serv:peer_id(),
+                           {inet:ip_address(), inet:port_number()}) ->
+          ok |
+          {error,
+           {bad_request, Reason :: binary()} |
+           {invalid_response, Response :: term()} |
+           {http_error, Reason :: term()}}.
+
+stop_of_conversation(MyPeerId, Address) ->
+    case request(MyPeerId, Address, "stop-of-conversation", no_request_body, post) of
+        {ok, {{_Version, 204, _ReasonPhrase}, _Headers, _ResponseBody}} ->
+            ok;
         {ok, {{_Version, 400, _ReasonPhrase}, _Headers, Reason}} ->
             {error, {bad_request, Reason}};
         {ok, Response} ->

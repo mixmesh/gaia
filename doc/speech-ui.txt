@@ -42,7 +42,7 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 * "Give high priority to X"
 * "Do not give high priority to X"
 
-* "Which contacts are online?"
+* "Which [contacts] are online?"
 
 2 Commands
 
@@ -120,12 +120,12 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
       <- "You are now an active member of group X"
         [Leaves command mode]
         NOTE: See "Incoming asynchronous messages" below
-      <- "Hey! You are already an active member of group X"
+      <- "You are already an active member of group X"
         [Leaves command mode]
     -> "No" or "Nah"
        <- "OK"
          [Leaves command mode]
-  <- "Hey! Group X is not known. Please try again!"
+  <- "Group X is not known. Please try again!"
      [Stays in command mode]
 
 2.3.3 Leave [group] X
@@ -136,12 +136,12 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
       <- "You are no longer an active member active of group X"
         [Leaves command mode]
         NOTE: See "Incoming asynchronous messages" below
-      <- "Hey! You are not an active member of group X"
+      <- "You are not an active member of group X"
         [Leaves command mode]
     -> "No" or "Nah"
        <- "OK"
          [Leaves command mode]
-  <- "Hey! Group X is not known. Please try again!"
+  <- "Group X is not known. Please try again!"
      [Stays in command mode]
 
 2.4 Busy management
@@ -156,39 +156,39 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 
 -> "I'm busy"
   <- "You are now busy"
-  <- "Hey! You are already busy"
+  <- "You are already busy"
 
 2.4.3 I'm not busy
 
 -> "I'm not busy"
   <- "You are no longer busy"
-  <- "Hey! You are not busy"
+  <- "You are not busy"
 
 2.5 Mute management
 
 2.5.1 "Am I muted for [contact] X?"
 
 -> "Am I muted for [contact] X?
-  <- "Yes, you are muted for contact X"
-  <- "No, you are not muted for contact X"
-  <- "Hey! You are neither in a call nor in an active group with X"
-  <- "Hey! Contact X is not known. Please try again!"
+  <- "Yes, you are muted for X"
+  <- "No, you are not muted for X"
+  <- "You are neither in a call nor in an active group with X"
+  <- "X is not known. Please try again!"
 
 NOTE: X might be "all"
 
 2.5.2 Mute me for [contact] X
 
 -> "Mute me for [contact] X"
-  <- "Do you want to mute yourself for contact X?"
+  <- "Do you want to mute yourself for X?"
     -> "Yes" or "Yeah"
-      <- "You are now muted for contact X"
+      <- "You are now muted for X"
         [Leaves command mode]
-      <- "Hey! You are already muted for contact X"
+      <- "You are already muted for X"
         [Leaves command mode]
     -> "No" or "Nah"
       <- "OK"
         [Leaves command mode]
-  <- "Hey! Contact X is not known. Please try again!"
+  <- "X is not known. Please try again!"
      [Stays in command mode]
 
 NOTE: X might be "all"
@@ -196,16 +196,16 @@ NOTE: X might be "all"
 2.5.3 Unmute me for [contact] X
 
 -> "Unmute me for [contact] X"
-  <- "Do you want to unmute yourself for contact X?"
+  <- "Do you want to unmute yourself for X?"
     -> "Yes" or "Yeah"
-      <- "You are now unmuted for contact X"
+      <- "You are now unmuted for X"
         [Leaves command mode]
-      <- "Hey! You are not muted for contact X"
+      <- "You are not muted for X"
         [Leaves command mode]
     -> "No" or "Nah"
       <- "OK"
         [Leaves command mode]
-  <- "Hey! X is not known. Please try again!"
+  <- "X is not known. Please try again!"
      [Stays in command mode]
 
 NOTE: X might be "all"
@@ -214,25 +214,25 @@ NOTE: X might be "all"
 
 2.6.1 "Am I deaf to [contact] X?"
 
--> "Am I deaf to contact X?
-  <- "Yes, you are deaf to contact X"
-  <- "No, you are not deaf to contact X"
-  <- "Hey! You are neither in a call nor in an active group with X"
-  <- "Hey! X is not known. Please try again!"
+-> "Am I deaf to [contact] X?
+  <- "Yes, you are deaf to X"
+  <- "No, you are not deaf to X"
+  <- "You are neither in a call nor in an active group with X"
+  <- "X is not known. Please try again!"
 
 2.6.2 "Deafen me to [contact] X"
 
 -> "Deafen me to [contact] X"
-  <- "Do you want to be deaf to contact X?"
+  <- "Do you want to be deaf to X?"
     -> "Yes" or "Yeah"
-      <- "You are now deaf to contact X"
+      <- "You are now deaf to X"
         [Leaves command mode]
-      <- "Hey! You are already deaf to contact X"
+      <- "You are already deaf to X"
         [Leaves command mode]
     -> "No" or "Nah"
       <- "OK"
         [Leaves command mode]
-  <- "Hey! X is not known. Please try again!"
+  <- "X is not known. Please try again!"
      [Stays in command mode]
 
 NOTE: X might be "all"
@@ -240,97 +240,97 @@ NOTE: X might be "all"
 2.6.3 Undeafen me to [contact] X
 
 -> "Undeafen me to [contact] X"
-  <- "Do you no longer be deaf to contact X?"
+  <- "Do you no longer be deaf to X?"
     -> "Yes" or "Yeah"
-      <- "You are no longer deaf to contact X"
+      <- "You are no longer deaf to X"
         [Leaves command mode]
-      <- "Hey! You are not deaf to contact X"
+      <- "You are not deaf to X"
         [Leaves command mode]
     -> "No" or "Nah"
       <- "OK"
         [Leaves command mode]
-  <- "Hey! Contact X is not known. Please try again!"
+  <- "X is not known. Please try again!"
      [Stays in command mode]
 
 NOTE: X might be "all"
 
 2.7 Ignore management
 
-2.7.1 Is X ignored?
+2.7.1 Am I ignoring [contact] X?
 
 -> "Am I ignoring [contact] X?"
-  <- "Yes, contact X is ignored"
-  <- "No, contact X is not ignored"
-  <- "Hey! contact X is not known. Please try again!"
+  <- "Yes, X is ignored"
+  <- "No, X is not ignored"
+  <- "X is not known. Please try again!"
 
 2.7.2 Ignore [contact] X
 
 -> "Ignore [contact] X"
-  <- "You now ignore contact X"
-  <- "Hey! You already ignore contact X"
-  <- "Hey! contact X is not known. Please try again!"
+  <- "You now ignore X"
+  <- "You already ignore X"
+  <- "X is not known. Please try again!"
 
 2.7.3 Do not ignore [contact] X
 
 -> "Do not not ignore [contact] X"
-  <- "You no longer ignore contact X"
-  <- "You do not ignore contact X"
-  <- "Hey! Contact X is not known. Please try again!"
+  <- "You no longer ignore X"
+  <- "You do not ignore X"
+  <- "X is not known. Please try again!"
 
 2.8 Direct management
 
 2.8.1 Has [contact] X direct access?
 
 -> "Has [contact] X direct access?"
-  <- "Yes, conytact X has direct access"
-  <- "No, contact X has not direct access"
-  <- "Hey! Contact X is not known. Please try again!"
+  <- "Yes, X has direct access"
+  <- "No, X has not direct access"
+  <- "X is not known. Please try again!"
 
 2.8.2 Give direct access to [contact] X
 
 -> "Give direct access to [contact] X"
-  <- "You gave direct access to contact X"
-  <- "Hey! You already give direct access to contact X"
-  <- "Hey! Contact X is not known. Please try again!"
+  <- "You gave direct access to X"
+  <- "You already give direct access to X"
+  <- "X is not known. Please try again!"
 
 2.8.3 Do not give direct access to [contact] X
 
 -> "Do not give direct access to [contact] X"
-  <- "You no longer give direct access to contact X"
-  <- "Hey! You do not give direct access to contact X"
-  <- "Hey! Contact X is not known. Please try again!"
+  <- "You no longer give direct access to X"
+  <- "You do not give direct access to X"
+  <- "X is not known. Please try again!"
 
 2.9 Priority management
 
 2.9.1 Has [contact] X high priority?
 
 -> "Has [contact] X high priority?"
-  <- "Yes, contact X has high priority"
-  <- "No, contact X does not have high priority"
-  <- "Hey! Contact X is not known. Please try again!"
+  <- "Yes, X has high priority"
+  <- "No, X does not have high priority"
+  <- "X is not known. Please try again!"
 
 2.9.2 Give [contact] X high priority
 
 -> "Give [contact] X high priority"
-  <- "You gave contact X high priority"
-  <- "Hey! You already give contact X high priority"
-  <- "Hey! Contact X is not known. Please try again!"
+  <- "You gave X high priority"
+  <- "You already give X high priority"
+  <- "X is not known. Please try again!"
 
 2.9.3 Do not give [contact] X high priority
 
 -> "Do not give [contact] X high priority"
-  <- "You no longer give contact X high priority"
-  <- "Hey! You do not give contact X high priority"
-  <- "Hey! Contact X is not known. Please try again!"
+  <- "You no longer give X high priority"
+  <- "You do not give X high priority"
+  <- "X is not known. Please try again!"
 
 2.10 Contacts
 
 2.10.1 Which [contacts] are online?
 
 -> "Which [contacts] are online?"
-  <- "No contacts are online"
-  <- "Contact X is online"
-  <- "The contacts X, Y and Z are online"
+  <- "No one is online"
+  <- "X is online"
+  <- "X, Y and Z are online"
 
 3. Incoming asynchronous messages:
 
@@ -343,7 +343,9 @@ NOTE: X might be "all"
 * "Hey! You now only listen to X"
 * "Hey! You now only talk to X"
 * "Hey! You are now in a call with X"
+* "Hey! You are no longer in a call with X"
 * "Hey! You are now pinging X"
+* "Hey! You no longer nor listen neither talk to X"
 * "Hey! X is busy"
 * "Hey! X is not available"
 * "Hey! X did not respond"
