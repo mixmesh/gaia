@@ -87,26 +87,20 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
   <- "X is not known. Please try again!"
      [Stays in command mode]
 
-
-
-
-
-
-
 2.2.3 Hang-up [contact] X
 
 -> "Hang-up [contact] X"
-  <- "Do you want hang-up [contact] X?"
+  <- "Do you want hang-up X?"
     -> "Yes" or "Yeah"
-      <- "You are no longer in a call with contact X"
+      <- "You are no longer in a call with X"
         [Leaves command mode]
         NOTE: See "Incoming asynchronous messages" below
-      <- "Hey! You are not in a call with contact X"
+      <- "You are not in a call with X"
         [Leaves command mode]
     -> "No" or "Nah"
        <- "OK"
          [Leaves command mode]
-  <- "Hey! Contact X is not known. Please try again!"
+  <- "X is not known. Please try again!"
      [Stays in command mode]
 
 2.3 Multi-party group management

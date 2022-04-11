@@ -114,15 +114,13 @@ all() ->
                Name = maps:get(name, Dict),
                case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
                  [#gaia_peer{name = PeerName} = Peer] ->
-                   Text = [<<"Do you want to hang-up contact ">>, PeerName,
-                           <<"?">>],
+                   Text = [<<"Do you want to hang-up ">>, PeerName, <<"?">>],
                    ok = gaia_command_serv:say(Text),
                    [{dict, Dict#{peer => Peer}},
                     remove_timeout,
                     {last_say, Text}];
                  [] ->
-                   Text = [<<"Hey! Contact ">>, Name,
-                           <<" is not known. Please try again!">>],
+                   Text = [Name, <<" is not known. Please try again!">>],
                    ok = gaia_command_serv:say(Text),
                    [{cd, '..'}, {last_say, Text}]
                end
@@ -131,16 +129,14 @@ all() ->
                ?LOG_INFO(#{onsuccess => yes}),
                case gaia_serv:stop_peer_conversation(PeerId) of
                  ok ->
-                   Text = [<<"You are no longer in a call with contact ">>,
-                           PeerName],
+                   Text = [<<"You are no longer in a call with ">>, PeerName],
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
                  {error, no_such_peer} ->
                    ?LOG_ERROR(#{unexpected_return_value => no_such_peer}),
                    leave_command_mode();
                  {error, already_stopped} ->
-                   Text = [<<"Hey! You are not in a call with contact ">>,
-                           PeerName],
+                   Text = [<<"You are not in a call with ">>, PeerName],
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()]
                end
