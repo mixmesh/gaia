@@ -128,7 +128,7 @@ all() ->
                ?LOG_INFO(#{onsuccess => yes}),
                case gaia_serv:stop_peer_conversation(PeerId) of
                  ok ->
-                   Text = [<<"You are no longer in a call with ">>, PeerName],
+                   Text = [<<"You are ending the call with ">>, PeerName],
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
                  {error, no_such_peer} ->

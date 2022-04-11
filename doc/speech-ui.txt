@@ -92,7 +92,7 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 -> "Hang-up [contact] X"
   <- "Do you want hang-up X?"
     -> "Yes" or "Yeah"
-      <- "You are no longer in a call with X"
+      <- "You are now ending the call with X"
         [Leaves command mode]
         NOTE: See "Incoming asynchronous messages" below
       <- "You are not in a call with X"
