@@ -68,6 +68,9 @@ handle_http_get(Socket, Request, _Body, _Options) ->
                         {error, bad_request, "Invalid Group ID"}
                 end,
             rest_util:response(Socket, Request, Response);
+	["stop-of-conversation"] ->
+            Response = stop_of_conversation_get(Request),
+            rest_util:response(Socket, Request, Response);
         Tokens ->
 	    ?LOG_ERROR(#{unknown_get_path => Tokens}),
 	    rest_util:response(Socket, Request, {error, not_found})
@@ -128,6 +131,21 @@ encode_members(PeerId, Members) ->
             {error, not_member}
     end.
 
+stop_of_conversation_get(
+  #http_request{headers = #http_chdr{other = Headers}}) ->
+    case get_gaia_headers(Headers) of
+        {PeerId, _Nonce, _HMAC} when PeerId /= not_set ->
+            case gaia_serv:handle_stop_of_conversation(PeerId) of
+                ok ->
+                    ok_204;
+                {error, Reason} ->
+                    ?LOG_INFO(#{stop_of_conversation_rejected => Reason}),
+                    ok_204
+            end;
+        _ ->
+            {error, {bad_request, "Bad GAIA HTTP headers"}}
+    end.
+
 %%
 %% POST
 %%
@@ -148,9 +166,6 @@ handle_http_post(Socket, Request, Body, _Options) ->
                         ?LOG_ERROR(#{invalid_request_body => Body}),
                         {error, bad_request, "Invalid request body"}
                 end,
-            rest_util:response(Socket, Request, Response);
-	["stop-of-conversation"] ->
-            Response = stop_of_conversation_post(Request),
             rest_util:response(Socket, Request, Response);
 	Tokens ->
 	    ?LOG_ERROR(#{unknown_post_path => Tokens}),
@@ -200,18 +215,3 @@ get_gaia_headers([{"Gaia-Peer-Id", PeerId}|Rest], {_, Nonce, HMAC}) ->
     end;
 get_gaia_headers([_|Rest], Acc) ->
     get_gaia_headers(Rest, Acc).
-
-stop_of_conversation_post(
-  #http_request{headers = #http_chdr{other = Headers}}) ->
-    case get_gaia_headers(Headers) of
-        {PeerId, _Nonce, _HMAC} when PeerId /= not_set ->
-            case gaia_serv:handle_stop_of_conversation(PeerId) of
-                ok ->
-                    ok_204;
-                {error, Reason} ->
-                    ?LOG_INFO(#{stop_of_conversation_rejected => Reason}),
-                    ok_204
-            end;
-        _ ->
-            {error, {bad_request, "Bad GAIA HTTP headers"}}
-    end.

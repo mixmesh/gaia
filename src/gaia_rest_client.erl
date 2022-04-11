@@ -24,7 +24,8 @@
 
 start_of_conversation(MyPeerId, Address, LocalPort) ->
     RequestBody = encode_json(#{<<"port">> => LocalPort}),
-    case request(MyPeerId, Address, "start-of-conversation", RequestBody, post) of
+    case request(MyPeerId, Address, "start-of-conversation", RequestBody,
+                 post) of
         {ok, {{_Version, 200, _ReasonPhrase}, _Headers, ResponseBody}} ->
             try jsone:decode(ResponseBody) of
                 #{<<"port">> := Port} when is_integer(Port) ->
@@ -62,7 +63,8 @@ start_of_conversation(MyPeerId, Address, LocalPort) ->
            {http_error, Reason :: term()}}.
 
 stop_of_conversation(MyPeerId, Address) ->
-    case request(MyPeerId, Address, "stop-of-conversation", no_request_body, post) of
+    case request(MyPeerId, Address, "stop-of-conversation", no_request_body,
+                 get) of
         {ok, {{_Version, 204, _ReasonPhrase}, _Headers, _ResponseBody}} ->
             ok;
         {ok, {{_Version, 400, _ReasonPhrase}, _Headers, Reason}} ->
