@@ -520,7 +520,7 @@ update_network(MyPeerId, Db, Busy, StartOfConversations, StoppedPeerIds) ->
         _ ->
             ok = stop_of_conversations(MyPeerId, Db, StoppedPeerIds)
     end,
-    update_network_sender(Db, Conversations).
+    update_network_sender(MyPeerId, Db, Conversations).
 
 find_conversations(_Db, _Busy = true) ->
     [];
@@ -632,7 +632,7 @@ stop_of_conversations(MyPeerId, Db, [PeerId|Rest]) ->
             stop_of_conversations(MyPeerId, Db, Rest)
     end.
 
-update_network_sender(Db, Conversations) ->
+update_network_sender(MyPeerId, Db, Conversations) ->
     ConversationAddresses =
         lists:foldl(
           fun({peer, PeerId}, Acc) ->
@@ -675,7 +675,10 @@ update_network_sender(Db, Conversations) ->
                             end, [], Db) ++ Acc;
                       [#gaia_group{members = Members}] ->
                           lists:foldl(
-                            fun(PeerId, MemberAddresses) ->
+                            fun(PeerId, _MemberAddresses)
+                                  when PeerId == MyPeerId ->
+                                    Acc;
+                               (PeerId, MemberAddresses) ->
                                     [#gaia_peer{
                                         nodis_address =
                                             {IpAddress, _SyncPort}}] =
