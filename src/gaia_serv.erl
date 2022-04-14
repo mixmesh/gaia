@@ -679,11 +679,17 @@ update_network_sender(MyPeerId, Db, Conversations) ->
                                   when PeerId == MyPeerId ->
                                     Acc;
                                (PeerId, MemberAddresses) ->
-                                    [#gaia_peer{
-                                        nodis_address =
-                                            {IpAddress, _SyncPort}}] =
-                                        db_lookup_peer_by_id(Db, PeerId),
-                                    [{IpAddress, GroupPort}|MemberAddresses]
+                                    case db_lookup_peer_by_id(Db, PeerId) of
+                                        [#gaia_peer{
+                                            nodis_address =
+                                                {IpAddress, _SyncPort}}] ->
+                                            [{IpAddress, GroupPort}|
+                                             MemberAddresses];
+                                        [_Peer] ->
+                                            Acc;
+                                        [] ->
+                                            Acc
+                                    end
                             end, [], Members) ++ Acc
                   end;
              ({group, _GroupId, MulticastIpAddress, GroupPort}, Acc) ->
@@ -987,13 +993,21 @@ sync_with_config(Db, _DeleteEphemeralPeers = false) ->
                   [GroupOfInterest|Acc]
           end, [], config:lookup([gaia, 'groups-of-interest'])),
     %% Extract all peer and group names
-    AllNames =
+    PeerAndGroupNames =
         db_fold(
           fun(#gaia_peer{name = PeerName}, Acc) ->
                   [PeerName|Acc];
-             ( #gaia_group{name = GroupName}, Acc) ->
+             (#gaia_group{name = GroupName}, Acc) ->
                   [GroupName|Acc]
           end, [], Db),
+    GroupOfInterestNames =
+        lists:map(
+          fun(ConfigGroupOfInterest) ->
+                  [Name] = config:lookup_children([name],
+                                                  ConfigGroupOfInterest),
+                  Name
+          end, config:lookup([gaia, 'groups-of-interest'])),
+    AllNames = PeerAndGroupNames ++ GroupOfInterestNames,
     {ok, GroupsOfInterest, AllNames}.
 
 generate_id_if_needed(0, Name) ->
