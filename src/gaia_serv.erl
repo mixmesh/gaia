@@ -686,8 +686,12 @@ update_network_sender(MyPeerId, Db, Conversations) ->
                                             [{IpAddress, GroupPort}|
                                              MemberAddresses];
                                         [_Peer] ->
+                                            ?LOG_INFO(#{not_a_member1 =>
+                                                            PeerId}),
                                             Acc;
                                         [] ->
+                                            ?LOG_INFO(#{not_a_member2 =>
+                                                            PeerId}),
                                             Acc
                                     end
                             end, [], Members) ++ Acc
