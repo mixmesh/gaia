@@ -687,7 +687,7 @@ update_network_sender(MyPeerId, Db, Conversations) ->
                                              MemberAddresses];
                                         [_Peer] ->
                                             ?LOG_INFO(#{not_a_member1 =>
-                                                            PeerId}),
+                                                            {PeerId, _Peer}}),
                                             Acc;
                                         [] ->
                                             ?LOG_INFO(#{not_a_member2 =>
