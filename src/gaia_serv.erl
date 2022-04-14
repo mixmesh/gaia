@@ -675,9 +675,9 @@ update_network_sender(MyPeerId, Db, Conversations) ->
                             end, [], Db) ++ Acc;
                       [#gaia_group{members = Members}] ->
                           lists:foldl(
-                            fun(PeerId, _MemberAddresses)
+                            fun(PeerId, MemberAddresses)
                                   when PeerId == MyPeerId ->
-                                    Acc;
+                                    MemberAddresses;
                                (PeerId, MemberAddresses) ->
                                     case db_lookup_peer_by_id(Db, PeerId) of
                                         [#gaia_peer{
@@ -690,11 +690,11 @@ update_network_sender(MyPeerId, Db, Conversations) ->
                                         [_Peer] ->
                                             ?LOG_INFO(#{not_a_member1 =>
                                                             {PeerId, _Peer}}),
-                                            Acc;
+                                            MemberAddresses;
                                         [] ->
                                             ?LOG_INFO(#{not_a_member2 =>
                                                             PeerId}),
-                                            Acc
+                                            MemberAddresses
                                     end
                             end, [], Members) ++ Acc
                   end;
