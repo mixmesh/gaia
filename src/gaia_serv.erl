@@ -682,7 +682,9 @@ update_network_sender(MyPeerId, Db, Conversations) ->
                                     case db_lookup_peer_by_id(Db, PeerId) of
                                         [#gaia_peer{
                                             nodis_address =
-                                                {IpAddress, _SyncPort}}] ->
+                                                {IpAddress, _SyncPort}} = _Peer] ->
+                                            ?LOG_INFO(#{is_a_member =>
+                                                            {PeerId, _Peer}}),
                                             [{IpAddress, GroupPort}|
                                              MemberAddresses];
                                         [_Peer] ->
