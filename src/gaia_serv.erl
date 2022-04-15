@@ -553,15 +553,16 @@ find_conversations(Db, _Busy = false) ->
 
 update_network_receiver(Db, Conversations) ->
     %% Update network receiver
-    LocalPorts =
-        gaia_nif:update_conversations(
-          lists:map(
-            fun({group, GroupId, MulticastIpAddress, GroupPort})
-                  when MulticastIpAddress /= undefined ->
-                    {group, GroupId, inet:ntoa(MulticastIpAddress), GroupPort};
-               (Conversation) ->
-                    Conversation
-            end, Conversations)),
+    NifConversations =
+        lists:map(
+          fun({group, GroupId, MulticastIpAddress, GroupPort})
+                when MulticastIpAddress /= undefined ->
+                  {group, GroupId, inet:ntoa(MulticastIpAddress), GroupPort};
+             (Conversation) ->
+                  Conversation
+          end, Conversations),
+    ?LOG_INFO(#{{gaia_nif, update_conversations} => NifConversations}),
+    LocalPorts = gaia_nif:update_conversations(NifConversations),
     ?LOG_DEBUG(#{local_ports => LocalPorts}),
     %% Update peer with new local port
     lists:foreach(
@@ -701,7 +702,8 @@ update_network_sender(MyPeerId, Db, Conversations) ->
              ({group, _GroupId, MulticastIpAddress, GroupPort}, Acc) ->
                   [{MulticastIpAddress, GroupPort}|Acc]
           end, [], Conversations),
-    ?LOG_INFO(#{conversation_addresses => ConversationAddresses}),
+    ?LOG_INFO(#{{gaia_network_sender_serv, set_conversation_addresses} =>
+                    ConversationAddresses}),
     gaia_network_sender_serv:set_conversation_addresses(
       lists:usort(ConversationAddresses)).
 
