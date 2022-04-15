@@ -254,7 +254,6 @@ static ERL_NIF_TERM _update_conversations(ErlNifEnv* env, int argc,
         }
         conversation_table_foreach(conversation_table,
                                    mark_conversation_as_unused);
-
         // Generate [{{peer | group, gaia_serv:id()}, LocalPort :: integer()}]
         ERL_NIF_TERM item, items = argv[0];
         ERL_NIF_TERM return_value = enif_make_list(env, 0);
@@ -279,7 +278,7 @@ static ERL_NIF_TERM _update_conversations(ErlNifEnv* env, int argc,
                     unsigned int local_port;
                     if (arity == 2) { // peer
                         local_port = 0;
-                    } else { // group
+                    } else if (arity == 4) { // group
                         if (tuple[2] != ATOM(undefined)) {
                             if (!enif_get_uint(env, tuple[2], &ip_address)) {
                                 conversation_table_release_mutex(
@@ -292,6 +291,8 @@ static ERL_NIF_TERM _update_conversations(ErlNifEnv* env, int argc,
                                 conversation_table);
                             return enif_make_badarg(env);
                         }
+                    } else {
+                        return enif_make_badarg(env);
                     }
                     // Create and bind new UDP socket
                     int sockfd;
