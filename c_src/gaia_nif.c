@@ -305,7 +305,7 @@ static ERL_NIF_TERM _update_conversations(ErlNifEnv* env, int argc,
                     memset(&addr, 0, sizeof(addr));
                     addr.sin_family = AF_INET;
                     addr.sin_addr.s_addr = ip_address;
-                    addr.sin_port = local_port;
+                    addr.sin_port = htons(local_port);
                     if (bind(sockfd, (struct sockaddr *)&addr,
                              sizeof(addr)) < 0) {
                         perror("bind: Binding of socket failed");

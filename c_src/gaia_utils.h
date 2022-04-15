@@ -14,7 +14,7 @@
 #ifdef INFO
 #define INFOF(f, ...) fprintf(stderr, f "\r\n", ##__VA_ARGS__)
 #else
-#define INFOF(f, ...) fprintf(stderr, f "\r\n", ##__VA_ARGS__)
+#define INFOF(f, ...)
 #endif
 
 #define ERRORF(f, ...) fprintf(stderr, f "\r\n", ##__VA_ARGS__)
