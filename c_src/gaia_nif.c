@@ -338,7 +338,6 @@ static ERL_NIF_TERM _update_conversations(ErlNifEnv* env, int argc,
                                            new_conversation);
                     INFOF("Set conversation: %d (%d)", new_conversation->id,
                           new_conversation->port);
-
                     // Add local port to return value list
                     ERL_NIF_TERM id_tuple;
                     if (arity == 2) {
@@ -368,9 +367,7 @@ static ERL_NIF_TERM _update_conversations(ErlNifEnv* env, int argc,
         }
         conversation_table_foreach(conversation_table,
                                    delete_unused_conversation);
-
         conversation_table_release_mutex(conversation_table);
-
         return return_value;
     } else {
         conversation_table_release_mutex(conversation_table);
