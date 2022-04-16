@@ -1,6 +1,11 @@
-* Look into FIXME:s
+* Clean out mixmesh/etc and create/update all conf files
+* Test, test and test
 
 == STOP! THINK!
+
+* Look into FIXME:s
+* Svenska
+* Install on all golden boxes
 
 * Adaptive jitter buffer
   * Look at the 94 paper and work with pitch scaling
