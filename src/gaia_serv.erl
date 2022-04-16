@@ -869,7 +869,9 @@ down_peer(Db, NodisAddress) ->
         [Peer] ->
             true = db_insert(Db, Peer#gaia_peer{
                                    nodis_address = undefined,
-                                   rest_port = undefined}),
+                                   rest_port = undefined,
+                                   local_port = undefined,
+                                   remote_port = undefined}),
             gaia_command_serv:peer_down(Peer);
         [] ->
             {error, no_such_nodis_address}
@@ -922,7 +924,6 @@ sync_with_config(Db, OnNew) ->
                                                      nodis_address = undefined,
                                                      local_port = undefined,
                                                      remote_port = undefined,
-                                                     session_key = undefined,
                                                      options = Options};
                                   true ->
                                       Peer#gaia_peer{mode = Mode,
