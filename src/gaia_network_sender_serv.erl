@@ -82,7 +82,8 @@ message_handler(#{parent := Parent,
             {stop, From, ok};
         {cast, {set_conversation_addresses, NewConversationAddresses} = Call} ->
             ?LOG_DEBUG(#{call => Call}),
-            case {ConversationAddresses, lists:sort(NewConversationAddresses)} of
+            case {ConversationAddresses,
+                  lists:sort(NewConversationAddresses)} of
                 {_, ConversationAddresses} ->
                     noreply;
                 {_, []} ->

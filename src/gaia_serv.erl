@@ -150,7 +150,8 @@ stop_group_conversation(GroupIdOrName) ->
 %% Exported: lookup
 %%
 
--spec lookup(id() | {name | fuzzy_name, name()}) -> [#gaia_peer{}|#gaia_group{}].
+-spec lookup(id() | {name | fuzzy_name, name()}) ->
+          [#gaia_peer{}|#gaia_group{}].
 
 lookup(IdOrName) ->
     serv:call(?MODULE, {lookup, IdOrName}).
@@ -393,7 +394,8 @@ message_handler(#{parent := Parent,
                                              no_nodis_address}),
                             {reply, From, {error, not_available}};
                         {no, ignore} ->
-                            ?LOG_DEBUG(#{handle_start_of_conversation => ignore}),
+                            ?LOG_DEBUG(#{handle_start_of_conversation =>
+                                             ignore}),
                             {reply, From, {error, not_available}};
                         {yes, UpdatedPeer} ->
                             true = db_insert(Db, UpdatedPeer#gaia_peer{
@@ -408,7 +410,9 @@ message_handler(#{parent := Parent,
                                     ?LOG_DEBUG(#{local_port_created =>
                                                      {MyPeerName, PeerName},
                                                  local_port => LocalPort}),
-                                    ok = gaia_command_serv:conversation_started(Peer),
+                                    ok =
+                                        gaia_command_serv:conversation_started(
+                                          Peer),
                                     {reply, From, {ok, LocalPort}}
                             end
                     end;
@@ -502,7 +506,8 @@ message_handler(#{parent := Parent,
 %%
 
 update_network(MyPeerId, Db, Busy) ->
-    update_network(MyPeerId, Db, Busy, _StartOfConversations = true, _StoppedPeerIds = []).
+    update_network(MyPeerId, Db, Busy, _StartOfConversations = true,
+                   _StoppedPeerIds = []).
 
 update_network(MyPeerId, Db, Busy, StartOfConversations, StoppedPeerIds) ->
     Conversations = find_conversations(Db, Busy),
@@ -596,18 +601,21 @@ start_of_conversations(MyPeerId, Db, [{peer, PeerId}|Rest]) ->
             true = db_insert(Db, Peer#gaia_peer{remote_port = NewRemotePort}),
             start_of_conversations(MyPeerId, Db, Rest);
         calling ->
-            ok = gaia_command_serv:start_of_conversation_failed(PeerName, calling),
+            ok = gaia_command_serv:start_of_conversation_failed(
+                   PeerName, calling),
             start_of_conversations(MyPeerId, Db, Rest);
         busy ->
             ok = gaia_command_serv:start_of_conversation_failed(PeerName, busy),
             start_of_conversations(MyPeerId, Db, Rest);
         not_available ->
-            ok = gaia_command_serv:start_of_conversation_failed(PeerName, not_available),
+            ok = gaia_command_serv:start_of_conversation_failed(
+                   PeerName, not_available),
             start_of_conversations(MyPeerId, Db, Rest);
         {error, Reason} ->
             ?LOG_ERROR(#{{rest_service_client, start_of_conversation} =>
                              Reason}),
-            ok = gaia_command_serv:start_of_conversation_failed(PeerName, error),
+            ok = gaia_command_serv:start_of_conversation_failed(
+                   PeerName, error),
             UpdatedPeer = Peer#gaia_peer{conversation = false},
             true = db_insert(Db, UpdatedPeer),
             start_of_conversations(MyPeerId, Db, Rest)
@@ -683,18 +691,12 @@ update_network_sender(MyPeerId, Db, Conversations) ->
                                     case db_lookup_peer_by_id(Db, PeerId) of
                                         [#gaia_peer{
                                             nodis_address =
-                                                {IpAddress, _SyncPort}} = _Peer] ->
-                                            ?LOG_INFO(#{is_a_member =>
-                                                            {PeerId, _Peer}}),
+                                                {IpAddress, _SyncPort}}] ->
                                             [{IpAddress, GroupPort}|
                                              MemberAddresses];
-                                        [_Peer] ->
-                                            ?LOG_INFO(#{not_a_member1 =>
-                                                            {PeerId, _Peer}}),
+                                        [_] ->
                                             MemberAddresses;
                                         [] ->
-                                            ?LOG_INFO(#{not_a_member2 =>
-                                                            PeerId}),
                                             MemberAddresses
                                     end
                             end, [], Members) ++ Acc
@@ -755,7 +757,8 @@ begin_conversation(_Busy, _Peer) ->
 %% Stop of peer conversations
 %%
 
-end_conversation(#gaia_peer{conversation = {true, _ConversationStatus}} = Peer) ->
+end_conversation(
+  #gaia_peer{conversation = {true, _ConversationStatus}} = Peer) ->
     UpdatedPeer = Peer#gaia_peer{conversation = false},
     ok = gaia_command_serv:conversation_stopped(UpdatedPeer),
     yes;
@@ -823,7 +826,8 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                             rest_port = RestPort} = Peer]
                   when NodisAddress /= NewNodisAddress andalso
                        RestPort /= NewRestPort ->
-                    ?LOG_DEBUG(#{'CHANGE_PEER' => new_nodis_address_or_rest_port}),
+                    ?LOG_DEBUG(#{'CHANGE_PEER' =>
+                                     new_nodis_address_or_rest_port}),
                     UpdatedPeer =
                         Peer#gaia_peer{nodis_address = NewNodisAddress,
                                        remote_port = undefined,
@@ -833,7 +837,8 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                     gaia_command_serv:groups_of_interest_updated(
                       PeerName, GroupNamesOfInterest);
                 [#gaia_peer{name = PeerName}] ->
-                    ?LOG_DEBUG(#{'CHANGE_PEER' => same_nodis_address_or_rest_port}),
+                    ?LOG_DEBUG(#{'CHANGE_PEER' =>
+                                     same_nodis_address_or_rest_port}),
                     gaia_command_serv:groups_of_interest_updated(
                       PeerName, GroupNamesOfInterest);
                 [_] ->
