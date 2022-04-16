@@ -3,6 +3,7 @@
 
 == STOP! THINK!
 
+* Build vosk ourselves
 * alsa_wav.erl blocks BEAM
 * Look into FIXME:s
 * Svenska
