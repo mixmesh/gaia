@@ -1,18 +1,4 @@
-* announce public groups
-* gaia_command_serv:incoming_call/1 -> more than not_available (calling?)
-  * same when a group is announced
-                     
-* use gaia.rest_port ... in nodis_info
-
-* write gaia_command_serv.erl
-
-  * start talking to peer or wildcard peer (ask or direct)
-  * stop talking to peer or wildcard peer
-  * toggle status, i.e. busy or available.
-  * toggle between modes, direct, ask and ignore
-  * mute mic
-  * start talking to group (ask or direct)
-  * stop talking to group
+* Look into FIXME:s
 
 == STOP! THINK!
 
