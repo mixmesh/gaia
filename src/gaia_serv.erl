@@ -898,10 +898,13 @@ sync_db({Tab, DetsTab} = Db) ->
     ?LOG_DEBUG(#{db_synced_with_config => ets:tab2list(Tab)}),
     {ok, GroupsOfInterest, AllNames}.
 
-sync_with_config(Db, _DeleteEphemeralPeers = true) ->
-    db_delete_ephemeral_peers(Db),
-    sync_with_config(Db, false);
-sync_with_config(Db, _DeleteEphemeralPeers = false) ->
+sync_with_config(Db, OnNew) ->
+    if
+        OnNew ->
+            db_delete_ephemeral_peers(Db);
+        true ->
+            keep_ephemeral_peers
+    end,
     %% Update existing peers and groups
     {NewConfigPeers, NewConfigGroups} =
         db_fold(
@@ -913,8 +916,18 @@ sync_with_config(Db, _DeleteEphemeralPeers = false) ->
                               config:lookup_children([mode, options],
                                                      ConfigPeer),
                           UpdatedPeer =
-                              Peer#gaia_peer{mode = Mode,
-                                             options = Options},
+                              if
+                                  OnNew ->
+                                      Peer#gaia_peer{mode = Mode,
+                                                     nodis_address = undefined,
+                                                     local_port = undefined,
+                                                     remote_port = undefined,
+                                                     session_key = undefined,
+                                                     options = Options};
+                                  true ->
+                                      Peer#gaia_peer{mode = Mode,
+                                                     options = Options}
+                              end,
                           true = db_insert(Db, UpdatedPeer),
                           {RemainingConfigPeers, ConfigGroups};
                       false ->
