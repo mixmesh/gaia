@@ -3,6 +3,7 @@
 
 == STOP! THINK!
 
+* alsa_wav.erl blocks BEAM
 * Look into FIXME:s
 * Svenska
 * Install on all golden boxes
