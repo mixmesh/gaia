@@ -223,14 +223,12 @@ init(Parent, GaiaDir, PeerId, PeerName, RestPort, PlaybackPcmName) ->
 
 initial_message_handler(#{peer_id := PeerId,
                           rest_port := RestPort,
-                          busy := Busy,
                           db := Db} = State) ->
     receive
         {neighbour_workers, _NeighbourWorkers} ->
             NodeInfo = prepare_node_info(PeerId, RestPort, Db),
             ?LOG_DEBUG(#{node_info => NodeInfo}),
             ok = nodis:set_node_info(NodeInfo),
-            ok = update_network(PeerId, Db, Busy),
             {swap_message_handler, fun ?MODULE:message_handler/1, State}
     end.
 
