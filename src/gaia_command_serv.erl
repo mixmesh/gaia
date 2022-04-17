@@ -264,7 +264,7 @@ message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
                     NewLocalCallback = say(LocalCallback, Text),
                     {noreply, State#{local_callback => NewLocalCallback}};
                 GroupNames ->
-                    Text = [<<"Hey! ">>, PeerName, <<" updated: ">>,
+                    Text = [<<"Hey! ">>, PeerName, <<" updated the groups ">>,
                             format_items(GroupNames)],
                     NewLocalCallback = say(LocalCallback, Text),
                     {noreply, State#{local_callback => NewLocalCallback}}

@@ -72,7 +72,7 @@ You can *always* say "What?" to repeat the last thing said by Gaia.
 -> "Call [contact] X"
   <- "Do you want to call X?"
     -> "Yes" or "Yeah"
-      <- "You are now calling X..."
+      <- "You are now connecing to X"
         [Leaves command mode]
         NOTE: See "Incoming asynchronous messages" below
       <- "X is not online"
