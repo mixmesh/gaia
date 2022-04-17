@@ -209,15 +209,13 @@ init(Parent, GaiaDir, PeerId, PeerName, RestPort, PlaybackPcmName) ->
     ?LOG_DEBUG(#{groups_of_interest => GroupsOfInterest}),
     ok = config_serv:subscribe(),
     {ok, NodisSubscription} = nodis_serv:subscribe(),
-    Busy = false,
-    ok = update_network(PeerId, Db, Busy),
     self() ! purge_groups_of_interest,
     ?LOG_INFO("Gaia server has been started"),
     {ok, #{parent => Parent,
            peer_id => PeerId,
            peer_name => PeerName,
            rest_port => RestPort,
-           busy => Busy,
+           busy => false,
            db => Db,
            groups_of_interest => GroupsOfInterest,
            all_names => AllNames,
@@ -225,12 +223,14 @@ init(Parent, GaiaDir, PeerId, PeerName, RestPort, PlaybackPcmName) ->
 
 initial_message_handler(#{peer_id := PeerId,
                           rest_port := RestPort,
+                          busy := Busy,
                           db := Db} = State) ->
     receive
         {neighbour_workers, _NeighbourWorkers} ->
             NodeInfo = prepare_node_info(PeerId, RestPort, Db),
             ?LOG_DEBUG(#{node_info => NodeInfo}),
             ok = nodis:set_node_info(NodeInfo),
+            ok = update_network(PeerId, Db, Busy),
             {swap_message_handler, fun ?MODULE:message_handler/1, State}
     end.
 
@@ -264,6 +264,7 @@ message_handler(#{parent := Parent,
                     {reply, From, {error, already_started}};
                 [Peer] ->
                     UpdatedPeer =
+
                         Peer#gaia_peer{conversation =
                                            {true, ConversationStatus}},
                     true = db_insert(Db, UpdatedPeer),
