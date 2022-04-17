@@ -79,7 +79,7 @@ all() ->
                case gaia_serv:start_peer_conversation(
                       PeerId, #{read => true, write => true}) of
                  ok ->
-                   Text = [<<"You are now calling ">>, PeerName],
+                   Text = [<<"You are now connecting to ">>, PeerName],
                    ok = gaia_command_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
                  {error, not_online} ->
