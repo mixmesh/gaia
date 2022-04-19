@@ -800,7 +800,7 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                NewRestPort >= 1024 andalso
                NewRestPort =< 65535 andalso
                is_list(PublicGroupIds) ->
-            %% Sync groups of interests
+            %% Sync groups of interest
             GroupNamesOfInterest =
                 lists:foldl(
                   fun(#group_of_interest{id = GroupId, admin = Admin}, Acc)
@@ -808,22 +808,23 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                           case gaia_rest_client:get_group(
                                  MyPeerId, Admin, {IpAddress, NewRestPort},
                                  GroupId) of
-                              {ok, #gaia_group{name = GroupName} = Group} ->
+                              {ok, #gaia_group{name = GroupName} = NewGroup} ->
 				  case db_lookup_group_by_id(Db, GroupId) of
-				      [Group] ->
-					  ?LOG_INFO(#{group_of_interest_unchanged => Group}),
-					  Acc;
-				      [#gaia_group{
-                                          conversation = Conversation} = AnotherGroup] ->
-					  ?LOG_INFO(#{insert_another_group => {Group, AnotherGroup}}),
-                                          UpdatedGroup =
-                                              Group#gaia_group{
-                                                conversation = Conversation},
-					  true = db_insert(Db, UpdatedGroup),
-					  [GroupName|Acc];
+                                      [Group] ->
+                                          case is_group_updated(
+                                                 NewGroup, Group) of
+                                              no ->
+                                                  ?LOG_INFO(#{group_of_interest_unchanged => NewGroup}),
+                                                  Acc;
+                                              yes ->
+                                                  ?LOG_INFO(#{group_of_interest_changed => NewGroup}),
+                                                  true = db_insert(
+                                                           Db, NewGroup),
+                                                  [GroupName|Acc]
+                                          end;
 				      [] ->
-					  ?LOG_INFO(#{insert_from_empty_group => Group}),
-					  true = db_insert(Db, Group),
+					  ?LOG_INFO(#{insert_from_empty_group => NewGroup}),
+					  true = db_insert(Db, NewGroup),
 					  [GroupName|Acc]
 				  end;
                               {error, Reason} ->
@@ -880,6 +881,16 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
             {error, {bad_gaia_info, GaiaInfo}};
         false ->
             {error, no_gaia_info}
+    end.
+
+is_group_updated(Group, Group) ->
+    no;
+is_group_updated(NewGroup, #gaia_group{conversation = Conversation} = Group) ->
+    case NewGroup#gaia_group{conversation = Conversation} of
+        Group ->
+            no;
+        _ ->
+            yes
     end.
 
 down_peer(Db, NodisAddress) ->
