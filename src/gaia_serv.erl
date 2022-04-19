@@ -968,7 +968,7 @@ sync_with_config(Db, OnNew) ->
                                 port = GroupPort,
                                 type = Type,
                                 members = Members,
-                                admin = Admin},
+                                admin = get_admin_id(Db, Admin)},
                           true = db_insert(Db, UpdatedGroup),
                           {ConfigPeers, RemainingConfigGroups};
                       false ->
