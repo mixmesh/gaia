@@ -809,9 +809,19 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                                  MyPeerId, Admin, {IpAddress, NewRestPort},
                                  GroupId) of
                               {ok, #gaia_group{name = GroupName} = Group} ->
-                                  ?LOG_INFO(#{insert_group => Group}),
-                                  true = db_insert(Db, Group),
-                                  [GroupName|Acc];
+				  case db_lookup_group_by_id(Db, GroupId) of
+				      [Group] ->
+					  ?LOG_INFO(#{group_of_interest_unchanged => Group}),
+					  Acc;
+				      [AnotherGroup] ->
+					  ?LOG_INFO(#{insert_another_group => {Group, AnotherGroup}}),
+					  true = db_insert(Db, Group),
+					  [GroupName|Acc];
+				      [] ->
+					  ?LOG_INFO(#{insert_from_empty_group => Group}),
+					  true = db_insert(Db, Group),
+					  [GroupName|Acc]
+				  end;
                               {error, Reason} ->
                                   ?LOG_ERROR(#{{gaia_rest_client,
                                                 get_group} => Reason}),
@@ -820,6 +830,12 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                      (_, Acc) ->
                           Acc
                   end, [], GroupsOfInterest),
+
+
+	    ?LOG_ERROR(#{babajajjajajajajajjaj => {GroupsOfInterest,
+						   GroupNamesOfInterest}}),
+
+
             %% Update peer if needed or create ephemeral peer
             case db_lookup_peer_by_id(Db, NewPeerId) of
                 [#gaia_peer{name = PeerName,
@@ -835,13 +851,13 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                                        rest_port = NewRestPort},
                     true = db_insert(Db, UpdatedPeer),
                     ok = gaia_command_serv:peer_up(UpdatedPeer),
-                    gaia_command_serv:groups_of_interest_updated(
-                      PeerName, GroupNamesOfInterest);
+		    gaia_command_serv:groups_of_interest_updated(
+		      PeerName, GroupNamesOfInterest);
                 [#gaia_peer{name = PeerName}] ->
                     ?LOG_DEBUG(#{'CHANGE_PEER' =>
                                      same_nodis_address_or_rest_port}),
-                    gaia_command_serv:groups_of_interest_updated(
-                      PeerName, GroupNamesOfInterest);
+		    gaia_command_serv:groups_of_interest_updated(
+		      PeerName, GroupNamesOfInterest);
                 [_] ->
                     ?LOG_DEBUG(#{'CHANGE_PEER' => ignoring_peer}),
                     ok;
@@ -936,7 +952,8 @@ sync_with_config(Db, OnNew) ->
                           true = db_delete(Db, PeerId),
                           {ConfigPeers, ConfigGroups}
                   end;
-             (#gaia_group{id = GroupId} = Group, {ConfigPeers, ConfigGroups}) ->
+             (#gaia_group{id = GroupId, name = GroupName} = Group,
+	      {ConfigPeers, ConfigGroups}) ->
                   case lists:keytake(id, 1, ConfigGroups) of
                       {value, ConfigGroup, RemainingConfigGroups} ->
                           [Public, MulticastIpAddress, GroupPort, Type,
@@ -955,8 +972,14 @@ sync_with_config(Db, OnNew) ->
                           true = db_insert(Db, UpdatedGroup),
                           {ConfigPeers, RemainingConfigGroups};
                       false ->
-                          true = db_delete(Db, GroupId),
-                          {ConfigPeers, ConfigGroups}
+			  case config:lookup(
+				 [gaia, 'groups-of-interest', {name, GroupName}]) of
+			      not_found ->
+				  true = db_delete(Db, GroupId),
+				  {ConfigPeers, ConfigGroups};
+			      _ ->
+				  {ConfigPeers, ConfigGroups}
+			  end
                   end
           end, {config:lookup([gaia, peers]),
                 config:lookup([gaia, groups])}, Db),
@@ -980,25 +1003,25 @@ sync_with_config(Db, OnNew) ->
                   config:lookup_children(
                     [id, name, public, 'multicast-ip-address', port, type,
                      members], ConfigGroup),
-              Peer = #gaia_group{
-                        id = generate_id_if_needed(GroupId, GroupName),
-                        name = GroupName,
-                        public = Public,
-                        multicast_ip_address = MulticastIpAddress,
-                        port = GroupPort,
-                        type = Type,
-                        members = Members,
-                        admin = generate_artificial_id(
-                                  config:lookup([gaia, 'peer-name']))},
-              true = db_insert(Db, Peer)
+              Group = #gaia_group{
+			 id = generate_id_if_needed(GroupId, GroupName),
+			 name = GroupName,
+			 public = Public,
+			 multicast_ip_address = MulticastIpAddress,
+			 port = GroupPort,
+			 type = Type,
+			 members = Members,
+			 admin = generate_artificial_id(
+				   config:lookup([gaia, 'peer-name']))},
+              true = db_insert(Db, Group)
       end, NewConfigGroups),
     %% Resolve group member peers
     ok = db_fold(
            fun(#gaia_group{members = Members, admin = Admin} = Group, Acc) ->
                    UpdatedGroup =
                        Group#gaia_group{
-                         members = replace_with_peer_id(Db, Members),
-                         admin = get_peer_id(Db, Admin)},
+                         members = replace_with_peer_id_if_needed(Db, Members),
+                         admin = get_admin_id(Db, Admin)},
                    true = db_insert(Db, UpdatedGroup),
                    Acc;
               (_, Acc) ->
@@ -1012,11 +1035,12 @@ sync_with_config(Db, OnNew) ->
                   [GroupId, GroupName, Admin, CacheTimeout] =
                       config:lookup_children([id, name, admin, 'cache-timeout'],
                                              ConfigGroupOfInterest),
+		  [#gaia_peer{id = AdminId}] = db_lookup_peer_by_name(Db, Admin),
                   GroupOfInterest =
                       #group_of_interest{
                          id = generate_id_if_needed(GroupId, GroupName),
                          name = GroupName,
-                         admin = get_peer_id(Db, Admin),
+                         admin = AdminId,
                          cache_timeout = Now + (CacheTimeout * 3600)},
                   [GroupOfInterest|Acc]
           end, [], config:lookup([gaia, 'groups-of-interest'])),
@@ -1043,7 +1067,7 @@ generate_id_if_needed(0, Name) ->
 generate_id_if_needed(Id, _Name) ->
     Id.
 
-get_peer_id(Db, PeerName) ->
+get_admin_id(Db, PeerName) ->
     case db_lookup_peer_by_name(Db, PeerName) of
         [#gaia_peer{id = PeerId}] ->
             PeerId;
@@ -1051,19 +1075,24 @@ get_peer_id(Db, PeerName) ->
             generate_artificial_id(config:lookup([gaia, 'peer-name']))
     end.
 
-replace_with_peer_id(_Db, [<<"*">>]) ->
-    '*';
-replace_with_peer_id(_Db, []) ->
+replace_with_peer_id_if_needed(_Db, []) ->
     [];
-replace_with_peer_id(Db, [PeerName|Rest]) ->
+replace_with_peer_id_if_needed(_Db, '*') ->
+    '*';
+replace_with_peer_id_if_needed(Db, [PeerId|Rest]) when is_integer(PeerId) ->
+    [PeerId|replace_with_peer_id_if_needed(Db, Rest)];
+replace_with_peer_id_if_needed(_Db, [<<"*">>]) ->
+    '*';
+replace_with_peer_id_if_needed(Db, [PeerName|Rest]) ->
     case db_lookup_peer_by_name(Db, PeerName) of
-        [#gaia_peer{id = PeerId}] ->
-            [PeerId|replace_with_peer_id(Db, Rest)];
-        [] ->
-            %% In this case it must be [gaia, 'peer-name'].
-            %% This is verfied by mixmesh_config_serv:post_process/3
-            PeerName = config:lookup([gaia, 'peer-name']),
-            [generate_artificial_id(PeerName)|replace_with_peer_id(Db, Rest)]
+	[#gaia_peer{id = PeerId}] ->
+            [PeerId|replace_with_peer_id_if_needed(Db, Rest)];
+	[] ->
+	    %% In this case it must be [gaia, 'peer-name'].
+	    %% This is verfied by mixmesh_config_serv:post_process/3
+	    PeerName = config:lookup([gaia, 'peer-name']),
+            [generate_artificial_id(PeerName)|
+	     replace_with_peer_id_if_needed(Db, Rest)]
     end.
 
 db_insert({Tab, DetsTab}, PeerOrGroup) ->
@@ -1106,8 +1135,8 @@ db_lookup_peer_by_id({Tab, _DetsTab}, PeerId) ->
 db_lookup_peer_by_name({Tab, _DetsTab}, Name) ->
     ets:match_object(Tab, #gaia_peer{name = Name, _ = '_'}).
 
-db_lookup_group_by_id({Tab, _DetsTab}, PeerId) ->
-    ets:match_object(Tab, #gaia_group{id = PeerId, _ = '_'}).
+db_lookup_group_by_id({Tab, _DetsTab}, GroupId) ->
+    ets:match_object(Tab, #gaia_group{id = GroupId, _ = '_'}).
 
 db_lookup_group_by_name({Tab, _DetsTab}, Name) ->
     ets:match_object(Tab, #gaia_group{name = Name, _ = '_'}).
