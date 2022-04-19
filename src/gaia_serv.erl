@@ -800,7 +800,7 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                NewRestPort >= 1024 andalso
                NewRestPort =< 65535 andalso
                is_list(PublicGroupIds) ->
-            %% Check for groups of interest on this peer
+            %% Sync groups of interests
             GroupNamesOfInterest =
                 lists:foldl(
                   fun(#group_of_interest{id = GroupId, admin = Admin}, Acc)
@@ -813,9 +813,13 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
 				      [Group] ->
 					  ?LOG_INFO(#{group_of_interest_unchanged => Group}),
 					  Acc;
-				      [AnotherGroup] ->
+				      [#gaia_group{
+                                          conversation = Conversation} = AnotherGroup] ->
 					  ?LOG_INFO(#{insert_another_group => {Group, AnotherGroup}}),
-					  true = db_insert(Db, Group),
+                                          UpdatedGroup =
+                                              Group#gaia_group{
+                                                conversation = Conversation},
+					  true = db_insert(Db, UpdatedGroup),
 					  [GroupName|Acc];
 				      [] ->
 					  ?LOG_INFO(#{insert_from_empty_group => Group}),
