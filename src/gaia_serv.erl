@@ -411,9 +411,6 @@ message_handler(#{parent := Parent,
                                     ?LOG_DEBUG(#{local_port_created =>
                                                      {MyPeerName, PeerName},
                                                  local_port => LocalPort}),
-                                    ok =
-                                        gaia_command_serv:conversation_started(
-                                          Peer),
                                     {reply, From, {ok, LocalPort}}
                             end
                     end;
@@ -814,16 +811,13 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                                           case is_group_updated(
                                                  NewGroup, Group) of
                                               no ->
-                                                  ?LOG_INFO(#{group_of_interest_unchanged => NewGroup}),
                                                   Acc;
                                               yes ->
-                                                  ?LOG_INFO(#{group_of_interest_changed => NewGroup}),
                                                   true = db_insert(
                                                            Db, NewGroup),
                                                   [GroupName|Acc]
                                           end;
 				      [] ->
-					  ?LOG_INFO(#{insert_from_empty_group => NewGroup}),
 					  true = db_insert(Db, NewGroup),
 					  [GroupName|Acc]
 				  end;
@@ -835,12 +829,6 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                      (_, Acc) ->
                           Acc
                   end, [], GroupsOfInterest),
-
-
-	    ?LOG_ERROR(#{babajajjajajajajajjaj => {GroupsOfInterest,
-						   GroupNamesOfInterest}}),
-
-
             %% Update peer if needed or create ephemeral peer
             case db_lookup_peer_by_id(Db, NewPeerId) of
                 [#gaia_peer{name = PeerName,
