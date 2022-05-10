@@ -1,7 +1,8 @@
 -module(gaia_command_serv).
--export([start_link/1, stop/0]).
+-export([start_link/2, stop/0]).
 -export([groups_of_interest_updated/2, peer_up/1, peer_down/1]).
 -export([say/1, beep/1, format_items/1, serve_only_me/0, serve_all/0]).
+-export([enter_command_mode/0, leave_command_mode/0]).
 -export([message_handler/1]).
 %% Initiated from REST service
 -export([conversation_started/1, conversation_stopped/1,
@@ -24,12 +25,15 @@
 %% Exported: start_link
 %%
 
--spec start_link(boolean()) -> serv:spawn_server_result().
+-spec start_link(boolean(), boolean()) -> serv:spawn_server_result().
 
-start_link(AudioSourceCallback) ->
-    ?spawn_server(fun(Parent) -> init(Parent, AudioSourceCallback) end,
-                  fun initial_message_handler/1,
-                  #serv_options{name = ?MODULE}).
+start_link(AlwaysInCommandMode, AudioSourceCallback) ->
+    ?spawn_server(
+       fun(Parent) ->
+               init(Parent, AlwaysInCommandMode, AudioSourceCallback)
+       end,
+       fun initial_message_handler/1,
+       #serv_options{name = ?MODULE}).
 
 %%
 %% Exported: stop
@@ -190,6 +194,20 @@ serve_all() ->
     serv:cast(?MODULE, serve_all).
 
 %%
+%% Exported: enter_command_mode
+%%
+
+enter_command_mode() ->
+    serv:cast(?MODULE, enter_command_mode).
+
+%%
+%% Exported: leave_command_mode
+%%
+
+leave_command_mode() ->
+    serv:cast(?MODULE, leave_command_mode).
+
+%%
 %% Exported: format_items
 %%
 
@@ -209,7 +227,7 @@ format_remaining_items([Item|Rest]) ->
 %% Server
 %%
 
-init(Parent, AudioSourceCallback) ->
+init(Parent, AlwaysInCommandMode, AudioSourceCallback) ->
     VoskModel = vosk:model_new(filename:join(code:priv_dir(vosk), ?MODEL)),
     VoskRecognizer = vosk:recognizer_new(VoskModel, ?RATE_IN_HZ),
     VoskTransform =
@@ -220,37 +238,55 @@ init(Parent, AudioSourceCallback) ->
         end,
     ?LOG_INFO("Gaia command server has been started"),
     {ok, #{parent => Parent,
+           always_in_command_mode => AlwaysInCommandMode,
            audio_source_callback => AudioSourceCallback,
            vosk_recognizer => VoskRecognizer,
-           vosk_transform => VoskTransform}}.
+           vosk_transform => VoskTransform,
+           in_command_mode => false}}.
 
-initial_message_handler(#{audio_source_callback := AudioSourceCallback,
+initial_message_handler(#{always_in_command_mode := AlwaysInCommandMode,
+                          audio_source_callback := AudioSourceCallback,
                           vosk_recognizer := VoskRecognizer,
                           vosk_transform := VoskTransform} = State) ->
     receive
         {neighbour_workers, _NeighbourWorkers} ->
-            CommandState =
-                #{parent => self(),
-                  path => [],
-                  all_commands => gaia_commands:all(),
-                  dict => #{},
-                  timeout_timer => undefined,
-                  last_say => <<"I didn't say anything!">>},
-            Callback =
-                create_callback(VoskRecognizer, VoskTransform, CommandState),
-            UpdatedState =
-                case AudioSourceCallback of
-                    true ->
-                        ok = gaia_audio_source_serv:subscribe(Callback),
-                        State#{local_callback => undefined};
-                    false ->
-                        ok = gaia_audio_source_serv:subscribe(),
-                        State#{local_callback => Callback}
-                    end,
-            {swap_message_handler, fun ?MODULE:message_handler/1, UpdatedState}
+            case AlwaysInCommandMode of
+                true ->
+                    CommandState =
+                        #{parent => self(),
+                          path => [],
+                          all_commands => gaia_commands:all(),
+                          dict => #{},
+                          timeout_timer => undefined,
+                          last_say => <<"I didn't say anything!">>},
+                    Callback =
+                        create_callback(VoskRecognizer, VoskTransform, CommandState),
+                    case AudioSourceCallback of
+                        true ->
+                            ok = gaia_audio_source_serv:subscribe(Callback),
+                            {swap_message_handler, fun ?MODULE:message_handler/1,
+                             State#{in_command_mode => true,
+                                    local_callback => undefined}};
+                        false ->
+                            ok = gaia_audio_source_serv:subscribe(),
+                            {swap_message_handler, fun ?MODULE:message_handler/1,
+                             State#{in_command_mode => true,
+                                    local_callback => Callback}}
+                    end;
+                false ->
+                    {swap_message_handler, fun ?MODULE:message_handler/1,
+                     State#{in_command_mode => false,
+                            local_callback => undefined}}
+            end
     end.
 
-message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
+message_handler(#{parent := Parent,
+                  always_in_command_mode := AlwaysInCommandMode,
+                  audio_source_callback := AudioSourceCallback,
+                  vosk_recognizer := VoskRecognizer,
+                  vosk_transform := VoskTransform,
+                  in_command_mode := InCommandMode,
+                  local_callback := LocalCallback}= State) ->
     receive
         {call, From, stop = Call} ->
             ?LOG_DEBUG(#{call => Call}),
@@ -366,6 +402,45 @@ message_handler(#{parent := Parent, local_callback := LocalCallback} = State) ->
             %% FIXME: enable serve only!!!
             %%ok = gaia_audio_source_serv:serve_all(),
             noreply;
+        {cast, enter_command_mode} ->
+            case InCommandMode of
+                true ->
+                    noreply;
+                false ->
+                    CommandState =
+                        #{parent => self(),
+                          path => [],
+                          all_commands => gaia_commands:all(),
+                          dict => #{},
+                          timeout_timer => undefined,
+                          last_say => <<"I didn't say anything!">>},
+                    Callback =
+                        create_callback(VoskRecognizer, VoskTransform, CommandState),
+                    UpdatedCallback =
+                        trigger_callback(Callback, {handle_command, "command"}),
+                    case AudioSourceCallback of
+                        true ->
+                            ok = gaia_audio_source_serv:subscribe(UpdatedCallback),
+                            {noreply, State#{in_command_mode => true,
+                                             local_callback => undefined}};
+                        false ->
+                            ok = gaia_audio_source_serv:subscribe(),
+                            {noreply, State#{in_command_mode => true,
+                                             local_callback => UpdatedCallback}}
+                    end
+            end;
+        {cast, leave_command_mode} ->
+            case not InCommandMode orelse AlwaysInCommandMode of
+                true ->
+                    noreply;
+                false ->
+                    ok = gaia_audio_source_serv:unsubscribe(),
+                    UpdatedCallback =
+                        trigger_callback(LocalCallback,
+                                         {handle_command, "goodbye"}),
+                    {noreply, State#{in_command_mode => false,
+                                     local_callback => UpdatedCallback}}
+            end;
         {subscription_packet, Packet} when LocalCallback /= undefined ->
             NewLocalCallback = trigger_callback(LocalCallback, Packet),
             {noreply, State#{local_callback => NewLocalCallback}};
@@ -407,6 +482,9 @@ create_callback(VoskRecognizer, VoskTransform, CommandState) ->
        ({cd, Path, Dict}) ->
             create_callback(VoskRecognizer, VoskTransform,
                             CommandState#{path => Path, dict => Dict});
+       ({handle_command, Text}) ->
+            NewCommandState = handle_command(Text, CommandState),
+            create_callback(VoskRecognizer, VoskTransform, NewCommandState);
        (Packet) when is_binary(Packet) ->
             case vosk:recognizer_accept_waveform(
                    VoskRecognizer, VoskTransform(Packet)) of
