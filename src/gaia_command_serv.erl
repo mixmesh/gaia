@@ -486,22 +486,28 @@ create_callback(VoskRecognizer, VoskTransform, CommandState) ->
             NewCommandState = handle_command(Text, CommandState),
             create_callback(VoskRecognizer, VoskTransform, NewCommandState);
        (Packet) when is_binary(Packet) ->
+            Start = os:timestamp(),
             case vosk:recognizer_accept_waveform(
                    VoskRecognizer, VoskTransform(Packet)) of
 		0 ->
+                    io:format("0: ~f ms~n", [timer:now_diff(os:timestamp(), Start) / 1000]),
                     create_callback(VoskRecognizer, VoskTransform,
                                     CommandState);
                 1 ->
+                    io:format("1: ~f ms~n", [timer:now_diff(os:timestamp(), Start) / 1000]),
                     case vosk:recognizer_result(VoskRecognizer) of
                         #{"text" := ""} ->
+                            io:format("EMPTY STRING: ~f ms~n", [timer:now_diff(os:timestamp(), Start) / 1000]),
                             _ = vosk:recognizer_reset(VoskRecognizer),
                             create_callback(VoskRecognizer, VoskTransform,
                                             CommandState);
                         #{"text" := "huh"} ->
+                            io:format("HUH: ~f ms~n", [timer:now_diff(os:timestamp(), Start) / 1000]),
                             _ = vosk:recognizer_reset(VoskRecognizer),
                             create_callback(VoskRecognizer, VoskTransform,
                                             CommandState);
                         #{"text" := Text} ->
+                            io:format("AFTER RECOGNIZER RESULT: ~f ms~n", [timer:now_diff(os:timestamp(), Start) / 1000]),
                             ?LOG_INFO(#{vosk_text => Text}),
                             NewCommandState =
                                 handle_command(Text, CommandState),
@@ -510,6 +516,7 @@ create_callback(VoskRecognizer, VoskTransform, CommandState) ->
                                             NewCommandState)
                     end;
 		-1 ->
+                    io:format("-1: ~f ms~n", [timer:now_diff(os:timestamp(), Start) / 1000]),
                     ?LOG_ERROR("Vosk failed!"),
 		    _ = vosk:recognizer_reset(VoskRecognizer),
                     create_callback(VoskRecognizer, VoskTransform, CommandState)
