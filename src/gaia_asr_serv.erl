@@ -199,6 +199,9 @@ create_callback(VoskRecognizer, VoskTransform, CommandState) ->
                                             CommandState);
                         #{"text" := Text} ->
                             ?LOG_INFO(#{vosk_text => Text}),
+
+
+
                             NewCommandState =
                                 handle_command(Text, CommandState),
                             _ = vosk:recognizer_reset(VoskRecognizer),
@@ -212,6 +215,21 @@ create_callback(VoskRecognizer, VoskTransform, CommandState) ->
 	    end;
        (OldCallback) when is_function(OldCallback) ->
             create_callback(VoskRecognizer, VoskTransform, CommandState)
+    end.
+
+purge_subscription_packets(Size) ->
+    receive
+        {subscription_packet, Packet} ->
+            purge_subscription_packets(Size + size(Packet))
+    after
+        0 ->
+            if
+                Size == 0 ->
+                    ok;
+                true ->
+                    ?LOG_INFO(#{purging_packets => Size}),
+                    ok
+            end
     end.
 
 handle_command(Text, #{parent := Parent,
