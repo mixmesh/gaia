@@ -381,10 +381,10 @@ message_handler(#{parent := Parent,
                 [#gaia_peer{name = PeerName} = Peer] ->
                     case begin_conversation(Busy, Peer) of
                         {no, call} ->
-                            ok = gaia_command_serv:call(Peer),
+                            ok = gaia_tts_serv:call(Peer),
                             {reply, From, {error, call}};
                         {no, busy} ->
-                            ok = gaia_command_serv:conversation_rejected(
+                            ok = gaia_tts_serv:conversation_rejected(
                                    Peer, busy),
                             {reply, From, {error, busy}};
                         {no, skip} ->
@@ -595,25 +595,24 @@ start_of_conversations(MyPeerId, Db, [{peer, PeerId}|Rest]) ->
     case gaia_rest_client:start_of_conversation(
            MyPeerId, {IpAddress, RestPort}, LocalPort) of
         {ok, NewRemotePort} ->
-            ok = gaia_command_serv:start_of_conversation_succeeded(PeerName),
+            ok = gaia_tts_serv:start_of_conversation_succeeded(PeerName),
             true = db_insert(Db, Peer#gaia_peer{remote_port = NewRemotePort}),
             start_of_conversations(MyPeerId, Db, Rest);
         calling ->
-            ok = gaia_command_serv:start_of_conversation_failed(
+            ok = gaia_tts_serv:start_of_conversation_failed(
                    PeerName, calling),
             start_of_conversations(MyPeerId, Db, Rest);
         busy ->
-            ok = gaia_command_serv:start_of_conversation_failed(PeerName, busy),
+            ok = gaia_tts_serv:start_of_conversation_failed(PeerName, busy),
             start_of_conversations(MyPeerId, Db, Rest);
         not_available ->
-            ok = gaia_command_serv:start_of_conversation_failed(
+            ok = gaia_tts_serv:start_of_conversation_failed(
                    PeerName, not_available),
             start_of_conversations(MyPeerId, Db, Rest);
         {error, Reason} ->
             ?LOG_ERROR(#{{rest_service_client, start_of_conversation} =>
                              Reason}),
-            ok = gaia_command_serv:start_of_conversation_failed(
-                   PeerName, error),
+            ok = gaia_tts_serv:start_of_conversation_failed(PeerName, error),
             UpdatedPeer = Peer#gaia_peer{conversation = false},
             true = db_insert(Db, UpdatedPeer),
             start_of_conversations(MyPeerId, Db, Rest)
@@ -630,12 +629,12 @@ stop_of_conversations(MyPeerId, Db, [PeerId|Rest]) ->
     case gaia_rest_client:stop_of_conversation(
            MyPeerId, {IpAddress, RestPort}) of
         ok ->
-            ok = gaia_command_serv:stop_of_conversation_succeeded(PeerName),
+            ok = gaia_tts_serv:stop_of_conversation_succeeded(PeerName),
             stop_of_conversations(MyPeerId, Db, Rest);
         {error, Reason} ->
             ?LOG_ERROR(#{{rest_service_client, stop_of_conversation} =>
                              Reason}),
-            ok = gaia_command_serv:stop_of_conversation_failed(PeerName, error),
+            ok = gaia_tts_serv:stop_of_conversation_failed(PeerName, error),
             stop_of_conversations(MyPeerId, Db, Rest)
     end.
 
@@ -736,7 +735,7 @@ begin_conversation(_Busy = true, #gaia_peer{
             UpdatedPeer =
                 Peer#gaia_peer{conversation =
                                    {true, #{read => true, write => true}}},
-            ok = gaia_command_serv:conversation_started(UpdatedPeer),
+            ok = gaia_tts_serv:conversation_started(UpdatedPeer),
             {yes, UpdatedPeer};
         false ->
             {no, busy}
@@ -746,7 +745,7 @@ begin_conversation(_Busy = false, #gaia_peer{mode = call}) ->
 begin_conversation(_Busy = false, #gaia_peer{mode = direct} = Peer) ->
     UpdatedPeer = Peer#gaia_peer{conversation =
                                      {true, #{read => true, write => true}}},
-    ok = gaia_command_serv:conversation_started(UpdatedPeer),
+    ok = gaia_tts_serv:conversation_started(UpdatedPeer),
     {yes, UpdatedPeer};
 begin_conversation(_Busy, _Peer) ->
     {no, skip}.
@@ -758,7 +757,7 @@ begin_conversation(_Busy, _Peer) ->
 end_conversation(
   #gaia_peer{conversation = {true, _ConversationStatus}} = Peer) ->
     UpdatedPeer = Peer#gaia_peer{conversation = false},
-    ok = gaia_command_serv:conversation_stopped(UpdatedPeer),
+    ok = gaia_tts_serv:conversation_stopped(UpdatedPeer),
     yes;
 end_conversation(_Peer) ->
     no.
@@ -843,13 +842,13 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                                        remote_port = undefined,
                                        rest_port = NewRestPort},
                     true = db_insert(Db, UpdatedPeer),
-                    ok = gaia_command_serv:peer_up(UpdatedPeer),
-		    gaia_command_serv:groups_of_interest_updated(
+                    ok = gaia_tts_serv:peer_up(UpdatedPeer),
+		    gaia_tts_serv:groups_of_interest_updated(
 		      PeerName, GroupNamesOfInterest);
                 [#gaia_peer{name = PeerName}] ->
                     ?LOG_DEBUG(#{'CHANGE_PEER' =>
                                      same_nodis_address_or_rest_port}),
-		    gaia_command_serv:groups_of_interest_updated(
+		    gaia_tts_serv:groups_of_interest_updated(
 		      PeerName, GroupNamesOfInterest);
                 [_] ->
                     ?LOG_DEBUG(#{'CHANGE_PEER' => ignoring_peer}),
@@ -892,7 +891,7 @@ down_peer(Db, NodisAddress) ->
                                    rest_port = undefined,
                                    local_port = undefined,
                                    remote_port = undefined}),
-            gaia_command_serv:peer_down(Peer);
+            gaia_tts_serv:peer_down(Peer);
         [] ->
             {error, no_such_nodis_address}
     end.

@@ -1,6 +1,6 @@
 %% -*- erlang-indent-level: 2 -*-
 -module(gaia_commands).
--export([all/0, leave_command_mode/1]).
+-export([all/0, leave_command_mode/0]).
 
 -include_lib("kernel/include/logger.hrl").
 -include_lib("apptools/include/shorthand.hrl").
@@ -46,9 +46,9 @@ all() ->
                        [<<"You are in an active call with ">>, PeerName];
                      _ ->
                        [<<"You are in active calls with ">>,
-                        gaia_command_serv:format_items(PeerNames)]
+                        gaia_tts_serv:format_items(PeerNames)]
                    end,
-                 ok = gaia_command_serv:say(Text),
+                 ok = gaia_tts_serv:say(Text),
                  [{last_say, Text}|leave_command_mode()]
              end),
          %%
@@ -64,13 +64,13 @@ all() ->
                case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
                  [#gaia_peer{name = PeerName} = Peer] ->
                    Text = [<<"Do you want to call ">>, PeerName, <<"?">>],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{dict, Dict#{peer => Peer}},
                     remove_timeout,
                     {last_say, Text}];
                  [] ->
                    Text = [Name, <<" is not known. Please try again!">>],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{cd, '..'}, {last_say, Text}]
                end
            end,
@@ -80,25 +80,25 @@ all() ->
                       PeerId, #{read => true, write => true}) of
                  ok ->
                    Text = [<<"You are now connecting to ">>, PeerName],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
                  {error, not_online} ->
                    Text = [PeerName, <<" is not online">>],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
                  {error, no_such_peer} ->
                    Text = [PeerName, <<" is unknown">>],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
                  {error, already_started} ->
                    Text = [<<"You are already in a call with ">>, PeerName],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()]
                end
            end,
            fun(_Dict) ->
                ?LOG_INFO(#{onsuccess => no}),
-               ok = gaia_command_serv:say(<<"OK">>),
+               ok = gaia_tts_serv:say(<<"OK">>),
                leave_command_mode()
            end),
          %%
@@ -114,13 +114,13 @@ all() ->
                case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
                  [#gaia_peer{name = PeerName} = Peer] ->
                    Text = [<<"Do you want to hang-up ">>, PeerName, <<"?">>],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{dict, Dict#{peer => Peer}},
                     remove_timeout,
                     {last_say, Text}];
                  [] ->
                    Text = [Name, <<" is not known. Please try again!">>],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{cd, '..'}, {last_say, Text}]
                end
            end,
@@ -129,20 +129,20 @@ all() ->
                case gaia_serv:stop_peer_conversation(PeerId) of
                  ok ->
                    Text = [<<"You are ending the call with ">>, PeerName],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
                  {error, no_such_peer} ->
                    ?LOG_ERROR(#{unexpected_return_value => no_such_peer}),
                    leave_command_mode();
                  {error, already_stopped} ->
                    Text = [<<"You are not in a call with ">>, PeerName],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()]
                end
            end,
            fun(_Dict) ->
                ?LOG_INFO(#{onsuccess => no}),
-               ok = gaia_command_serv:say(<<"OK">>),
+               ok = gaia_tts_serv:say(<<"OK">>),
                leave_command_mode()
            end),
          %%
@@ -169,9 +169,9 @@ all() ->
                        [<<"You have joined group ">>, GroupName];
                      _ ->
                        [<<"You have joined groups ">>,
-                        gaia_command_serv:format_items(GroupNames)]
+                        gaia_tts_serv:format_items(GroupNames)]
                    end,
-                 ok = gaia_command_serv:say(Text),
+                 ok = gaia_tts_serv:say(Text),
                  [{last_say, Text}|leave_command_mode()]
              end),
          %%
@@ -188,14 +188,14 @@ all() ->
                  [#gaia_group{name = GroupName} = Group] ->
                    Text = [<<"Do you want to join group ">>, GroupName,
                            <<"?">>],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{dict, Dict#{group => Group}},
                     remove_timeout,
                     {last_say, Text}];
                  [] ->
                    Text = [<<"Group ">>, Name,
                            <<" is not known. Please try again!">>],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{cd, '..'}, {last_say, Text}]
                end
            end,
@@ -205,18 +205,18 @@ all() ->
                  ok ->
                    Text = [<<"You are now an active member of group ">>,
                            GroupName],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
                  {error, already_started} ->
                    Text = [<<"You are already an active member of group ">>,
                            GroupName],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()]
                end
            end,
            fun(_Dict) ->
                ?LOG_INFO(#{onsuccess => no}),
-               ok = gaia_command_serv:say(<<"OK">>),
+               ok = gaia_tts_serv:say(<<"OK">>),
                leave_command_mode()
            end),
          %%
@@ -233,14 +233,14 @@ all() ->
                  [#gaia_group{name = GroupName} = Group] ->
                    Text = [<<"Do you want to leave group ">>, GroupName,
                            <<"?">>],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{dict, Dict#{group => Group}},
                     remove_timeout,
                     {last_say, Text}];
                  [] ->
                    Text = [<<"Group ">>, Name,
                            <<" is not known. Please try again!">>],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{cd, '..'}, {last_say, Text}]
                end
            end,
@@ -250,7 +250,7 @@ all() ->
                  ok ->
                    Text = [<<"You are no longer an active member of group ">>,
                            GroupName],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
                  {error, no_such_group} ->
                    ?LOG_ERROR(#{unexpected_return_value => no_such_group}),
@@ -258,13 +258,13 @@ all() ->
                  {error, already_stopped} ->
                    Text = [<<"You are not an active member of group ">>,
                            GroupName],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()]
                end
            end,
            fun(_Dict) ->
                ?LOG_INFO(#{onsuccess => no}),
-               ok = gaia_command_serv:say(<<"OK">>),
+               ok = gaia_tts_serv:say(<<"OK">>),
                leave_command_mode()
            end),
          %%
@@ -277,11 +277,11 @@ all() ->
                  case gaia_serv:busy() of
                    true ->
                      Text = <<"Yes, you are busy">>,
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()];
                    false ->
                      Text = <<"No, you are not busy">>,
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()]
                  end
              end),
@@ -296,12 +296,12 @@ all() ->
                  case gaia_serv:busy() of
                    true ->
                      Text = <<"You are already busy">>,
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()];
                    false ->
                      ok = gaia_serv:busy(true),
                      Text = <<"You are now busy">>,
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()]
                  end
              end),
@@ -316,12 +316,12 @@ all() ->
                  case gaia_serv:busy() of
                    false ->
                      Text = <<"You are not busy">>,
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()];
                    true ->
                      ok = gaia_serv:busy(false),
                      Text = <<"You are no longer busy">>,
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()]
                  end
              end),
@@ -338,19 +338,19 @@ all() ->
                    [#gaia_peer{name = PeerName,
                                conversation = {true, #{write := false}}}] ->
                      Text = [<<"Yes, you are muted for ">>, PeerName],
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()];
                    [#gaia_peer{name = PeerName,
                                conversation = {true, #{write := true}}}] ->
                      Text = [<<"No, you are not muted for ">>, PeerName],
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()];
                    [#gaia_peer{name = PeerName,
                                conversation = false}] ->
                      Text = [<<"You are neither in a call nor in an active \
 group with ">>,
                         PeerName],
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()];
                    [] ->
                      case gaia_fuzzy:match(?l2b(Name), [<<"all">>]) of
@@ -367,16 +367,16 @@ group with ">>,
                          case MutedForAll of
                            true ->
                              Text = <<"Yes, you are muted for all">>,
-                             ok = gaia_command_serv:say(Text),
+                             ok = gaia_tts_serv:say(Text),
                              [{last_say, Text}|leave_command_mode()];
                            false ->
                              Text = <<"No, you are not muted for all">>,
-                             ok = gaia_command_serv:say(Text),
+                             ok = gaia_tts_serv:say(Text),
                              [{last_say, Text}|leave_command_mode()]
                          end;
                        nomatch ->
                          Text = [Name, <<" is not known. Please try again!">>],
-                         ok = gaia_command_serv:say(Text),
+                         ok = gaia_tts_serv:say(Text),
                          [{cd, '..'}, {last_say, Text}]
                      end
                  end
@@ -395,7 +395,7 @@ group with ">>,
                  [#gaia_peer{name = PeerName} = Peer] ->
                    Text = [<<"Do you want to mute yourself for ">>, PeerName,
                            <<"?">>],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{dict, Dict#{peer => Peer}},
                     remove_timeout,
                     {last_say, Text}];
@@ -403,13 +403,13 @@ group with ">>,
                    case gaia_fuzzy:match(?l2b(Name), [<<"all">>]) of
                      {ok, _} ->
                        Text = [<<"Do you want to mute yourself for all?">>],
-                       ok = gaia_command_serv:say(Text),
+                       ok = gaia_tts_serv:say(Text),
                        [{dict, Dict#{peer => all}},
                         remove_timeout,
                         {last_say, Text}];
                      nomatch ->
                        Text = [Name, <<" is not known. Please try again!">>],
-                       ok = gaia_command_serv:say(Text),
+                       ok = gaia_tts_serv:say(Text),
                        [{cd, '..'}, {last_say, Text}]
                    end
                end
@@ -420,11 +420,11 @@ group with ">>,
                       PeerId, #{write => false}) of
                  ok ->
                    Text = [<<"You are now muted for ">>, PeerName],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
                  {error, already_set} ->
                    Text = [<<"You are already muted for ">>, PeerName],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()]
                end;
               (#{peer := all}) ->
@@ -444,12 +444,12 @@ group with ">>,
                            PeerId, #{write => false})
                  end, NonMutedPeerIds),
                Text = [<<"You are now muted for all">>],
-               ok = gaia_command_serv:say(Text),
+               ok = gaia_tts_serv:say(Text),
                [{last_say, Text}|leave_command_mode()]
            end,
            fun(_Dict) ->
                ?LOG_INFO(#{onsuccess => no}),
-               ok = gaia_command_serv:say(<<"OK">>),
+               ok = gaia_tts_serv:say(<<"OK">>),
                leave_command_mode()
            end),
          %%
@@ -466,7 +466,7 @@ group with ">>,
                  [#gaia_peer{name = PeerName} = Peer] ->
                    Text = [<<"Do you want to unmute yourself for ">>, PeerName,
                            <<"?">>],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{dict, Dict#{peer => Peer}},
                     remove_timeout,
                     {last_say, Text}];
@@ -474,13 +474,13 @@ group with ">>,
                    case gaia_fuzzy:match(?l2b(Name), [<<"all">>]) of
                      {ok, _} ->
                        Text = [<<"Do you want to unmute yourself for all?">>],
-                       ok = gaia_command_serv:say(Text),
+                       ok = gaia_tts_serv:say(Text),
                        [{dict, Dict#{peer => all}},
                         remove_timeout,
                         {last_say, Text}];
                      nomatch ->
                        Text = [Name, <<" is not known. Please try again!">>],
-                       ok = gaia_command_serv:say(Text),
+                       ok = gaia_tts_serv:say(Text),
                        [{cd, '..'}, {last_say, Text}]
                    end
                end
@@ -491,11 +491,11 @@ group with ">>,
                       PeerId, #{write => true}) of
                  ok ->
                    Text = [<<"You are now unmuted for ">>, PeerName],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
                  {error, already_set} ->
                    Text = [<<"You are not muted for ">>, PeerName],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()]
                end;
               (#{peer := all}) ->
@@ -515,12 +515,12 @@ group with ">>,
                            PeerId, #{write => true})
                  end, MutedPeerIds),
                Text = [<<"You are now unmuted for all">>],
-               ok = gaia_command_serv:say(Text),
+               ok = gaia_tts_serv:say(Text),
                [{last_say, Text}|leave_command_mode()]
            end,
            fun(_Dict) ->
                ?LOG_INFO(#{onsuccess => no}),
-               ok = gaia_command_serv:say(<<"OK">>),
+               ok = gaia_tts_serv:say(<<"OK">>),
                leave_command_mode()
            end),
          %%
@@ -536,19 +536,19 @@ group with ">>,
                    [#gaia_peer{name = PeerName,
                                conversation = {true, #{read := false}}}] ->
                      Text = [<<"Yes, you are deaf to ">>, PeerName],
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()];
                    [#gaia_peer{name = PeerName,
                                conversation = {true, #{read := true}}}] ->
                      Text = [<<"No, you are not deaf to ">>, PeerName],
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()];
                    [#gaia_peer{name = PeerName,
                                conversation = false}] ->
                      Text = [<<"You are neither in a call nor in an active \
 group with ">>,
                              PeerName],
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()];
                    [] ->
                      case gaia_fuzzy:match(?l2b(Name), [<<"all">>]) of
@@ -565,16 +565,16 @@ group with ">>,
                          case DeafToAll of
                            true ->
                              Text = <<"Yes, you are deaf to all">>,
-                             ok = gaia_command_serv:say(Text),
+                             ok = gaia_tts_serv:say(Text),
                              [{last_say, Text}|leave_command_mode()];
                            false ->
                              Text = <<"No, you are not deaf to all">>,
-                             ok = gaia_command_serv:say(Text),
+                             ok = gaia_tts_serv:say(Text),
                              [{last_say, Text}|leave_command_mode()]
                          end;
                        nomatch ->
                          Text = [Name, <<" is not known. Please try again!">>],
-                         ok = gaia_command_serv:say(Text),
+                         ok = gaia_tts_serv:say(Text),
                          [{cd, '..'}, {last_say, Text}]
                      end
                  end
@@ -592,7 +592,7 @@ group with ">>,
                case gaia_serv:lookup({fuzzy_name, ?l2b(Name)}) of
                  [#gaia_peer{name = PeerName} = Peer] ->
                    Text = [<<"Do you want to be deaf to ">>, PeerName, <<"?">>],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{dict, Dict#{peer => Peer}},
                     remove_timeout,
                     {last_say, Text}];
@@ -600,13 +600,13 @@ group with ">>,
                    case gaia_fuzzy:match(?l2b(Name), [<<"all">>]) of
                      {ok, _} ->
                        Text = [<<"Do you want to be deaf to all?">>],
-                       ok = gaia_command_serv:say(Text),
+                       ok = gaia_tts_serv:say(Text),
                        [{dict, Dict#{peer => all}},
                         remove_timeout,
                         {last_say, Text}];
                      nomatch ->
                        Text = [Name, <<" is not known. Please try again!">>],
-                       ok = gaia_command_serv:say(Text),
+                       ok = gaia_tts_serv:say(Text),
                        [{cd, '..'}, {last_say, Text}]
                    end
                end
@@ -617,11 +617,11 @@ group with ">>,
                       PeerId, #{read => false}) of
                  ok ->
                    Text = [<<"You are now deaf to ">>, PeerName],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
                  {error, already_set} ->
                    Text = [<<"You are already deaf to ">>, PeerName],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()]
                end;
               (#{peer := all}) ->
@@ -641,12 +641,12 @@ group with ">>,
                            PeerId, #{read => false})
                  end, NonMutedPeerIds),
                Text = [<<"You are now deaf to all">>],
-               ok = gaia_command_serv:say(Text),
+               ok = gaia_tts_serv:say(Text),
                [{last_say, Text}|leave_command_mode()]
            end,
            fun(_Dict) ->
                ?LOG_INFO(#{onsuccess => no}),
-               ok = gaia_command_serv:say(<<"OK">>),
+               ok = gaia_tts_serv:say(<<"OK">>),
                leave_command_mode()
            end),
          %%
@@ -663,7 +663,7 @@ group with ">>,
                  [#gaia_peer{name = PeerName} = Peer] ->
                    Text = [<<"Do you no longer want to be deaf to ">>, PeerName,
                            <<"?">>],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{dict, Dict#{peer => Peer}},
                     remove_timeout,
                     {last_say, Text}];
@@ -671,13 +671,13 @@ group with ">>,
                    case gaia_fuzzy:match(?l2b(Name), [<<"all">>]) of
                      {ok, _} ->
                        Text = [<<"Do you no longer want to be deaf to all?">>],
-                       ok = gaia_command_serv:say(Text),
+                       ok = gaia_tts_serv:say(Text),
                        [{dict, Dict#{peer => all}},
                         remove_timeout,
                         {last_say, Text}];
                      nomatch ->
                        Text = [Name, <<" is not known. Please try again!">>],
-                       ok = gaia_command_serv:say(Text),
+                       ok = gaia_tts_serv:say(Text),
                        [{cd, '..'}, {last_say, Text}]
                    end
                end
@@ -689,11 +689,11 @@ group with ">>,
                       PeerId, #{read => true}) of
                  ok ->
                    Text = [<<"You are no longer deaf to ">>, PeerName],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
                  {error, already_set} ->
                    Text = [<<"You are not deaf to ">>, PeerName],
-                   ok = gaia_command_serv:say(Text),
+                   ok = gaia_tts_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()]
                end;
               (#{peer := all}) ->
@@ -712,12 +712,12 @@ group with ">>,
                            PeerId, #{read => true})
                  end, MutedPeerIds),
                Text = [<<"You are no longer deaf to all">>],
-               ok = gaia_command_serv:say(Text),
+               ok = gaia_tts_serv:say(Text),
                [{last_say, Text}|leave_command_mode()]
            end,
            fun(_Dict) ->
                ?LOG_INFO(#{onsuccess => no}),
-               ok = gaia_command_serv:say(<<"OK">>),
+               ok = gaia_tts_serv:say(<<"OK">>),
                leave_command_mode()
            end),
          %%
@@ -732,17 +732,17 @@ group with ">>,
                  case config:lookup([gaia, peers, {name, ?l2b(Name)}]) of
                    not_found ->
                      Text = [Name, <<" is not known. Please try again!">>],
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{cd, '..'}, {last_say, Text}];
                    ConfigPeer ->
                      case config:lookup_children([mode], ConfigPeer) of
                        [ignore] ->
                          Text = [<<"Yes, ">>, Name, <<" is ignored">>],
-                         ok = gaia_command_serv:say(Text),
+                         ok = gaia_tts_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()];
                        _ ->
                          Text = [<<"No, ">>, Name, <<" is not ignored">>],
-                         ok = gaia_command_serv:say(Text),
+                         ok = gaia_tts_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()]
                      end
                  end
@@ -759,13 +759,13 @@ group with ">>,
                  case config:lookup([gaia, peers, {name, Name}]) of
                    not_found ->
                      Text = [Name, <<" is not known. Please try again!">>],
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{cd, '..'}, {last_say, Text}];
                    ConfigPeer ->
                      case config:lookup_children([mode], ConfigPeer) of
                        [ignore] ->
                          Text = [<<"You already ignore ">>, Name],
-                         ok = gaia_command_serv:say(Text),
+                         ok = gaia_tts_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()];
                        _ ->
                          ok = config:edit_config(
@@ -774,7 +774,7 @@ group with ">>,
                                     [[{name, Name},
                                       {mode, <<"ignore">>}]]}]}]),
                          Text = [<<"You now ignore ">>, Name],
-                         ok = gaia_command_serv:say(Text),
+                         ok = gaia_tts_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()]
                      end
                  end
@@ -791,7 +791,7 @@ group with ">>,
                  case config:lookup([gaia, peers, {name, Name}]) of
                    not_found ->
                      Text = [Name, <<" is not known. Please try again!">>],
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{cd, '..'}, {last_say, Text}];
                    ConfigPeer ->
                      case config:lookup_children([mode], ConfigPeer) of
@@ -802,11 +802,11 @@ group with ">>,
                                     [[{name, Name},
                                       {mode, <<"call">>}]]}]}]),
                          Text = [<<"You no longer ignore ">>, Name],
-                         ok = gaia_command_serv:say(Text),
+                         ok = gaia_tts_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()];
                        _ ->
                          Text = [<<"You do not ignore ">>, Name],
-                         ok = gaia_command_serv:say(Text),
+                         ok = gaia_tts_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()]
                      end
                  end
@@ -823,18 +823,18 @@ group with ">>,
                  case config:lookup([gaia, peers, {name, ?l2b(Name)}]) of
                    not_found ->
                      Text = [Name, <<" is not known. Please try again!">>],
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{cd, '..'}, {last_say, Text}];
                    ConfigPeer ->
                      case config:lookup_children([mode], ConfigPeer) of
                        [direct] ->
                          Text = [<<"Yes, ">>, Name, <<" has direct access">>],
-                         ok = gaia_command_serv:say(Text),
+                         ok = gaia_tts_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()];
                        _ ->
                          Text =
                            [<<"No, ">>, Name, <<" has not direct access">>],
-                         ok = gaia_command_serv:say(Text),
+                         ok = gaia_tts_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()]
                      end
                  end
@@ -851,14 +851,14 @@ group with ">>,
                  case config:lookup([gaia, peers, {name, Name}]) of
                    not_found ->
                      Text = [Name, <<" is not known. Please try again!">>],
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{cd, '..'}, {last_say, Text}];
                    ConfigPeer ->
                      case config:lookup_children([mode], ConfigPeer) of
                        [direct] ->
                          Text = [<<"You already give direct access to ">>,
                                  Name],
-                         ok = gaia_command_serv:say(Text),
+                         ok = gaia_tts_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()];
                        _ ->
                          ok = config:edit_config(
@@ -867,7 +867,7 @@ group with ">>,
                                     [[{name, Name},
                                       {mode, <<"direct">>}]]}]}]),
                          Text = [<<"You gave direct access to ">>, Name],
-                         ok = gaia_command_serv:say(Text),
+                         ok = gaia_tts_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()]
                      end
                  end
@@ -884,7 +884,7 @@ group with ">>,
                  case config:lookup([gaia, peers, {name, Name}]) of
                    not_found ->
                      Text = [Name, <<" is not known. Please try again!">>],
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{cd, '..'}, {last_say, Text}];
                    ConfigPeer ->
                      case config:lookup_children([mode], ConfigPeer) of
@@ -896,12 +896,12 @@ group with ">>,
                                       {mode, <<"call">>}]]}]}]),
                          Text = [<<"You no longer give direct access to ">>,
                                  Name],
-                         ok = gaia_command_serv:say(Text),
+                         ok = gaia_tts_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()];
                        _ ->
                          Text = [<<"You do not give direct access to ">>,
                                  Name],
-                         ok = gaia_command_serv:say(Text),
+                         ok = gaia_tts_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()]
                      end
                  end
@@ -918,18 +918,18 @@ group with ">>,
                  case config:lookup([gaia, peers, {name, ?l2b(Name)}]) of
                    not_found ->
                      Text = [Name, <<" is not known. Please try again!">>],
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{cd, '..'}, {last_say, Text}];
                    ConfigPeer ->
                      case config:lookup_children([mode], ConfigPeer) of
                        [direct] ->
                          Text = [<<"Yes, ">>, Name, <<" has high priority">>],
-                         ok = gaia_command_serv:say(Text),
+                         ok = gaia_tts_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()];
                        _ ->
                          Text = [<<"No, ">>, Name,
                                  <<" does not have high priority">>],
-                         ok = gaia_command_serv:say(Text),
+                         ok = gaia_tts_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()]
                      end
                  end
@@ -946,7 +946,7 @@ group with ">>,
                  case config:lookup([gaia, peers, {name, Name}]) of
                    not_found ->
                      Text = [Name, <<" is not known. Please try again!">>],
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{cd, '..'}, {last_say, Text}];
                    ConfigPeer ->
                      [Options] = config:lookup_children([options], ConfigPeer),
@@ -954,7 +954,7 @@ group with ">>,
                        true ->
                          Text = [<<"You already give ">>, Name,
                                  <<" high priority">>],
-                         ok = gaia_command_serv:say(Text),
+                         ok = gaia_tts_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()];
                        false ->
                          ok = config:edit_config(
@@ -965,7 +965,7 @@ group with ">>,
                                                  [?a2b(Option) ||
                                                    Option <- Options]]}]]}]}]),
                          Text = [<<"You gave ">>, Name, <<" high priority">>],
-                         ok = gaia_command_serv:say(Text),
+                         ok = gaia_tts_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()]
                      end
                  end
@@ -982,7 +982,7 @@ group with ">>,
                  case config:lookup([gaia, peers, {name, Name}]) of
                    not_found ->
                      Text = [Name, <<" is not known. Please try again!">>],
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{cd, '..'}, {last_say, Text}];
                    ConfigPeer ->
                      [Options] = config:lookup_children([options], ConfigPeer),
@@ -997,12 +997,12 @@ group with ">>,
                                                     Options)}]]}]}]),
                          Text = [<<"You no longer give ">>, Name,
                                  <<" high priority">>],
-                         ok = gaia_command_serv:say(Text),
+                         ok = gaia_tts_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()];
                        true ->
                          Text = [<<"You do not give ">>, Name,
                                  <<" high priority">>],
-                         ok = gaia_command_serv:say(Text),
+                         ok = gaia_tts_serv:say(Text),
                          [{last_say, Text}|leave_command_mode()]
                      end
                  end
@@ -1027,28 +1027,19 @@ group with ">>,
                  case OnlinePeerNames of
                    [] ->
                      Text = <<"No one is online">>,
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()];
                    [PeerName] ->
                      Text = [PeerName, <<" is online">>],
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()];
                    _ ->
-                     Text = [gaia_command_serv:format_items(OnlinePeerNames),
+                     Text = [gaia_tts_serv:format_items(OnlinePeerNames),
                              <<" are online">>],
-                     ok = gaia_command_serv:say(Text),
+                     ok = gaia_tts_serv:say(Text),
                      [{last_say, Text}|leave_command_mode()]
                  end
              end)]}].
-
-%%
-%% Export: leave_command_mode
-%%
-
-leave_command_mode(CommandState) ->
-  ok = gaia_command_serv:beep(leave_command_mode),
-  %%ok = gaia_command_serv:serve_all(),
-  CommandState#{path => [], dict => #{}}.
 
 %%
 %% Command utilities
@@ -1077,12 +1068,20 @@ ask_yes_no(Name, AskPatterns, AskOnsuccess, YesOnsuccess, NoOnsuccess) ->
 
 enter_command_mode() ->
   ?LOG_DEBUG(#{enter_command_mode => now}),
-  ok = gaia_command_serv:beep(enter_command_mode),
-  %%ok = gaia_command_serv:serve_only_me(),
+  ok = play(enter_command_mode),
+  %%ok = gaia_asr_serv:serve_only_me(),
   [].
 %[{set_timeout, 4000, fun leave_command_mode/1}].
 
 leave_command_mode() ->
-  ok = gaia_command_serv:beep(leave_command_mode),
-  %%ok = gaia_command_serv:serve_all(),
+  ok = play(leave_command_mode),
+  %%ok = gaia_asr_serv:serve_all(),
   [{cd, []}, {dict, #{}}].
+
+play(enter_command_mode) ->
+    ok = alsa_wave:enter(),
+    %% FIXME: lower volume and implement a alsa_wave:{start,stop}_loop/1
+    %%spawn(fun() -> alsa_wave:mute() end),
+    ok;
+play(leave_command_mode) ->
+    alsa_wave:leave().

@@ -60,12 +60,16 @@ init([]) ->
 	#{id => gaia_network_sender_serv,
           start => {gaia_network_sender_serv, start_link,
                     [PeerId, true, UseOpusCodec]}},
-    GaiaCommandServ =
-	#{id => gaia_command_serv,
-          start => {gaia_command_serv, start_link, [false, false]}},
+    GaiaAsrServ =
+	#{id => gaia_asr_serv,
+          start => {gaia_asr_serv, start_link, [true]}},
+    GaiaTtsServ =
+	#{id => gaia_tts_serv,
+          start => {gaia_tts_serv, start_link, []}},
     {ok, {#{strategy => one_for_all},
           [GaiaServ,
            GaiaRestService,
            GaiaAudioSourceServ,
            GaiaNetworkSenderServ,
-           GaiaCommandServ]}}.
+           GaiaAsrServ,
+           GaiaTtsServ]}}.
