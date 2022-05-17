@@ -199,9 +199,7 @@ create_callback(VoskRecognizer, VoskTransform, CommandState) ->
                                             CommandState);
                         #{"text" := Text} ->
                             ?LOG_INFO(#{vosk_text => Text}),
-
-
-
+                            ok = purge_subscription_packets(0),
                             NewCommandState =
                                 handle_command(Text, CommandState),
                             _ = vosk:recognizer_reset(VoskRecognizer),
