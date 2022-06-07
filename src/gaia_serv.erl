@@ -175,7 +175,8 @@ fold(Fun, Acc0) ->
 generate_artificial_id(PeerName) when size(PeerName) < 5 ->
     binary:decode_unsigned(PeerName);
 generate_artificial_id(PeerName) ->
-    binary:decode_unsigned(binary:part(PeerName, {byte_size(PeerName), -4})).
+    erlang:phash2(PeerName).
+%%    binary:decode_unsigned(binary:part(PeerName, {byte_size(PeerName), - 4})).
 
 %%
 %% Exported: handle_start_of_conversation
@@ -1151,3 +1152,6 @@ db_fold(Fun, Acc, {Tab, _DetsTab}) ->
 db_delete_ephemeral_peers({Tab, DetsTab}) ->
     ok = dets:match_delete(DetsTab, #gaia_peer{ephemeral = true, _ = '_'}),
     ets:match_delete(Tab, #gaia_peer{ephemeral = true, _ = '_'}).
+
+%db_dump({Tab, _DetsTab}) ->
+%    ets:tab2list(Tab).

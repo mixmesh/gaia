@@ -119,7 +119,6 @@ message_handler(#{parent := Parent,
     receive
         {call, From, stop = Call} ->
             ?LOG_DEBUG(#{call => Call}),
-            ok = gaia_nif:stop(),
             {stop, From, ok};
         {cast, serve_only_me = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
