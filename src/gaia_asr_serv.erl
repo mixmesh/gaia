@@ -1,7 +1,7 @@
 -module(gaia_asr_serv).
 -export([start_link/1, stop/0,
          serve_only_me/0, serve_all/0,
-         listen/1,
+         listen/1, unlisten/0,
          trigger_callback/1]).
 -export([message_handler/1]).
 
@@ -60,6 +60,15 @@ serve_all() ->
 
 listen(Listen) ->
     serv:cast(?MODULE, {listen, Listen}).
+
+%%
+%% Exported: unlisten
+%%
+
+-spec unlisten() -> ok.
+
+unlisten() ->
+    serv:cast(?MODULE, unlisten).
 
 %%
 %% Exported: trigger_callback
@@ -148,6 +157,9 @@ message_handler(#{parent := Parent,
                     {noreply, State#{callback => UpdatedCallback,
                                      listen => false}}
             end;
+	{cast, unlisten} ->
+            ok = gaia_audio_source_serv:unsubscribe(),
+            {noreply, State#{listen => false}};	    
         {cast, {trigger_callback, Term}} ->
             {noreply, State#{callback => Callback(Term)}};
         {subscription_packet, Packet} ->

@@ -1075,6 +1075,7 @@ enter_command_mode() ->
 
 leave_command_mode() ->
   ok = play(leave_command_mode),
+  ok = gaia_asr_serv:unlisten(),
   %%ok = gaia_asr_serv:serve_all(),
   [{cd, []}, {dict, #{}}].
 

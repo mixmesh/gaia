@@ -62,7 +62,7 @@ init([]) ->
                     [PeerId, true, UseOpusCodec]}},
     GaiaAsrServ =
 	#{id => gaia_asr_serv,
-          start => {gaia_asr_serv, start_link, [true]}},
+	  start => {gaia_asr_serv, start_link, [false]}},
     GaiaTtsServ =
 	#{id => gaia_tts_serv,
           start => {gaia_tts_serv, start_link, []}},
