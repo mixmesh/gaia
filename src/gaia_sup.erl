@@ -72,4 +72,5 @@ init([]) ->
            GaiaAudioSourceServ,
            GaiaNetworkSenderServ,
            GaiaAsrServ,
-           GaiaTtsServ]}}.
+           GaiaTtsServ,
+           GaiaNodisListenerServ]}}.
