@@ -44,9 +44,12 @@ void *audio_sink(void *arg) {
                 jb->exhausted = true;
                 skip_packet = true;
             } else if (jb->playback->seqnum != jb->playback_seqnum) {
+                /*
                 INFOF("Jitter buffer playback has wrapped around for gaia-id \
 %u",
                       jb->peer_id);
+                */
+                printf(">");
                 reset_playback_delay(jb);
             } else {
                 // Step playback entry
@@ -60,11 +63,14 @@ void *audio_sink(void *arg) {
                         // Seqnum mismatch. Use the old playback entry
                         // again!
                         assert(jb->playback->prev->seqnum > next_seqnum);
+                        /*
                         INFOF("Jitter buffer for gaia-id %u expected playback \
 entry %u but got %u (%u will be reused as %u!)",
                               jb->peer_id, next_seqnum,
                               jb->playback->prev->seqnum,
                               jb->playback->prev->seqnum, next_seqnum);
+                        */
+                        printf("?");
                         jb->playback->seqnum = next_seqnum;
                         jb->playback_seqnum = next_seqnum;
                     }

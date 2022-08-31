@@ -205,8 +205,11 @@ gaia-id");
                 if (jb->tail->seqnum == seqnum) {
                     INFOF("Duplicated UDP packet (%u)", seqnum);
                 } else if (jb->tail->seqnum + 1 != seqnum) {
+                    /*
                     INFOF("Missing UDP packet %u. Got %u instead.",
                           jb->tail->seqnum + 1, seqnum);
+                    */
+                    printf("-");
                 }
             }
             jb_entry->seqnum = seqnum;
