@@ -209,7 +209,7 @@ gaia-id");
                     INFOF("Missing UDP packet %u. Got %u instead.",
                           jb->tail->seqnum + 1, seqnum);
                     */
-                    printf("-");
+                    INFOF("-");
                 }
             }
             jb_entry->seqnum = seqnum;

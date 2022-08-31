@@ -49,7 +49,7 @@ void *audio_sink(void *arg) {
 %u",
                       jb->peer_id);
                 */
-                printf(">");
+                INFOF(">");
                 reset_playback_delay(jb);
             } else {
                 // Step playback entry
@@ -70,7 +70,7 @@ entry %u but got %u (%u will be reused as %u!)",
                               jb->playback->prev->seqnum,
                               jb->playback->prev->seqnum, next_seqnum);
                         */
-                        printf("?");
+                        INFOF("?");
                         jb->playback->seqnum = next_seqnum;
                         jb->playback_seqnum = next_seqnum;
                     }
