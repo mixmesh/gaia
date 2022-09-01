@@ -930,9 +930,9 @@ sync_with_config(MyPeerId, Db, OnNew) ->
     %% Update existing peers and groups
     {NewConfigPeers, NewConfigGroups} =
         db_fold(
-          fun(#gaia_peer{id = PeerId} = Peer,
+          fun(#gaia_peer{id = PeerId, name = PeerName} = Peer,
               {ConfigPeers, ConfigGroups}) ->
-                  case lists:keytake(id, 1, ConfigPeers) of
+                  case take_config_peer(PeerName, ConfigPeers) of
                       {value, ConfigPeer, RemainingConfigPeers} ->
                           [Mode, Options] =
                               config:lookup_children([mode, options],
@@ -957,7 +957,7 @@ sync_with_config(MyPeerId, Db, OnNew) ->
                   end;
              (#gaia_group{id = GroupId, name = GroupName} = Group,
 	      {ConfigPeers, ConfigGroups}) ->
-                  case lists:keytake(id, 1, ConfigGroups) of
+                  case take_config_group(GroupName, ConfigGroups) of
                       {value, ConfigGroup, RemainingConfigGroups} ->
                           [Public, MulticastIpAddress, GroupPort, Type,
                            Members] =
@@ -1065,6 +1065,36 @@ sync_with_config(MyPeerId, Db, OnNew) ->
           end, config:lookup([gaia, 'groups-of-interest'])),
     AllNames = PeerAndGroupNames ++ GroupOfInterestNames,
     {ok, GroupsOfInterest, AllNames}.
+
+take_config_peer(PeerName, ConfigPeers) ->
+    take_config_peer(PeerName, ConfigPeers, []).
+
+take_config_peer(_PeerName, [], _MismatchedConfigPeers) ->
+    false;
+take_config_peer(PeerName, [ConfigPeer|Rest], MismatchedConfigPeers) ->
+    case config:lookup_children([name], ConfigPeer) of
+        [PeerName] ->
+            {value, ConfigPeer,
+             lists:reverse(MismatchedConfigPeers) ++ Rest};
+	[_] ->
+            take_config_peer(PeerName, Rest,
+                             [ConfigPeer|MismatchedConfigPeers])
+    end.
+
+take_config_group(GroupName, ConfigGroups) ->
+    take_config_group(GroupName, ConfigGroups, []).
+
+take_config_group(_GroupName, [], _MismatchedConfigGroups) ->
+    false;
+take_config_group(GroupName, [ConfigGroup|Rest], MismatchedConfigGroups) ->
+    case config:lookup_children([name], ConfigGroup) of
+        [GroupName] ->
+            {value, ConfigGroup,
+             lists:reverse(MismatchedConfigGroups) ++ Rest};
+        [_] ->
+            take_config_group(GroupName, Rest,
+                              [ConfigGroup|MismatchedConfigGroups])
+    end.
 
 generate_id_if_needed(0, Name) ->
     generate_artificial_id(Name);
