@@ -42,4 +42,4 @@ Read http://youness.net/raspberry-pi/how-to-connect-bluetooth-headset-or-speaker
 
 Note: You can pass "auto_switch=2" to module-bluetooth-policy in /etc/pulse/default.pa to make the profile switching more aggressive.
 
-load-module module-bluetooth-policy auto_switch=2
+https://www.freedesktop.org/wiki/Software/PulseAudio/Documentation/User/SystemWide/

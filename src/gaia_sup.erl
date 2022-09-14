@@ -17,7 +17,9 @@ start_link() ->
         {ok, SupervisorPid} ->
             supervisor_helper:foreach_worker(
               SupervisorPid,
-              fun(_Id, Pid, NeighbourWorkers) ->
+              fun(gaia_pa_serv, _Pid, _NeighbourWorkers) ->
+                      ok;
+                 (_Id, Pid, NeighbourWorkers) ->
                       Pid ! {neighbour_workers, NeighbourWorkers}
               end),
             {ok, SupervisorPid};
@@ -38,6 +40,9 @@ init([]) ->
         config:lookup_children(
           ['peer-id', 'peer-name', 'rest-port', 'use-opus-codec',
            'capture-pcm-name', 'playback-pcm-name'], ConfigGaia),
+    GaiaPaServ =
+	#{id => gaia_pa_serv,
+          start => {gaia_pa_serv, start_link, []}},
     GaiaServ =
 	#{id => gaia_serv,
           start => {gaia_serv, start_link,
@@ -67,7 +72,8 @@ init([]) ->
 	#{id => gaia_tts_serv,
           start => {gaia_tts_serv, start_link, []}},
     {ok, {#{strategy => one_for_all},
-          [GaiaServ,
+          [GaiaPaServ,
+           GaiaServ,
            GaiaRestService,
            GaiaAudioSourceServ,
            GaiaNetworkSenderServ,

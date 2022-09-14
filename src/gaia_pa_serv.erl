@@ -49,7 +49,7 @@ message_handler(#{parent := Parent, port := Port} = _State) ->
             ok = switch(N, string:tokens(Lines, "\n")),
             noreply;
         {Port, {data, Data}} ->
-            ?LOG_DEBUG(#{skip_data => Data}),
+            %?LOG_DEBUG(#{skip_data => Data}),
             noreply;
         {'EXIT', Parent, Reason} ->
             exit(Reason);
@@ -63,11 +63,24 @@ switch(_N, []) ->
 switch(N, [Line|Rest]) ->
     case string:tokens(Line, "\t") of
         [N, "bluez_card." ++ _ = Card, _] ->
-            Result =
-                os:cmd("/usr/bin/pactl set-card-profile " ++ Card ++
-                           " headset_head_unit 2>&1"),
-            ?LOG_INFO(#{switch_to => Card, result => Result}),
-            ok;
+            set_card_profile(Card);
         _ ->
             switch(N, Rest)
+    end.
+
+set_card_profile(Card) ->
+    set_card_profile("/usr/bin/pactl set-card-profile " ++ Card,
+                     ["headset_head_unit", "handsfree_head_unit"]).
+
+set_card_profile(_Command, []) ->
+    ok;
+set_card_profile(Command, [Profile|Rest]) ->
+    FinalCommand = Command ++ " " ++ Profile ++ " 2>&1",
+    case os:cmd(FinalCommand) of
+        "" ->
+            ?LOG_INFO(#{command_success => FinalCommand}),
+            ok;
+        Failure ->
+            ?LOG_INFO(#{command_failure => FinalCommand, reason => Failure}),
+            set_card_profile(Command, Rest)
     end.
