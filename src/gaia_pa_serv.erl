@@ -48,7 +48,7 @@ message_handler(#{parent := Parent, port := Port} = _State) ->
             Lines = os:cmd("/usr/bin/pactl list short cards"),
             ok = switch(N, string:tokens(Lines, "\n")),
             noreply;
-        {Port, {data, Data}} ->
+        {Port, {data, _Data}} ->
             %?LOG_DEBUG(#{skip_data => Data}),
             noreply;
         {'EXIT', Parent, Reason} ->
