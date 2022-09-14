@@ -6,6 +6,8 @@
 #include "globals.h"
 #include "gaia_utils.h"
 
+extern FILE *LOG_FD;
+
 jb_t *jb_new(uint32_t peer_id, bool opus_enabled) {
     jb_t *jb = malloc(sizeof(jb_t));
     jb->peer_id = peer_id;

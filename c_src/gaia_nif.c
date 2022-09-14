@@ -36,6 +36,8 @@ DECL_ATOM(undefined);
 #define MAX_PCM_NAME_LEN 64
 #define MAX_SRC_ADDRS 256
 
+FILE *LOG_FD;
+
 bool started = false;
 pthread_rwlock_t *params_rwlock;
 uint64_t params_last_updated;
@@ -123,6 +125,12 @@ static ERL_NIF_TERM _start(ErlNifEnv* env, int argc,
     if (!parse_params(env, argc, argv)) {
         return enif_make_tuple2(env, ATOM(error), ATOM(bad_params));
     }
+
+#ifdef LOG_TO_FILE
+    LOG_FD = fopen("/tmp/gaia-nif-trace.log", "w");
+#else
+    LOG_FD = stderr;
+#endif
 
     // Create locks
     params_rwlock = malloc(sizeof(pthread_rwlock_t));

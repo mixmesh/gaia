@@ -7,6 +7,8 @@
 #define M  (1 << 15)
 #define MM (1 << 31)
 
+extern FILE *LOG_FD;
+
 // Read https://www.alsa-project.org/wiki/FramesPeriods carefully
 
 int audio_new(char *pcm_name, snd_pcm_stream_t stream, int mode,

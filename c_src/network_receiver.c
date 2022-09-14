@@ -15,6 +15,8 @@
 #define FOUR_SECONDS_IN_US (4 * 1000000)
 #define DRAIN_BUF_SIZE 1
 
+extern FILE *LOG_FD;
+
 extern jb_table_t *jb_table;
 extern bool kill_network_receiver;
 extern conversation_table_t *conversation_table;

@@ -13,6 +13,8 @@
 #define MAX_NETWORK_SENDER_ADDR_PORTS 256
 #define MAX_SRC_ADDRS 256
 
+FILE *LOG_FD;
+
 // Shared data (same as in gaia_nif.c)
 jb_table_t *jb_table;
 bool kill_network_sender = false;
@@ -154,6 +156,12 @@ int main (int argc, char *argv[]) {
     if (peer_id == 0) {
         usage(argv);
     }
+
+#ifdef LOG_TO_FILE
+    LOG_FD = fopen("/tmp/gaia-nif-trace.log", "w");
+#else
+    LOG_FD = stderr;
+#endif
 
     // Create jitter buffer table
     jb_table = jb_table_new();

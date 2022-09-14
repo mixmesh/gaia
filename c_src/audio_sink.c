@@ -16,6 +16,8 @@ extern bool playback_packet_is_ready;
 
 #define MAX_SILENCE_CYCLES 4
 
+extern FILE *LOG_FD;
+
 void reset_playback_delay(jb_t *jb) {
     jb->playback = jb_get_entry(jb, JITTER_BUFFER_PLAYBACK_DELAY_IN_PERIODS);
     assert(jb->playback != NULL);
