@@ -6,19 +6,32 @@
 #include <inttypes.h>
 
 #ifdef DEBUG
+#ifdef LOG_TO_FILE
+#define DEBUGF(f, ...) fprintf(LOG_FD, f "\r\n", ##__VA_ARGS__); fflush(LOG_FD)
+#else
 #define DEBUGF(f, ...) fprintf(LOG_FD, f "\r\n", ##__VA_ARGS__)
+#endif
 #else
 #define DEBUGF(f, ...)
 #endif
 
 #ifdef INFO
+#ifdef LOG_TO_FILE
+#define INFOF(f, ...) fprintf(LOG_FD, f "\r\n", ##__VA_ARGS__); fflush(LOG_FD)
+#define INFOFNNL(f, ...) fprintf(LOG_FD, f, ##__VA_ARGS__); fflush(LOG_FD)
+#else
 #define INFOF(f, ...) fprintf(LOG_FD, f "\r\n", ##__VA_ARGS__)
 #define INFOFNNL(f, ...) fprintf(LOG_FD, f, ##__VA_ARGS__)
+#endif
 #else
 #define INFOF(f, ...)
 #endif
 
+#ifdef LOG_TO_FILE
+#define ERRORF(f, ...) fprintf(LOG_FD, f "\r\n", ##__VA_ARGS__); fflush(LOG_FD)
+#else
 #define ERRORF(f, ...) fprintf(LOG_FD, f "\r\n", ##__VA_ARGS__)
+#endif
 
 #if __BIG_ENDIAN__
 #define htonll(x) (x)
