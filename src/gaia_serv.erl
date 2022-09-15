@@ -655,8 +655,9 @@ update_network_sender(MyPeerId, Db, Conversations) ->
              ({group, GroupId, undefined, GroupPort}, Acc) ->
                   case db_lookup_group_by_id(Db, GroupId) of
                       [#gaia_group{members = '*'}] ->
-                          [#gaia_peer{options = GroupOptions}] =
+                          [#gaia_peer{options = GroupOptions} = GGG] =
                               db_lookup_peer_by_name(Db, <<"*">>),
+                          ?LOG_INFO(#{star => GGG}),
                           db_fold(
                             fun(#gaia_peer{
                                    ephemeral = Ephemeral,
@@ -674,13 +675,16 @@ update_network_sender(MyPeerId, Db, Conversations) ->
                                                      MemberAddresses]
                                             end;
                                         true ->
+                                            ?LOG_INFO(#{star1 => {IpAddress, GroupPort}}),
                                             [{IpAddress, GroupPort}|
                                              MemberAddresses]
                                     end;
                                (_, MemberAddresses) ->
+                                    ?LOG_INFO(#{star2 => true}),
                                     MemberAddresses
                             end, [], Db) ++ Acc;
                       [#gaia_group{members = Members}] ->
+                          ?LOG_INFO(#{non_star => Members}),
                           lists:foldl(
                             fun(PeerId, MemberAddresses)
                                   when PeerId == MyPeerId ->
