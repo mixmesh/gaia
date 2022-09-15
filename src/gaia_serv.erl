@@ -263,7 +263,6 @@ message_handler(#{parent := Parent,
                     {reply, From, {error, already_started}};
                 [Peer] ->
                     UpdatedPeer =
-
                         Peer#gaia_peer{conversation =
                                            {true, ConversationStatus}},
                     true = db_insert(Db, UpdatedPeer),
@@ -510,7 +509,7 @@ update_network(MyPeerId, Db, Busy) ->
 
 update_network(MyPeerId, Db, Busy, StartOfConversations, StoppedPeerIds) ->
     Conversations = find_conversations(Db, Busy),
-    ?LOG_DEBUG(#{'UPDATE_NETWORK' => {conversations, Conversations}}),
+    ?LOG_INFO(#{update_network_receiver => Conversations}),
     ok = update_network_receiver(Db, Conversations),
     if
         StartOfConversations ->
@@ -524,6 +523,7 @@ update_network(MyPeerId, Db, Busy, StartOfConversations, StoppedPeerIds) ->
         _ ->
             ok = stop_of_conversations(MyPeerId, Db, StoppedPeerIds)
     end,
+    ?LOG_INFO(#{update_network_sender => Conversations}),
     update_network_sender(MyPeerId, Db, Conversations).
 
 find_conversations(_Db, _Busy = true) ->
@@ -567,7 +567,7 @@ update_network_receiver(Db, Conversations) ->
           end, Conversations),
     ?LOG_INFO(#{{gaia_nif, update_conversations} => NifConversations}),
     LocalPorts = gaia_nif:update_conversations(NifConversations),
-    ?LOG_DEBUG(#{local_ports => LocalPorts}),
+    ?LOG_INFO(#{local_ports => LocalPorts}),
     %% Update peer with new local port
     lists:foreach(
       fun({{peer, PeerId}, NewLocalPort}) ->
