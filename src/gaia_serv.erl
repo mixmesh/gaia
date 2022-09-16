@@ -833,6 +833,7 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                      (_, Acc) ->
                           Acc
                   end, [], GroupsOfInterest),
+            ?LOG_INFO(#{group_names_of_interest => GroupNamesOfInterest}),
             %% Update peer if needed or create ephemeral peer
             case db_lookup_peer_by_id(Db, NewPeerId) of
                 [#gaia_peer{name = PeerName,
@@ -850,9 +851,9 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                     ok = gaia_tts_serv:peer_up(UpdatedPeer),
 		    gaia_tts_serv:groups_of_interest_updated(
 		      PeerName, GroupNamesOfInterest);
-                [#gaia_peer{name = PeerName}] ->
+                [#gaia_peer{name = PeerName} = BAJS] ->
                     ?LOG_DEBUG(#{'CHANGE_PEER' =>
-                                     same_nodis_address_or_rest_port}),
+                                     {same_nodis_address_or_rest_port, BAJS, NewNodisAddress, NewRestPort}}),
 		    gaia_tts_serv:groups_of_interest_updated(
 		      PeerName, GroupNamesOfInterest);
                 [_] ->
