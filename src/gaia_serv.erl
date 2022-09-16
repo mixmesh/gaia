@@ -425,7 +425,8 @@ message_handler(#{parent := Parent,
                     case end_conversation(Peer) of
                         no ->
                             {reply, From, {error, no_such_call}};
-                        yes ->
+                        {yes, UpdatedPeer} ->
+                            true = db_insert(Db, UpdatedPeer),
                             ok = update_network(MyPeerId, Db, Busy, false, []),
                             {reply, From, ok}
                     end;
@@ -592,7 +593,7 @@ start_of_conversations(MyPeerId, Db, [{peer, PeerId}|Rest]) ->
                 rest_port = RestPort,
                 local_port = LocalPort} = Peer] =
         db_lookup_peer_by_id(Db, PeerId),
-    ?LOG_DEBUG(#{'START_OF_CONVERSATIONS' => {name, PeerName}}),
+    ?LOG_DEBUG(#{start_of_conversations => {name, PeerName}}),
     case gaia_rest_client:start_of_conversation(
            MyPeerId, {IpAddress, RestPort}, LocalPort) of
         {ok, NewRemotePort} ->
@@ -626,7 +627,7 @@ stop_of_conversations(MyPeerId, Db, [PeerId|Rest]) ->
                 nodis_address = {IpAddress, _SyncPort},
                 rest_port = RestPort}] =
         db_lookup_peer_by_id(Db, PeerId),
-    ?LOG_DEBUG(#{'STOP_OF_CONVERSATIONS' => {name, PeerName}}),
+    ?LOG_DEBUG(#{stop_of_conversation => {name, PeerName}}),
     case gaia_rest_client:stop_of_conversation(
            MyPeerId, {IpAddress, RestPort}) of
         ok ->
@@ -759,7 +760,7 @@ end_conversation(
   #gaia_peer{conversation = {true, _ConversationStatus}} = Peer) ->
     UpdatedPeer = Peer#gaia_peer{conversation = false},
     ok = gaia_tts_serv:conversation_stopped(UpdatedPeer),
-    yes;
+    {yes, UpdatedPeer};
 end_conversation(_Peer) ->
     no.
 
