@@ -947,6 +947,13 @@ sync_with_config(MyPeerId, Db, OnNew) ->
                                   OnNew ->
                                       Peer#gaia_peer{mode = Mode,
                                                      nodis_address = undefined,
+
+
+                                                     rest_port = undefined,
+
+
+
+
                                                      local_port = undefined,
                                                      remote_port = undefined,
                                                      options = Options};
