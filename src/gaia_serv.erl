@@ -679,8 +679,8 @@ update_network_sender(MyPeerId, Db, Conversations) ->
                                             [{IpAddress, GroupPort}|
                                              MemberAddresses]
                                     end;
-                               (_, MemberAddresses) ->
-                                    ?LOG_INFO(#{star2 => true}),
+                               (G2, MemberAddresses) ->
+                                    ?LOG_INFO(#{star2 => G2}),
                                     MemberAddresses
                             end, [], Db) ++ Acc;
                       [#gaia_group{members = Members}] ->
