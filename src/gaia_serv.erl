@@ -847,7 +847,7 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                     ok = gaia_tts_serv:peer_up(UpdatedPeer),
 		    gaia_tts_serv:groups_of_interest_updated(
 		      PeerName, GroupNamesOfInterest);
-                [#gaia_peer{name = PeerName} = BAJS] ->
+                [#gaia_peer{name = PeerName}] ->
                     ?LOG_DEBUG(#{change_peer => same_nodis_address_or_rest_port}),
 		    gaia_tts_serv:groups_of_interest_updated(
 		      PeerName, GroupNamesOfInterest);
