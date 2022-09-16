@@ -655,9 +655,8 @@ update_network_sender(MyPeerId, Db, Conversations) ->
              ({group, GroupId, undefined, GroupPort}, Acc) ->
                   case db_lookup_group_by_id(Db, GroupId) of
                       [#gaia_group{members = '*'}] ->
-                          [#gaia_peer{options = GroupOptions} = GGG] =
+                          [#gaia_peer{options = GroupOptions}] =
                               db_lookup_peer_by_name(Db, <<"*">>),
-                          ?LOG_INFO(#{star => GGG}),
                           db_fold(
                             fun(#gaia_peer{
                                    ephemeral = Ephemeral,
@@ -675,16 +674,13 @@ update_network_sender(MyPeerId, Db, Conversations) ->
                                                      MemberAddresses]
                                             end;
                                         true ->
-                                            ?LOG_INFO(#{star1 => {IpAddress, GroupPort}}),
                                             [{IpAddress, GroupPort}|
                                              MemberAddresses]
                                     end;
-                               (G2, MemberAddresses) ->
-                                    ?LOG_INFO(#{star2 => G2}),
+                               (_, MemberAddresses) ->
                                     MemberAddresses
                             end, [], Db) ++ Acc;
                       [#gaia_group{members = Members}] ->
-                          ?LOG_INFO(#{non_star => Members}),
                           lists:foldl(
                             fun(PeerId, MemberAddresses)
                                   when PeerId == MyPeerId ->
@@ -841,8 +837,8 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
                             rest_port = RestPort} = Peer]
                   when NodisAddress /= NewNodisAddress andalso
                        RestPort /= NewRestPort ->
-                    ?LOG_DEBUG(#{'CHANGE_PEER' =>
-                                     new_nodis_address_or_rest_port}),
+                    ?LOG_DEBUG(
+                       #{change_peer => new_nodis_address_or_rest_port}),
                     UpdatedPeer =
                         Peer#gaia_peer{nodis_address = NewNodisAddress,
                                        remote_port = undefined,
@@ -852,15 +848,14 @@ change_peer(MyPeerId, Db, GroupsOfInterest,
 		    gaia_tts_serv:groups_of_interest_updated(
 		      PeerName, GroupNamesOfInterest);
                 [#gaia_peer{name = PeerName} = BAJS] ->
-                    ?LOG_DEBUG(#{'CHANGE_PEER' =>
-                                     {same_nodis_address_or_rest_port, BAJS, NewNodisAddress, NewRestPort}}),
+                    ?LOG_DEBUG(#{change_peer => same_nodis_address_or_rest_port}),
 		    gaia_tts_serv:groups_of_interest_updated(
 		      PeerName, GroupNamesOfInterest);
                 [_] ->
-                    ?LOG_DEBUG(#{'CHANGE_PEER' => ignoring_peer}),
+                    ?LOG_DEBUG(#{change_peer => ignoring_peer}),
                     ok;
                 [] ->
-                    ?LOG_DEBUG(#{'CHANGE_PEER' => epehemeral_peer}),
+                    ?LOG_DEBUG(#{change_peer => epehemeral_peer}),
                     EphemeralPeer =
                         #gaia_peer{
                            id = NewPeerId,
@@ -908,7 +903,7 @@ down_peer(Db, NodisAddress) ->
 
 new_db(GaiaDir, PeerId) ->
     FilePath = filename:join([GaiaDir, ?MODULE]),
-    #gaia_peer.id = #gaia_group.id, %% This must me true!
+    #gaia_peer.id = #gaia_group.id, %% This must be true!
     {ok, DetsTab} =
         dets:open_file(?MODULE, [{file, ?b2l(FilePath)},
                                  {keypos, #gaia_peer.id}]),
@@ -947,13 +942,7 @@ sync_with_config(MyPeerId, Db, OnNew) ->
                                   OnNew ->
                                       Peer#gaia_peer{mode = Mode,
                                                      nodis_address = undefined,
-
-
                                                      rest_port = undefined,
-
-
-
-
                                                      local_port = undefined,
                                                      remote_port = undefined,
                                                      options = Options};
