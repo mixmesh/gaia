@@ -512,20 +512,28 @@ update_network(MyPeerId, Db, Busy, StartOfConversations, StoppedPeerIds) ->
     Conversations = find_conversations(Db, Busy),
     ?LOG_INFO(#{update_network_receiver => Conversations}),
     ok = update_network_receiver(Db, Conversations),
-    if
-        StartOfConversations ->
-            ok = start_of_conversations(MyPeerId, Db, Conversations);
-        true ->
-            ok
-    end,
+    RemainingConversations =
+        if
+            StartOfConversations ->
+                case start_of_conversations(MyPeerId, Db, Conversations) of
+                    success ->
+                        Conversations;
+                    failure ->
+                        UpdatedConversations = find_conversations(Db, Busy),
+                        update_network_receiver(Db, UpdatedConversations),
+                        UpdatedConversations
+                end;
+            true ->
+                Conversations
+        end,
     case StoppedPeerIds of
         [] ->
             ok;
         _ ->
             ok = stop_of_conversations(MyPeerId, Db, StoppedPeerIds)
     end,
-    ?LOG_INFO(#{update_network_sender => Conversations}),
-    update_network_sender(MyPeerId, Db, Conversations).
+    ?LOG_INFO(#{update_network_sender => RemainingConversations}),
+    update_network_sender(MyPeerId, Db, RemainingConversations).
 
 find_conversations(_Db, _Busy = true) ->
     [];
@@ -582,12 +590,16 @@ update_network_receiver(Db, Conversations) ->
               ok
       end, LocalPorts).
 
-start_of_conversations(_MyPeerId, _Db, []) ->
-    ok;
+start_of_conversations(MyPeerId, Db, Conversations) ->
+    start_of_conversations(success, MyPeerId, Db, Conversations).
+
+start_of_conversations(Result, _MyPeerId, _Db, []) ->
+    Result;
 start_of_conversations(
-  MyPeerId, Db, [{group, _GroupId, _MulticastIpAddress, _GroupPort}|Rest]) ->
-    start_of_conversations(MyPeerId, Db, Rest);
-start_of_conversations(MyPeerId, Db, [{peer, PeerId}|Rest]) ->
+  Result, MyPeerId, Db,
+  [{group, _GroupId, _MulticastIpAddress, _GroupPort}|Rest]) ->
+    start_of_conversations(Result, MyPeerId, Db, Rest);
+start_of_conversations(Result, MyPeerId, Db, [{peer, PeerId}|Rest]) ->
     [#gaia_peer{name = PeerName,
                 nodis_address = {IpAddress, _SyncPort},
                 rest_port = RestPort,
@@ -599,25 +611,29 @@ start_of_conversations(MyPeerId, Db, [{peer, PeerId}|Rest]) ->
         {ok, NewRemotePort} ->
             ok = gaia_tts_serv:start_of_conversation_succeeded(PeerName),
             true = db_insert(Db, Peer#gaia_peer{remote_port = NewRemotePort}),
-            start_of_conversations(MyPeerId, Db, Rest);
+            start_of_conversations(Result, MyPeerId, Db, Rest);
         calling ->
             ok = gaia_tts_serv:start_of_conversation_failed(
                    PeerName, calling),
-            start_of_conversations(MyPeerId, Db, Rest);
+            start_of_conversations(Result, MyPeerId, Db, Rest);
         busy ->
             ok = gaia_tts_serv:start_of_conversation_failed(PeerName, busy),
-            start_of_conversations(MyPeerId, Db, Rest);
+            UpdatedPeer = Peer#gaia_peer{conversation = false},
+            true = db_insert(Db, UpdatedPeer),
+            start_of_conversations(failure, MyPeerId, Db, Rest);
         not_available ->
             ok = gaia_tts_serv:start_of_conversation_failed(
                    PeerName, not_available),
-            start_of_conversations(MyPeerId, Db, Rest);
+            UpdatedPeer = Peer#gaia_peer{conversation = false},
+            true = db_insert(Db, UpdatedPeer),
+            start_of_conversations(failure, MyPeerId, Db, Rest);
         {error, Reason} ->
             ?LOG_ERROR(#{{rest_service_client, start_of_conversation} =>
                              Reason}),
             ok = gaia_tts_serv:start_of_conversation_failed(PeerName, error),
             UpdatedPeer = Peer#gaia_peer{conversation = false},
             true = db_insert(Db, UpdatedPeer),
-            start_of_conversations(MyPeerId, Db, Rest)
+            start_of_conversations(failure, MyPeerId, Db, Rest)
     end.
 
 stop_of_conversations(_MyPeerId, _Db, []) ->
