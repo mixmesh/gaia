@@ -152,14 +152,14 @@ message_handler(#{parent := Parent,
                 true ->
                     noreply;
                 false ->
-                    ok = gaia_audio_source_serv:unsubscribe(),
+                    _ = gaia_audio_source_serv:unsubscribe(),
                     UpdatedCallback = Callback({handle_command, "goodbye"}),
                     {noreply, State#{callback => UpdatedCallback,
                                      listen => false}}
             end;
 	{cast, unlisten} ->
             ok = gaia_audio_source_serv:unsubscribe(),
-            {noreply, State#{listen => false}};	    
+            {noreply, State#{listen => false}};
         {cast, {trigger_callback, Term}} ->
             {noreply, State#{callback => Callback(Term)}};
         {subscription_packet, Packet} ->

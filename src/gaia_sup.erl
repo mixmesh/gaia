@@ -43,11 +43,12 @@ init([]) ->
     GaiaPaServ =
 	#{id => gaia_pa_serv,
           start => {gaia_pa_serv, start_link, []}},
+    ListenAlways = false,
     GaiaServ =
 	#{id => gaia_serv,
           start => {gaia_serv, start_link,
                     [GaiaDir, PeerId, PeerName, RestPort,
-                     ?b2l(PlaybackPcmName)]}},
+                     ?b2l(PlaybackPcmName), ListenAlways]}},
     GaiaRestService =
 	#{id => gaia_rest_service,
           start => {gaia_rest_service, start_link, [PeerId, RestPort]}},
@@ -67,7 +68,7 @@ init([]) ->
                     [PeerId, true, UseOpusCodec]}},
     GaiaAsrServ =
 	#{id => gaia_asr_serv,
-	  start => {gaia_asr_serv, start_link, [false]}},
+	  start => {gaia_asr_serv, start_link, [ListenAlways]}},
     GaiaTtsServ =
 	#{id => gaia_tts_serv,
           start => {gaia_tts_serv, start_link, []}},

@@ -1,5 +1,5 @@
 -module(gaia_serv).
--export([start_link/5, stop/0]).
+-export([start_link/6, stop/0]).
 -export([busy/0, busy/1,
          start_peer_conversation/1, start_peer_conversation/2,
          stop_peer_conversation/1,
@@ -54,14 +54,15 @@
 %%
 
 -spec start_link(binary(), peer_id(), peer_name(), inet:port_number(),
-                 string()) ->
+                 string(), boolean()) ->
           serv:spawn_server_result().
 
-start_link(GaiaDir, PeerId, PeerName, RestPort, PlaybackPcmName) ->
+start_link(GaiaDir, PeerId, PeerName, RestPort, PlaybackPcmName,
+           ListenAlways) ->
     ?spawn_server(
        fun(Parent) ->
                init(Parent, GaiaDir, PeerId, PeerName, RestPort,
-                    PlaybackPcmName)
+                    PlaybackPcmName, ListenAlways)
        end,
        fun initial_message_handler/1,
        #serv_options{name = ?MODULE}).
@@ -202,7 +203,8 @@ handle_stop_of_conversation(PeerId) ->
 %% Server
 %%
 
-init(Parent, GaiaDir, PeerId, PeerName, RestPort, PlaybackPcmName) ->
+init(Parent, GaiaDir, PeerId, PeerName, RestPort, PlaybackPcmName,
+     ListenAlways) ->
     ok = gaia_nif:start(#{pcm_name => PlaybackPcmName,
                           playback_audio => ?PLAYBACK_AUDIO}),
     ?LOG_INFO("Gaia NIF has been initialized"),
@@ -220,16 +222,25 @@ init(Parent, GaiaDir, PeerId, PeerName, RestPort, PlaybackPcmName) ->
            db => Db,
            groups_of_interest => GroupsOfInterest,
            all_names => AllNames,
-           nodis_subscription => NodisSubscription}}.
+           nodis_subscription => NodisSubscription,
+           listen_always => ListenAlways,
+           playcd => false}}.
 
 initial_message_handler(#{peer_id := PeerId,
                           rest_port := RestPort,
-                          db := Db} = State) ->
+                          db := Db,
+                          listen_always := ListenAlways} = State) ->
     receive
         {neighbour_workers, _NeighbourWorkers} ->
             NodeInfo = prepare_node_info(PeerId, RestPort, Db),
             ?LOG_DEBUG(#{node_info => NodeInfo}),
             ok = nodis:set_node_info(NodeInfo),
+            case ListenAlways of
+                true ->
+                    ok;
+                false ->
+                    gaia_pa_serv:subscribe()
+            end,
             {swap_message_handler, fun ?MODULE:message_handler/1, State}
     end.
 
@@ -241,7 +252,8 @@ message_handler(#{parent := Parent,
                   groups_of_interest := GroupsOfInterest,
                   all_names := AllNames,
                   busy := Busy,
-                  nodis_subscription := NodisSubscription} = State) ->
+                  nodis_subscription := NodisSubscription,
+                  playcd := PlayCd} = State) ->
     receive
         {call, From, stop = Call} ->
             ?LOG_DEBUG(#{call => Call}),
@@ -490,6 +502,16 @@ message_handler(#{parent := Parent,
             _ = erlang:send_after(1800 * 1000, self(),
                                   purge_groups_of_interest),
             {noreply, State#{groups_of_interest => UpdatedGroupsOfInterest}};
+        {input_event, playcd} ->
+            ?LOG_DEBUG(#{input_event => playcd}),
+            case PlayCd of
+                true ->
+                    ok = gaia_asr_serv:unlisten(),
+                    {noreply, State#{playcd => false}};
+                false ->
+                    ok = gaia_asr_serv:listen(true),
+                    {noreply, State#{playcd => true}}
+            end;
         {system, From, Request} ->
             ?LOG_DEBUG(#{system => Request}),
             {system, From, Request};
