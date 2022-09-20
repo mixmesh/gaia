@@ -173,7 +173,7 @@ refresh_devices(Devices) ->
                       ok;
                   false ->
                       ?LOG_DEBUG(#{unsubscribe => DeviceFilename}),
-                      inpevt:unsubscribe(Port, self())
+                      ok = inpevt:unsubscribe(Port, self())
               end
       end, Devices),
     %% Subscribe
@@ -184,7 +184,7 @@ refresh_devices(Devices) ->
                       ok;
                   false ->
                       ?LOG_DEBUG(#{subscribe => DeviceFilename}),
-                      inpevt:subscribe(Port, self())
+                      ok = inpevt:subscribe(Port, self())
               end
       end, UpdatedDevices),
     UpdatedDevices.
