@@ -1,15 +1,10 @@
-* Use new erlang on golden boxes (with JIT support). Already done?
-* Clean out mixmesh/etc and create/update all conf files
-* Test, test and test
-* Remove dirty scheduler in opus nif?
+* Install on all golden boxes + headsets
+* Test
 
 == STOP! THINK!
 
-* Build vosk ourselves
-* alsa_wav.erl blocks BEAM
 * Look into FIXME:s
 * Svenska
-* Install on all golden boxes
 
 * Adaptive jitter buffer
   * Look at the 94 paper and work with pitch scaling
