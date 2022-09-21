@@ -192,7 +192,7 @@ all() ->
                    [{dict, Dict#{group => Group}},
                     remove_timeout,
                     {last_say, Text}];
-                 [] ->
+                 _ ->
                    Text = [<<"Group ">>, Name,
                            <<" is not known. Please try again!">>],
                    ok = gaia_tts_serv:say(Text),
