@@ -139,9 +139,6 @@ message_handler(#{parent := Parent,
             %% FIXME: enable serve only!!!
             %%ok = gaia_audio_source_serv:serve_all(),
             noreply;
-        {cast, {listen, Listen} = Cast} ->
-            ?LOG_DEBUG(#{cast => Cast}),
-            noreply;
         {cast, {listen, true} = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
             UpdatedCallback = Callback({handle_command, "command"}),

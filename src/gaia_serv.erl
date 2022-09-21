@@ -506,9 +506,11 @@ message_handler(#{parent := Parent,
             ?LOG_DEBUG(#{input_event => playcd}),
             case PlayCd of
                 true ->
+                    ?LOG_DEBUG(#{unlisten => playcd}),
                     ok = gaia_asr_serv:unlisten(),
                     {noreply, State#{playcd => false}};
                 false ->
+                    ?LOG_DEBUG(#{listen => playcd}),
                     ok = gaia_asr_serv:listen(true),
                     {noreply, State#{playcd => true}}
             end;
