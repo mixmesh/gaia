@@ -161,49 +161,55 @@ set_card_profile(Command, [Profile|Rest]) ->
 %%
 
 refresh_devices(Devices) ->
-    timer:sleep(2000), % ehhh!
-    ok = delete_devices(inpevt:list_devices(), Devices),
-    _ = inpevt:add_matched_devices([{name, "OpenMove"}]),
-    {ok, UpdatedDevices} = inpevt:get_devices(),
-    %% Unsubscribe
-    lists:foreach(
-      fun({_Name, #{device := DeviceFilename, port := Port}}) ->
-              case device_exists(DeviceFilename, UpdatedDevices) of
-                  true ->
-                      ok;
-                  false ->
-                      ?LOG_DEBUG(#{unsubscribe => DeviceFilename}),
-                      ok = inpevt:unsubscribe(Port, self())
-              end
-      end, Devices),
-    %% Subscribe
-    lists:foreach(
-      fun({_Name, #{device := DeviceFilename, port := Port}}) ->
-              case device_exists(DeviceFilename, Devices) of
-                  true ->
-                      ok;
-                  false ->
-                      ?LOG_DEBUG(#{subscribe => DeviceFilename}),
-                      ok = inpevt:subscribe(Port, self())
-              end
-      end, UpdatedDevices),
-    UpdatedDevices.
+    timer:sleep(2000), % ehhh! try fnotify?
+    {_Added,Removed} = inpevt:diff_devices(Devices),
+    inpevt:delete_devices(Removed),
+    ?LOG_DEBUG(#{delete_devices => Removed}),
+    Added1 = inpevt:add_matched_devices([{name, "OpenMove"}]),
+    ?LOG_DEBUG(#{add_devices => Added1}),
+    inpevt:subscribe(Added1),
+    inpevt:get_devices().
 
-delete_devices(_AllDevices, []) ->
-    ok;
-delete_devices(AllDevices, [{_Name, #{device := DeviceFilename}}|Rest]) ->
-    case device_exists(DeviceFilename, AllDevices) of
-        true ->
-            delete_devices(AllDevices, Rest);
-        false ->
-            ?LOG_DEBUG(#{delete_device => DeviceFilename}),
-            ok = inpevt:delete_device(DeviceFilename),
-            delete_devices(AllDevices, Rest)
-    end.
+    %% {ok, UpdatedDevices} = inpevt:get_devices(),
+    %% %% Unsubscribe
+    %% lists:foreach(
+    %%   fun({_Name, #{device := DeviceFilename, port := Port}}) ->
+    %%           case device_exists(DeviceFilename, UpdatedDevices) of
+    %%               true ->
+    %%                   ok;
+    %%               false ->
+    %%                   ?LOG_DEBUG(#{unsubscribe => DeviceFilename}),
+    %%                   ok = inpevt:unsubscribe(Port, self())
+    %%           end
+    %%   end, Devices),
+    %% %% Subscribe
+    %% lists:foreach(
+    %%   fun({_Name, #{device := DeviceFilename, port := Port}}) ->
+    %%           case device_exists(DeviceFilename, Devices) of
+    %%               true ->
+    %%                   ok;
+    %%               false ->
+    %%                   ?LOG_DEBUG(#{subscribe => DeviceFilename}),
+    %%                   ok = inpevt:subscribe(Port, self())
+    %%           end
+    %%   end, UpdatedDevices),
+    %% UpdatedDevices.
 
-device_exists(_DeviceFilename, []) ->
-    false;
-device_exists(DeviceFilename, [{_Name, #{device := DeviceFilename}}|_]) ->
-    true;
-device_exists(DeviceFilename, [_|Rest]) ->
-    device_exists(DeviceFilename, Rest).
+%% delete_devices(_AllDevices, []) ->
+%%     ok;
+%% delete_devices(AllDevices, [{_Name, #{device := DeviceFilename}}|Rest]) ->
+%%     case device_exists(DeviceFilename, AllDevices) of
+%%         true ->
+%%             delete_devices(AllDevices, Rest);
+%%         false ->
+%%             ?LOG_DEBUG(#{delete_device => DeviceFilename}),
+%%             ok = inpevt:delete_device(DeviceFilename),
+%%             delete_devices(AllDevices, Rest)
+%%     end.
+
+%% device_exists(_DeviceFilename, []) ->
+%%     false;
+%% device_exists(DeviceFilename, [{_Name, #{device := DeviceFilename}}|_]) ->
+%%     true;
+%% device_exists(DeviceFilename, [_|Rest]) ->
+%%     device_exists(DeviceFilename, Rest).
