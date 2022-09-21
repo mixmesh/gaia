@@ -422,6 +422,10 @@ group with ">>,
                    Text = [<<"You are now muted for ">>, PeerName],
                    ok = gaia_tts_serv:say(Text),
                    [{last_say, Text}|leave_command_mode()];
+		 {error, conversation_not_started} ->
+                   Text = [<<"You do not talk to ">>, PeerName],
+                   ok = gaia_tts_serv:say(Text),
+                   [{last_say, Text}|leave_command_mode()];		   
                  {error, already_set} ->
                    Text = [<<"You are already muted for ">>, PeerName],
                    ok = gaia_tts_serv:say(Text),
@@ -1059,11 +1063,11 @@ ask_yes_no(Name, AskPatterns, AskOnsuccess, YesOnsuccess, NoOnsuccess) ->
      children =
        [#command{
            name = yes,
-           patterns = [["yes"], ["yeah"]],
+           patterns = [["yes"], ["yes", "please"], ["yeah"]],
            onsuccess = YesOnsuccess},
         #command{
            name = no,
-           patterns = [["no"], ["nah"]],
+           patterns = [["no"], ["no","thanks"], ["no","thank","you"], ["nah"]],
            onsuccess = NoOnsuccess}]}.
 
 enter_command_mode() ->
