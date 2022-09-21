@@ -338,7 +338,7 @@ message_handler(#{parent := Parent,
             ?LOG_DEBUG(#{call => Call}),
             case db_lookup_group(Db, GroupIdOrName) of
                 [#gaia_group{conversation = true}] ->
-                    {reply, From, already_started};
+                    {reply, From, {error,already_started}};
                 [Group] ->
                     UpdatedGroup = Group#gaia_group{conversation = true},
                     true = db_insert(Db, UpdatedGroup),
