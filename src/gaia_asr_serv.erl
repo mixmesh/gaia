@@ -124,7 +124,7 @@ initial_message_handler(#{listen_always := ListenAlways,
 message_handler(#{parent := Parent,
                   listen_always := ListenAlways,
                   callback := Callback,
-                  listen := Listen} = State) ->
+                  listen := _Listen} = State) ->
     receive
         {call, From, stop = Call} ->
             ?LOG_DEBUG(#{call => Call}),
@@ -155,7 +155,7 @@ message_handler(#{parent := Parent,
                                      listen => false}}
             end;
 	{cast, unlisten} ->
-            ok = gaia_audio_source_serv:unsubscribe(),
+            _ = gaia_audio_source_serv:unsubscribe(),
             {noreply, State#{listen => false}};
         {cast, {trigger_callback, Term}} ->
             {noreply, State#{callback => Callback(Term)}};

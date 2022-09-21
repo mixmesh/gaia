@@ -165,7 +165,7 @@ refresh_devices(Devices) ->
     {_Added,Removed} = inpevt:diff_devices(Devices),
     inpevt:delete_devices(Removed),
     ?LOG_DEBUG(#{delete_devices => Removed}),
-    Added1 = inpevt:add_matched_devices([{name, "OpenMove"}]),
+    Added1 = inpevt:add_matched_devices([{name, "OpenMove|Jabra"}]),
     ?LOG_DEBUG(#{add_devices => Added1}),
     inpevt:subscribe(Added1),
     inpevt:get_devices().
