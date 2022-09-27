@@ -10,6 +10,7 @@
 #include "threadlib.h"
 
 extern bool kill_network_sender;
+extern FILE* LOG_FD;
 
 void *network_sender(void *arg) {
     int err;

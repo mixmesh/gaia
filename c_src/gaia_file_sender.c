@@ -132,7 +132,7 @@ root!\n");
 
     for (int i = 0; i < nsender_threads; i++) {
         pthread_join(sender_threads[i], NULL);
-        free(&params[i]);
+        free(params[i]);
     }
 
     return 0;
