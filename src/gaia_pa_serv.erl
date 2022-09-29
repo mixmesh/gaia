@@ -5,7 +5,7 @@
 -include_lib("kernel/include/logger.hrl").
 -include_lib("apptools/include/serv.hrl").
 -include_lib("inpevt/include/inpevt.hrl").
-
+-include_lib("dbus/include/dbus.hrl").
 %%
 %% Exported: start_link
 %%
@@ -51,18 +51,56 @@ unsubscribe() ->
 %%
 
 init(Parent) ->
-    Port = open_port({spawn, "/usr/bin/pactl subscribe"},
-                     [stream, {line, 1024}, in]),
-    Devices = refresh_devices([]),
+%%    Port = open_port({spawn, "/usr/bin/pactl subscribe"},
+%%                     [stream, {line, 1024}, in]),
+    PulseAddress = dbus:pulse_address(),
+    {ok,Connection} = dbus_connection:open(PulseAddress, external, false),
+
+    Signals = ["org.PulseAudio.Core1.NewCard",    
+	       "org.PulseAudio.Core1.CardRemoved" ],
+    Fs = [{path, "/org/pulseaudio/core1"},{destination, "org.PulseAudio1"}],
+    lists:foreach(
+      fun(Sig) ->
+	      %% filter objects (paths) may be given as list
+	      {ok,_Ref} = dbus_pulse:listen_for_signal(Connection,Fs,Sig,[])
+      end, Signals),
+    
+    %% Setup udev to look for input/power-switch devices
+    Udev = udev:new(),
+    Umon = udev:monitor_new_from_netlink(Udev, udev),
+    SubSys = "input",
+    DevType = null,
+    ok = udev:monitor_filter_add_match_subsystem_devtype(Umon,SubSys,DevType),
+    ok = udev:monitor_filter_add_match_tag(Umon,"power-switch"),
+    ok = udev:monitor_enable_receiving(Umon),
+    Uref = erlang:make_ref(),
+    select = udev:select(Umon, Uref),
+    %% Now enumerate and add all existing devices
+    Enum = udev:enumerate_new(Udev),
+    udev:enumerate_add_match_subsystem(Enum, "input"),
+    udev:enumerate_add_match_tag(Enum, "power-switch"),
+    %% fixme! support usb cards (think jabra eveolve dongle..)
+    udev:enumerate_add_match_property(Enum, "ID_BUS", "bluetooth"), 
+    State0 = #{parent => Parent,
+	       %% port => Port,
+	       dbus => Connection,
+	       %% udev => Udev,
+	       udev_mon => Umon,
+	       udev_ref => Uref,
+	       devices => #{},
+	       subscribers => []},
+    State1 = add_existing_devices(Udev, Enum, State0),
+    %% Devices = refresh_devices([]),
     ?LOG_INFO("Gaia pulseaudio server has been started"),
-    {ok, #{parent => Parent,
-           port => Port,
-           devices => Devices,
-           subscribers => []}}.
+    {ok, State1}.
 
 message_handler(#{parent := Parent,
-                  port := Port,
-                  devices := Devices,
+                  %% port := Port,
+		  dbus := Connection,
+		  %% udev := Udev,
+		  udev_mon := Umon,
+		  udev_ref := Uref,
+                  %% devices := Devices,
                   subscribers := Subscribers} = State) ->
     receive
         {call, From, stop = Call} ->
@@ -88,20 +126,55 @@ message_handler(#{parent := Parent,
                 false ->
                     {reply, From, {error, not_subsccribed}}
             end;
-        {Port, {data, {eol, "Event 'new' on card #" ++ N} = Data}} ->
-            ?LOG_DEBUG(#{data => Data}),
-            ok = maybe_set_card_profile(N),
-            UpdatedDevices = refresh_devices(Devices),
-            ?LOG_INFO(#{devices => UpdatedDevices}),
-            {noreply, State#{devices => UpdatedDevices}};
-        {Port, {data, {eol, "Event 'remove' on card #" ++ _} = Data}} ->
-            ?LOG_DEBUG(#{data => Data}),
-            UpdatedDevices = refresh_devices(Devices),
-            ?LOG_INFO(#{devices => UpdatedDevices}),
-            {noreply, State#{devices => UpdatedDevices}};
-        {Port, {data, _Data}} ->
-            %?LOG_DEBUG(#{skip_data => Data}),
-            noreply;
+	{signal, _Ref, Header, Message} ->
+	    Fds = Header#dbus_header.fields,
+	    case {Fds#dbus_field.interface,Fds#dbus_field.member} of
+		{"org.PulseAudio.Core1", "NewCard"} ->
+		    [Card|_] = Message,
+		    ?LOG_DEBUG(#{card=>Card}),
+		    new_dbus_card(Connection, Card),
+		    %% UpdatedDevices = refresh_devices(Devices),
+		    {noreply, State};
+		{"org.PulseAudio.Core1", "CardRemoved"} ->
+		    [Card|_] = Message,
+		    ?LOG_DEBUG(#{card => Card}),
+		    %%timer:sleep(2000), % ehhh! try fnotify?
+		    %% UpdatedDevices = refresh_devices(Devices),
+		    {noreply, State};
+		_ ->
+		    {noreply, State}
+	    end;
+	{select, Umon, Uref, ready_input} ->
+	    Recv = udev:monitor_receive_device(Umon),
+	    %% reselect should be ok to reuse the Uref...
+	    select = udev:select(Umon, Uref),
+	    case Recv of
+		undefined ->
+		    {noreply, State};
+		Dev ->
+		    case udev:device_get_action(Dev) of
+			"add" ->
+			    {noreply, add_udev_card(Dev, State)};
+			"remove" ->
+			    {noreply,remove_udev_card(Dev, State)}
+		    end
+	    end;		    
+	    
+%%        {Port, {data, {eol, "Event 'new' on card #" ++ N} = Data}} ->
+%%            ?LOG_DEBUG(#{data => Data}),
+%%            ok = maybe_set_card_profile(N),
+%%            UpdatedDevices = refresh_devices(Devices),
+%%            ?LOG_INFO(#{devices => UpdatedDevices}),
+%%            {noreply, State#{devices => UpdatedDevices}};
+
+%%        {Port, {data, {eol, "Event 'remove' on card #" ++ _} = Data}} ->
+%%            ?LOG_DEBUG(#{data => Data}),
+%%            UpdatedDevices = refresh_devices(Devices),
+%%            ?LOG_INFO(#{devices => UpdatedDevices}),
+%%            {noreply, State#{devices => UpdatedDevices}};
+%%        {Port, {data, _Data}} ->
+%%            %?LOG_DEBUG(#{skip_data => Data}),
+%%            noreply;
         #input_event{code_sym = playcd, value = 0} = InputEvent ->
             ?LOG_DEBUG(#{event => InputEvent}),
             lists:foreach(fun({Pid, _MonitorRef}) ->
@@ -121,10 +194,96 @@ message_handler(#{parent := Parent,
             noreply
     end.
 
+%% call at start to add subscriptions to existing cards
+add_existing_devices(Udev, Enum, State) ->
+    lists:foldl(
+      fun(Path, Si) ->
+	      Dev = udev:device_new_from_syspath(Udev, Path),
+	      add_udev_card(Dev, Si)
+      end, State, udev:enumerate_get_devices(Enum)).
+
+add_udev_card(Dev, State) ->
+    Prop = udev:device_get_properties(Dev),
+    DevNode = udev:device_get_devnode(Dev),
+    NAME = proplists:get_value("NAME",Prop,undefined),
+    if is_list(DevNode), NAME =:= undefined ->
+	    %% check&match NAME in parent
+	    Parent = udev:device_get_parent(Dev),
+	    PProp = udev:device_get_properties(Parent),
+	    PNAME = stripq(proplists:get_value("NAME",PProp,undefined)),
+	    io:format("~s: PNAME=~p\n", ["add",stripq(PNAME)]),
+	    io:format("    devnode=~p\n", [DevNode]),
+	    case inpevt:add_device(#{device => DevNode}) of
+		[] -> 
+		    State;
+		[Added] ->
+		    inpevt:subscribe(Added),
+		    Devices = maps:get(devices, State, #{}),
+		    Devices1 = maps:put(DevNode, Added, Devices),
+		    State#{ devices => Devices1 }
+	    end;
+       true ->
+	    State
+    end.
+
+remove_udev_card(Dev, State) ->
+    Prop = udev:device_get_properties(Dev),
+    DevNode = udev:device_get_devnode(Dev),
+    NAME = proplists:get_value("NAME",Prop,undefined),
+    if is_list(DevNode), NAME =:= undefined ->
+	    case udev:device_get_parent(Dev) of
+		false -> ok;
+		Parent ->
+		    PProp = udev:device_get_properties(Parent),
+		    PNAME = stripq(proplists:get_value("NAME",PProp,undefined)),
+		    io:format("~s: PNAME=~p\n", ["remove",stripq(PNAME)]),
+		    io:format("    devnode=~p\n", [DevNode])
+	    end,
+	    Devices = maps:get(devices, State, #{}),
+	    case maps:take(DevNode, Devices) of
+		error -> State;
+		{D, Devices1} ->
+		    inpevt:delete_device(D),
+		    State#{ devices => Devices1 }
+	    end;
+       true ->
+	    State
+    end.
+
 %%
 %% Card profile handling
 %%
+new_dbus_card(Connection,Card) ->
+    case dbus_pulse:get_card_profiles(Connection, Card) of
+	{ok,Profiles} ->
+	    lists:foreach(
+	      fun(Profile) ->
+		      case dbus_pulse:get_card_profile_name(Connection,Profile) of
+			  {ok,Name="handsfree_head_unit"} ->
+			      io:format("Set Active Profile: ~p\n", [Name]),
+			      dbus_pulse:set_card_active_profile(Connection, Card, Profile);
+			  {ok,Name} ->
+			      io:format("Profile: ~p\n", [Name]);
+			  _Error ->
+			      ignore
+		      end
+	      end, Profiles);
+	_Error ->
+	    ignore
+    end.
 
+%% strip double quotes
+stripq(Atom) when is_atom(Atom) -> Atom;
+stripq(String) when is_list(String) ->    
+    case String of
+	[$"|String0] ->
+	    case lists:reverse(String0) of
+		[$"|String1] -> lists:reverse(String1);
+		_ -> String0
+	    end;
+	_ -> String
+    end.
+		    
 maybe_set_card_profile(N) ->
     Lines = os:cmd("/usr/bin/pactl list short cards"),
     maybe_set_card_profile(N, string:tokens(Lines, "\n")).
@@ -161,7 +320,6 @@ set_card_profile(Command, [Profile|Rest]) ->
 %%
 
 refresh_devices(Devices) ->
-    timer:sleep(2000), % ehhh! try fnotify?
     {_Added,Removed} = inpevt:diff_devices(Devices),
     inpevt:delete_devices(Removed),
     ?LOG_DEBUG(#{delete_devices => Removed}),
