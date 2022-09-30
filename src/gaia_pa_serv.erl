@@ -56,7 +56,7 @@ init(Parent) ->
     PulseAddress = dbus:pulse_address(),
     {ok,Connection} = dbus_connection:open(PulseAddress, external, false),
 
-    Signals = ["org.PulseAudio.Core1.NewCard",    
+    Signals = ["org.PulseAudio.Core1.NewCard",
 	       "org.PulseAudio.Core1.CardRemoved" ],
     Fs = [{path, "/org/pulseaudio/core1"},{destination, "org.PulseAudio1"}],
     lists:foreach(
@@ -64,7 +64,7 @@ init(Parent) ->
 	      %% filter objects (paths) may be given as list
 	      {ok,_Ref} = dbus_pulse:listen_for_signal(Connection,Fs,Sig,[])
       end, Signals),
-    
+
     %% Setup udev to look for input/power-switch devices
     Udev = udev:new(),
     Umon = udev:monitor_new_from_netlink(Udev, udev),
@@ -80,7 +80,7 @@ init(Parent) ->
     udev:enumerate_add_match_subsystem(Enum, "input"),
     udev:enumerate_add_match_tag(Enum, "power-switch"),
     %% fixme! support usb cards (think jabra eveolve dongle..)
-    udev:enumerate_add_match_property(Enum, "ID_BUS", "bluetooth"), 
+    udev:enumerate_add_match_property(Enum, "ID_BUS", "bluetooth"),
     State0 = #{parent => Parent,
 	       %% port => Port,
 	       dbus => Connection,
@@ -158,8 +158,8 @@ message_handler(#{parent := Parent,
 			"remove" ->
 			    {noreply,remove_udev_card(Dev, State)}
 		    end
-	    end;		    
-	    
+	    end;
+
 %%        {Port, {data, {eol, "Event 'new' on card #" ++ N} = Data}} ->
 %%            ?LOG_DEBUG(#{data => Data}),
 %%            ok = maybe_set_card_profile(N),
@@ -187,6 +187,9 @@ message_handler(#{parent := Parent,
             ?LOG_DEBUG(#{subscriber_down => Info}),
             UpdatedSubscribers = lists:keydelete(Pid, 1, Subscribers),
             {noreply, State#{subscribers => UpdatedSubscribers}};
+        {system, From, Request} ->
+            ?LOG_DEBUG(#{system => Request}),
+            {system, From, Request};
         {'EXIT', Parent, Reason} ->
             exit(Reason);
         UnknownMessage ->
@@ -214,7 +217,7 @@ add_udev_card(Dev, State) ->
 	    io:format("~s: PNAME=~p\n", ["add",stripq(PNAME)]),
 	    io:format("    devnode=~p\n", [DevNode]),
 	    case inpevt:add_device(#{device => DevNode}) of
-		[] -> 
+		[] ->
 		    State;
 		[Added] ->
 		    inpevt:subscribe(Added),
@@ -274,7 +277,7 @@ new_dbus_card(Connection,Card) ->
 
 %% strip double quotes
 stripq(Atom) when is_atom(Atom) -> Atom;
-stripq(String) when is_list(String) ->    
+stripq(String) when is_list(String) ->
     case String of
 	[$"|String0] ->
 	    case lists:reverse(String0) of
@@ -283,7 +286,7 @@ stripq(String) when is_list(String) ->
 	    end;
 	_ -> String
     end.
-		    
+
 maybe_set_card_profile(N) ->
     Lines = os:cmd("/usr/bin/pactl list short cards"),
     maybe_set_card_profile(N, string:tokens(Lines, "\n")).
