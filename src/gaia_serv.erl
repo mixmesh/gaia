@@ -239,7 +239,7 @@ initial_message_handler(#{peer_id := PeerId,
                 true ->
                     ok;
                 false ->
-                    gaia_pa_serv:subscribe()
+                    ok = gaia_pa_serv:subscribe()
             end,
             {swap_message_handler, fun ?MODULE:message_handler/1, State}
     end.
@@ -506,12 +506,12 @@ message_handler(#{parent := Parent,
             ?LOG_DEBUG(#{input_event => playcd}),
             case PlayCd of
                 true ->
-                    ?LOG_DEBUG(#{unlisten => playcd}),
+                    ?LOG_DEBUG(#{listen => {PlayCd, false}}),
                     ok = gaia_asr_serv:unlisten(),
                     {noreply, State#{playcd => false}};
                 false ->
-                    ?LOG_DEBUG(#{listen => playcd}),
-                    ok = gaia_asr_serv:listen(true),
+                    ?LOG_DEBUG(#{listen =>  {PlayCd, true}}),
+                    ok = gaia_asr_serv:listen(),
                     {noreply, State#{playcd => true}}
             end;
         {system, From, Request} ->

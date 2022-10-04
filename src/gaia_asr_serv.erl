@@ -1,7 +1,7 @@
 -module(gaia_asr_serv).
 -export([start_link/1, stop/0,
          serve_only_me/0, serve_all/0,
-         listen/1, unlisten/0,
+         listen/0, unlisten/0,
          trigger_callback/1]).
 -export([message_handler/1]).
 
@@ -56,10 +56,10 @@ serve_all() ->
 %% Exported: listen
 %%
 
--spec listen(boolean()) -> ok.
+-spec listen() -> ok.
 
-listen(Listen) ->
-    serv:cast(?MODULE, {listen, Listen}).
+listen() ->
+    serv:cast(?MODULE, listen).
 
 %%
 %% Exported: unlisten
@@ -139,24 +139,22 @@ message_handler(#{parent := Parent,
             %% FIXME: enable serve only!!!
             %%ok = gaia_audio_source_serv:serve_all(),
             noreply;
-        {cast, {listen, true} = Cast} ->
+        {cast, listen = Cast} ->
             ?LOG_DEBUG(#{cast => Cast}),
             UpdatedCallback = Callback({handle_command, "command"}),
             ok = gaia_audio_source_serv:subscribe(),
             {noreply, State#{callback => UpdatedCallback, listen => true}};
-        {cast, {listen, false}} ->
+        {cast, unlisten = Cast} ->
+            ?LOG_DEBUG(#{cast => Cast}),
             case ListenAlways of
                 true ->
                     noreply;
                 false ->
-                    _ = gaia_audio_source_serv:unsubscribe(),
-                    UpdatedCallback = Callback({handle_command, "goodbye"}),
+                    ok = gaia_audio_source_serv:unsubscribe(),
+                    UpdatedCallback = Callback(leave_command_mode),
                     {noreply, State#{callback => UpdatedCallback,
                                      listen => false}}
             end;
-	{cast, unlisten} ->
-            _ = gaia_audio_source_serv:unsubscribe(),
-            {noreply, State#{listen => false}};
         {cast, {trigger_callback, Term}} ->
             {noreply, State#{callback => Callback(Term)}};
         {subscription_packet, Packet} ->
@@ -176,7 +174,11 @@ message_handler(#{parent := Parent,
     end.
 
 create_callback(VoskRecognizer, VoskTransform, CommandState) ->
-    fun({last_say, Text}) ->
+    fun(leave_command_mode) ->
+            ok = gaia_commands:leave_command_mode(),
+            create_callback(VoskRecognizer, VoskTransform,
+                            CommandState#{path => [], dict => #{}});
+       ({last_say, Text}) ->
             create_callback(VoskRecognizer, VoskTransform,
                             CommandState#{last_say => Text});
        ({remove_timeout, Callback}) ->
@@ -263,7 +265,7 @@ handle_command(Text, #{parent := Parent,
                 _ ->
                     case match_patterns(Tokens, #{}, [["goodbye"]]) of
                         {ok, _} ->
-                            _ = gaia_commands:leave_command_mode(),
+                            ok = gaia_pa_serv:playcd(gaia_serv),
                             CommandState#{path => [], dict => #{}};
                         nomatch ->
                             case match_patterns(Tokens, #{}, [["what?"]]) of

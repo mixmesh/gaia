@@ -1,5 +1,5 @@
 -module(gaia_pa_serv).
--export([start_link/0, stop/0, subscribe/0, unsubscribe/0]).
+-export([start_link/0, stop/0, subscribe/0, unsubscribe/0, playcd/1]).
 -export([message_handler/1]).
 
 -include_lib("kernel/include/logger.hrl").
@@ -47,6 +47,16 @@ unsubscribe() ->
     serv:call(?MODULE, {unsubscribe, self()}).
 
 %%
+%% Exported: playcd
+%%
+
+-spec playcd(pid() | atom()) -> ok.
+
+playcd(PidOrName) ->
+    PidOrName ! {input_event, playcd},
+    ok.
+
+%%
 %% Server
 %%
 
@@ -89,7 +99,7 @@ init(Parent) ->
 	       udev_ref => Uref,
 	       devices => #{},
 	       subscribers => []},
-    State1 = add_existing_devices(Udev, Enum, State0),
+    State1 = add_existing_devices(Connection, Udev, Enum, State0),
     %% Devices = refresh_devices([]),
     ?LOG_INFO("Gaia pulseaudio server has been started"),
     {ok, State1}.
@@ -178,7 +188,7 @@ message_handler(#{parent := Parent,
         #input_event{code_sym = playcd, value = 0} = InputEvent ->
             ?LOG_DEBUG(#{event => InputEvent}),
             lists:foreach(fun({Pid, _MonitorRef}) ->
-                                  Pid ! {input_event, playcd}
+                                  playcd(Pid)
                           end, Subscribers),
             noreply;
         #input_event{} ->
@@ -198,7 +208,12 @@ message_handler(#{parent := Parent,
     end.
 
 %% call at start to add subscriptions to existing cards
-add_existing_devices(Udev, Enum, State) ->
+add_existing_devices(Connection, Udev, Enum, State) ->
+    {ok,Cards} = dbus_pulse:get_cards(Connection),
+    lists:foreach(
+      fun(Card) ->
+              new_dbus_card(Connection, Card)
+      end, Cards),
     lists:foldl(
       fun(Path, Si) ->
 	      Dev = udev:device_new_from_syspath(Udev, Path),
@@ -287,49 +302,49 @@ stripq(String) when is_list(String) ->
 	_ -> String
     end.
 
-maybe_set_card_profile(N) ->
-    Lines = os:cmd("/usr/bin/pactl list short cards"),
-    maybe_set_card_profile(N, string:tokens(Lines, "\n")).
+%% maybe_set_card_profile(N) ->
+%%     Lines = os:cmd("/usr/bin/pactl list short cards"),
+%%     maybe_set_card_profile(N, string:tokens(Lines, "\n")).
 
-maybe_set_card_profile(_N, []) ->
-    ok;
-maybe_set_card_profile(N, [Line|Rest]) ->
-    case string:tokens(Line, "\t") of
-        [N, "bluez_card." ++ _ = Card, _] ->
-            set_card_profile(Card);
-        _ ->
-            maybe_set_card_profile(N, Rest)
-    end.
+%% maybe_set_card_profile(_N, []) ->
+%%     ok;
+%% maybe_set_card_profile(N, [Line|Rest]) ->
+%%     case string:tokens(Line, "\t") of
+%%         [N, "bluez_card." ++ _ = Card, _] ->
+%%             set_card_profile(Card);
+%%         _ ->
+%%             maybe_set_card_profile(N, Rest)
+%%     end.
 
-set_card_profile(Card) ->
-    set_card_profile("/usr/bin/pactl set-card-profile " ++ Card,
-                     ["headset_head_unit", "handsfree_head_unit"]).
+%% set_card_profile(Card) ->
+%%     set_card_profile("/usr/bin/pactl set-card-profile " ++ Card,
+%%                      ["headset_head_unit", "handsfree_head_unit"]).
 
-set_card_profile(_Command, []) ->
-    ok;
-set_card_profile(Command, [Profile|Rest]) ->
-    FinalCommand = Command ++ " " ++ Profile ++ " 2>&1",
-    case os:cmd(FinalCommand) of
-        "" ->
-            ?LOG_INFO(#{command_success => FinalCommand}),
-            ok;
-        Failure ->
-            ?LOG_INFO(#{command_failure => FinalCommand, reason => Failure}),
-            set_card_profile(Command, Rest)
-    end.
+%% set_card_profile(_Command, []) ->
+%%     ok;
+%% set_card_profile(Command, [Profile|Rest]) ->
+%%     FinalCommand = Command ++ " " ++ Profile ++ " 2>&1",
+%%     case os:cmd(FinalCommand) of
+%%         "" ->
+%%             ?LOG_INFO(#{command_success => FinalCommand}),
+%%             ok;
+%%         Failure ->
+%%             ?LOG_INFO(#{command_failure => FinalCommand, reason => Failure}),
+%%             set_card_profile(Command, Rest)
+%%     end.
 
 %%
 %% Device handling
 %%
 
-refresh_devices(Devices) ->
-    {_Added,Removed} = inpevt:diff_devices(Devices),
-    inpevt:delete_devices(Removed),
-    ?LOG_DEBUG(#{delete_devices => Removed}),
-    Added1 = inpevt:add_matched_devices([{name, "OpenMove|Jabra"}]),
-    ?LOG_DEBUG(#{add_devices => Added1}),
-    inpevt:subscribe(Added1),
-    inpevt:get_devices().
+%% refresh_devices(Devices) ->
+%%     {_Added,Removed} = inpevt:diff_devices(Devices),
+%%     inpevt:delete_devices(Removed),
+%%     ?LOG_DEBUG(#{delete_devices => Removed}),
+%%     Added1 = inpevt:add_matched_devices([{name, "OpenMove|Jabra"}]),
+%%     ?LOG_DEBUG(#{add_devices => Added1}),
+%%     inpevt:subscribe(Added1),
+%%     inpevt:get_devices().
 
     %% {ok, UpdatedDevices} = inpevt:get_devices(),
     %% %% Unsubscribe
