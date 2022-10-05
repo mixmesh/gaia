@@ -1,11 +1,28 @@
 %% -*- erlang-indent-level: 2 -*-
 -module(gaia_commands).
--export([all/0, leave_command_mode/0]).
+-export([all_patterns/0, all/0, leave_command_mode/0]).
 
 -include_lib("kernel/include/logger.hrl").
 -include_lib("apptools/include/shorthand.hrl").
 -include("../include/gaia_serv.hrl").
 -include("gaia_commands.hrl").
+
+%%
+%% all_patterns
+%%
+
+all_patterns() ->
+  all_patterns(all(), #{}).
+
+all_patterns([], PatternDb) ->
+  PatternDb;
+all_patterns([#command{patterns = Patterns,
+                       children = Children}|Rest], PatternDb) ->
+  all_patterns(Rest,
+               all_patterns(Children,
+                            lists:foldl(fun(Pattern, Acc) ->
+                                            maps:put(Pattern, Pattern, Acc)
+                                        end, PatternDb, Patterns))).
 
 %%
 %% Export: all
