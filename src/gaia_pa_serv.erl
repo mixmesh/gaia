@@ -64,11 +64,24 @@ playcd(PidOrName) ->
 init(Parent) ->
 %%    Port = open_port({spawn, "/usr/bin/pactl subscribe"},
 %%                     [stream, {line, 1024}, in]),
-    PulseAddress = dbus:pulse_address(),
+    UserId = string:strip(os:cmd("id --user"), right, $\n),
+    UserDbusSocketPath =
+        filename:join(["run", "user", UserId, "pulse", "dbus-socket"]),
+    PulseAddress =
+        case filelib:is_file(UserDbusSocketPath) of
+            true ->
+                dbus:pulse_address();
+            false ->
+                try
+                    dbus:pulse_address()
+                catch throw:bajs ->
+                        %% We assume that pulseaudio run as a system daemon
+                        "unix:path=/var/run/pulse/dbus-socket"
+                end
+        end,
     {ok,Connection} = dbus_connection:open(PulseAddress, external, false),
-
     Signals = ["org.PulseAudio.Core1.NewCard",
-	       "org.PulseAudio.Core1.CardRemoved" ],
+               "org.PulseAudio.Core1.CardRemoved" ],
     Fs = [{path, "/org/pulseaudio/core1"},{destination, "org.PulseAudio1"}],
     lists:foreach(
       fun(Sig) ->
