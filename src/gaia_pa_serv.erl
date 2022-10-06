@@ -74,7 +74,7 @@ init(Parent) ->
             false ->
                 try
                     dbus:pulse_address()
-                catch throw:bajs ->
+                catch error:_ ->
                         %% We assume that pulseaudio run as a system daemon
                         "unix:path=/var/run/pulse/dbus-socket"
                 end
