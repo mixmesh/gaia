@@ -94,8 +94,12 @@ init(Parent) ->
     Umon = udev:monitor_new_from_netlink(Udev, udev),
     SubSys = "input",
     DevType = null,
-    ok = udev:monitor_filter_add_match_subsystem_devtype(Umon,SubSys,DevType),
-    ok = udev:monitor_filter_add_match_tag(Umon,"power-switch"),
+
+
+%    ok = udev:monitor_filter_add_match_subsystem_devtype(Umon,SubSys,DevType),
+%    ok = udev:monitor_filter_add_match_tag(Umon,"power-switch"),
+
+
     ok = udev:monitor_enable_receiving(Umon),
     Uref = erlang:make_ref(),
     select = udev:select(Umon, Uref),
@@ -234,7 +238,9 @@ add_existing_devices(Connection, Udev, Enum, State) ->
     lists:foldl(
       fun(Path, Si) ->
 	      Dev = udev:device_new_from_syspath(Udev, Path),
-	      add_udev_card(Dev, Si)
+	      Si2 = add_udev_card(Dev, Si),
+              ?LOG_DEBUG(#{add_existing_devices => {Dev, Si, Si2}}),
+              Si2
       end, State, udev:enumerate_get_devices(Enum)).
 
 add_udev_card(Dev, State) ->
@@ -246,15 +252,17 @@ add_udev_card(Dev, State) ->
 	    Parent = udev:device_get_parent(Dev),
 	    PProp = udev:device_get_properties(Parent),
 	    PNAME = stripq(proplists:get_value("NAME",PProp,undefined)),
-	    io:format("~s: PNAME=~p\n", ["add",stripq(PNAME)]),
-	    io:format("    devnode=~p\n", [DevNode]),
+	    ?LOG_DEBUG(#{add_udev_card => [{add, stripq(PNAME)}, {devnode, DevNode}]}),
 	    case inpevt:add_device(#{device => DevNode}) of
 		[] ->
+                    ?LOG_DEBUG(#{add_udev_card => not_added}),
 		    State;
 		[Added] ->
-		    inpevt:subscribe(Added),
-		    Devices = maps:get(devices, State, #{}),
+                    ?LOG_DEBUG(#{add_udev_card => {added, Added}}),
+                    inpevt:subscribe(Added),
+                    Devices = maps:get(devices, State, #{}),
 		    Devices1 = maps:put(DevNode, Added, Devices),
+                    ?LOG_DEBUG(#{add_udev_card => {devices, Devices1}}),
 		    State#{ devices => Devices1 }
 	    end;
        true ->
