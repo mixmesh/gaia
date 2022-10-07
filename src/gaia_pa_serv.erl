@@ -230,6 +230,9 @@ add_existing_devices(Connection, Udev, Enum, State) ->
       end, Cards),
     lists:foldl(
       fun(Path, Si) ->
+              io:format("BAJS: ~p\n", [{Path, Si}]),
+
+
 	      Dev = udev:device_new_from_syspath(Udev, Path),
 	      add_udev_card(Dev, Si)
       end, State, udev:enumerate_get_devices(Enum)).
