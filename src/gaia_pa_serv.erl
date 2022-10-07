@@ -94,12 +94,8 @@ init(Parent) ->
     Umon = udev:monitor_new_from_netlink(Udev, udev),
     SubSys = "input",
     DevType = null,
-
-
-%    ok = udev:monitor_filter_add_match_subsystem_devtype(Umon,SubSys,DevType),
-%    ok = udev:monitor_filter_add_match_tag(Umon,"power-switch"),
-
-
+    ok = udev:monitor_filter_add_match_subsystem_devtype(Umon,SubSys,DevType),
+    ok = udev:monitor_filter_add_match_tag(Umon,"power-switch"),
     ok = udev:monitor_enable_receiving(Umon),
     Uref = erlang:make_ref(),
     select = udev:select(Umon, Uref),
