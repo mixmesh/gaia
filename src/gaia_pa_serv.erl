@@ -294,6 +294,9 @@ new_dbus_card(Connection,Card) ->
 			  {ok,Name="handsfree_head_unit"} ->
 			      io:format("Set Active Profile: ~p\n", [Name]),
 			      dbus_pulse:set_card_active_profile(Connection, Card, Profile);
+			  {ok,Name="headset_head_unit"} ->
+			      io:format("Set Active Profile: ~p\n", [Name]),
+			      dbus_pulse:set_card_active_profile(Connection, Card, Profile);
 			  {ok,Name} ->
 			      io:format("Profile: ~p\n", [Name]);
 			  _Error ->
