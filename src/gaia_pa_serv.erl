@@ -103,6 +103,8 @@ init(Parent) ->
     Enum = udev:enumerate_new(Udev),
     udev:enumerate_add_match_subsystem(Enum, "input"),
     udev:enumerate_add_match_tag(Enum, "power-switch"),
+
+
     %% fixme! support usb cards (think jabra eveolve dongle..)
     udev:enumerate_add_match_property(Enum, "ID_BUS", "bluetooth"),
     State0 = #{parent => Parent,
@@ -205,7 +207,8 @@ message_handler(#{parent := Parent,
                                   playcd(Pid)
                           end, Subscribers),
             noreply;
-        #input_event{} ->
+        #input_event{} = InputEvent ->
+            ?LOG_DEBUG(#{skipped_event => InputEvent}),
             noreply;
         {'DOWN', _Ref, process, Pid, Info} ->
             ?LOG_DEBUG(#{subscriber_down => Info}),
@@ -230,9 +233,6 @@ add_existing_devices(Connection, Udev, Enum, State) ->
       end, Cards),
     lists:foldl(
       fun(Path, Si) ->
-              io:format("BAJS: ~p\n", [{Path, Si}]),
-
-
 	      Dev = udev:device_new_from_syspath(Udev, Path),
 	      add_udev_card(Dev, Si)
       end, State, udev:enumerate_get_devices(Enum)).
