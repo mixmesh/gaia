@@ -259,10 +259,10 @@ add_udev_card(Dev, State) ->
 		    State;
 		[Added] ->
                     ?LOG_DEBUG(#{add_udev_card => {added, Added}}),
-                    inpevt:subscribe(Added),
+                    SubscribeResult = inpevt:subscribe(Added),
+                    ?LOG_DEBUG(#{add_udev_card => {subscribe, SubscribeResult}}),
                     Devices = maps:get(devices, State, #{}),
 		    Devices1 = maps:put(DevNode, Added, Devices),
-                    ?LOG_DEBUG(#{add_udev_card => {devices, Devices1}}),
 		    State#{ devices => Devices1 }
 	    end;
        true ->
