@@ -42,6 +42,31 @@ all_patterns([#command{patterns = Patterns,
                                                   maps:put(Pattern, Pattern, Acc)
                                           end, PatternDb, Patterns))).
 
+-define(ask(Name, Patterns, Onsuccess),
+	#command{
+	   name = (Name),
+	   patterns = (Patterns),
+	   onsuccess = (Onsuccess)}).
+
+-define(ask_yes_no(Name, Patterns, Onsuccess, Yes, No),
+	#command{
+	   name = (Name),
+	   patterns = (Patterns),
+	   onsuccess = (Onsuccess),
+	   children =
+	       [#command{
+		   name = yes,
+		   patterns = [["yes"], ["yes", "please"], ["yeah"]],
+		   onsuccess = Yes},
+		#command{
+		   name = no,
+		   patterns = [["no"],
+			       ["no","thanks"],
+			       ["no","thank","you"],
+			       ["nah"]],
+		   onsuccess = No}]}).
+
+
 %%
 %% Export: all
 %%
@@ -56,14 +81,14 @@ all() ->
              %%
              %% List [all] active calls?
              %%
-             ask(list_active_calls,
+             ?ask(list_active_calls,
                  [[["list", "least"], "active", ["calls", "cause"]],
                   [["list", "least"], "all", "active", ["calls", "cause"]]],
                  fun ?MODULE:list_active_calls/1),
              %%
              %% Call [contact] X
              %%
-             ask_yes_no(call,
+             ?ask_yes_no(call,
                         [["call", name],
                          ["call", "contact", name]],
                         fun ?MODULE:call/1,
@@ -72,7 +97,7 @@ all() ->
              %%
              %% Hang-up [contact] X
              %%
-             ask_yes_no(
+             ?ask_yes_no(
                hang_up,
                [["hang", "up", name],
                 ["hang", "up", "contact", name]],
@@ -82,14 +107,14 @@ all() ->
              %%
              %% List [all] joined groups
              %%
-             ask(list_joined_groups,
+             ?ask(list_joined_groups,
                  [["list", "joined", "groups"],
                   ["list", "all", "joined", "groups"]],
                  fun ?MODULE:list_joined_groups/1),
              %%
              %% Join [group] X
              %%
-             ask_yes_no(
+             ?ask_yes_no(
                join,
                [["join", name],
                 ["join", "group", name]],
@@ -99,7 +124,7 @@ all() ->
              %%
              %% Leave [group] X
              %%
-             ask_yes_no(
+             ?ask_yes_no(
                leave,
                [["leave", name],
                 ["leave", "group", name]],
@@ -109,34 +134,34 @@ all() ->
              %%
              %% Am I busy?
              %%
-             ask(am_i_busy,
+             ?ask(am_i_busy,
                  [["am", "i", ["busy", "bc"]]],
                  fun ?MODULE:am_i_busy/1),
              %%
              %% I'm busy
              %%
-             ask(busy,
+             ?ask(busy,
                  [["i'm", ["busy", "bc"]],
                   ["i", "am", ["busy", "bc"]]],
                  fun ?MODULE:busy/1),
              %%
              %% I'm not busy
              %%
-             ask(not_busy,
+             ?ask(not_busy,
                  [["i'm", "not", ["busy", "bc"]],
                   ["i", "am", "not", ["busy", "bc"]]],
                  fun ?MODULE:not_busy/1),
              %%
              %% Am I muted for X?
              %%
-             ask(am_i_muted,
+             ?ask(am_i_muted,
                  [["am", "i", "muted", "for", name],
                   ["am", "i", "muted", "for", "contact", name]],
                  fun ?MODULE:am_i_muted/1),
              %%
              %% Mute me for [contact] X
              %%
-             ask_yes_no(
+             ?ask_yes_no(
                mute,
                [["mute", "me", "for", name],
                 ["mute", "me", "for", "contact", name]],
@@ -146,7 +171,7 @@ all() ->
              %%
              %% Do not mute me for [contact] X
              %%
-             ask_yes_no(
+             ?ask_yes_no(
                unmute,
                [["unmute", "me", "for", name],
                 ["unmute", "me", "for", "contact", name]],
@@ -156,14 +181,14 @@ all() ->
              %%
              %% Am I deaf to [contact] X?
              %%
-             ask(am_i_deaf,
+             ?ask(am_i_deaf,
                  [["am", "I", "deaf", "to", name],
                   ["am", "I", "deaf", "to", "contact", name]],
                  fun ?MODULE:am_i_deaf/1),
              %%
              %% Deafen me to [contact] X
              %%
-             ask_yes_no(
+             ?ask_yes_no(
                deafen,
                [["deafen", "me", "to", name],
                 ["deafen", "me", "to", "contact", name]],
@@ -173,7 +198,7 @@ all() ->
              %%
              %% Undeafen me to [contact] X
              %%
-             ask_yes_no(
+             ?ask_yes_no(
                undeafen,
                [["undeafen", "me", "to", name],
                 ["undeafen", "me", "to", "contact", name]],
@@ -183,42 +208,42 @@ all() ->
              %%
              %% Am I ignoring [contact] X?
              %%
-             ask(am_i_ignoring,
+             ?ask(am_i_ignoring,
                  [["am", "i", "ignoring", name],
                   ["am", "i", "ignoring", "contact", name]],
                  fun ?MODULE:am_i_ignoring/1),
              %%
              %% Ignore [contact] X
              %%
-             ask(ignore,
+             ?ask(ignore,
                  [["ignore", name],
                   ["ignore", "contact", name]],
                  fun ?MODULE:ignore/1),
              %%
              %% Do not ignore [contact] X
              %%
-             ask(do_not_ignore,
+             ?ask(do_not_ignore,
                  [["do", "not", "ignore", name],
                   ["do", "not", "ignore", "contact", name]],
                  fun ?MODULE:do_not_ignore/1),
              %%
              %% Has [contact] X direct access?
              %%
-             ask(has_direct_access,
+             ?ask(has_direct_access,
                  [["has", name, "direct", "access"],
                   ["has", "contact", name, "direct", "access"]],
                  fun ?MODULE:has_direct_access/1),
              %%
              %% Give direct access to [contact] X
              %%
-             ask(give_direct_access,
+             ?ask(give_direct_access,
                  [["give", "direct", "access", "to", name],
                   ["give", "direct", "access", "to", "contact", name]],
                  fun ?MODULE:give_direct_access/1),
              %%
              %% Do not give direct access to [contact] X
              %%
-             ask(do_not_give_direct_access,
+             ?ask(do_not_give_direct_access,
                  [["do", "not", "give", "direct", "access", "to", name],
                   ["do", "not", "give", "direct", "access", "to", "contact",
                    name]],
@@ -226,21 +251,21 @@ all() ->
              %%
              %% Has [contact] X high priority?
              %%
-             ask(has_high_priority,
+             ?ask(has_high_priority,
                  [["has", name, "high", "priority"],
                   ["has", "contact", name, "high", "priority"]],
                  fun ?MODULE:has_high_priority/1),
              %%
              %% Give high priority to [contact] X
              %%
-             ask(give_high_priority,
+             ?ask(give_high_priority,
                  [["give", "high", "priority", "to", name],
                   ["give", "high", "priority", "to", "contact", name]],
                  fun ?MODULE:give_high_priority/1),
              %%
              %% Do not give high priority to [contact] X
              %%
-             ask(do_not_give_high_priority,
+             ?ask(do_not_give_high_priority,
                  [["do", "not", "give", "high", "priority", "to", name],
                   ["do", "not", "give", "high", "priority", "to", "contact",
                    name]],
@@ -248,7 +273,7 @@ all() ->
              %%
              %% Which [contacts] are online?
              %%
-             ask(online_contacts,
+             ?ask(online_contacts,
                  [["which", "are", "online"],
                   ["which", "contacts", "are", "online"]],
                  fun ?MODULE:online_contacts/1)]}].
@@ -1089,29 +1114,7 @@ online_contacts(_Dict) ->
 %% Command utilities
 %%
 
-ask(Name, Patterns, Onsuccess) ->
-    #command{
-       name = Name,
-       patterns = Patterns,
-       onsuccess = Onsuccess}.
 
-ask_yes_no(Name, Patterns, Onsuccess, Yes, No) ->
-    #command{
-       name = Name,
-       patterns = Patterns,
-       onsuccess = Onsuccess,
-       children =
-           [#command{
-               name = yes,
-               patterns = [["yes"], ["yes", "please"], ["yeah"]],
-               onsuccess = Yes},
-            #command{
-               name = no,
-               patterns = [["no"],
-                           ["no","thanks"],
-                           ["no","thank","you"],
-                           ["nah"]],
-               onsuccess = No}]}.
 
 enter_command_mode() ->
     ?LOG_DEBUG(#{enter_command_mode => now}),
