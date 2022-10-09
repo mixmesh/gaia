@@ -164,7 +164,7 @@ message_handler(#{parent := Parent,
 		{"org.PulseAudio.Core1", "CardRemoved"} ->
 		    [Card|_] = Message,
 		    ?LOG_DEBUG(#{card => Card}),
-		    timer:sleep(2000), % ehhh! try fnotify?
+		    %%timer:sleep(2000), % ehhh! try fnotify?
 		    %% UpdatedDevices = refresh_devices(Devices),
 		    {noreply, State};
 		_ ->
@@ -249,14 +249,12 @@ add_udev_card(Dev, State) ->
 	    PProp = udev:device_get_properties(Parent),
 	    PNAME = stripq(proplists:get_value("NAME",PProp,undefined)),
 	    ?LOG_DEBUG(#{add_udev_card => [{add, stripq(PNAME)}, {devnode, DevNode}]}),
-            timer:sleep(200),
 	    case inpevt:add_device(#{device => DevNode}) of
 		[] ->
                     ?LOG_DEBUG(#{add_udev_card => not_added}),
 		    State;
 		[Added] ->
                     ?LOG_DEBUG(#{add_udev_card => {added, Added}}),
-                    timer:sleep(200),
                     SubscribeResult = inpevt:subscribe(Added),
                     ?LOG_DEBUG(#{add_udev_card => {subscribe, SubscribeResult}}),
                     Devices = maps:get(devices, State, #{}),
