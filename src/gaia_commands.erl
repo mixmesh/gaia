@@ -1,5 +1,5 @@
 -module(gaia_commands).
--export([all_patterns/0, all/0, leave_command_mode/0]).
+-export([all_patterns/0, leave_command_mode/0, all/0]).
 %% Internal exports
 -export([hi/1,
          list_active_calls/1,
@@ -25,23 +25,6 @@
 -include("../include/gaia_serv.hrl").
 -include("gaia_commands.hrl").
 
-%%
-%% all_patterns
-%%
-
-all_patterns() ->
-    all_patterns(all(), #{}).
-
-all_patterns([], PatternDb) ->
-    PatternDb;
-all_patterns([#command{patterns = Patterns,
-                       children = Children}|Rest], PatternDb) ->
-    all_patterns(Rest,
-                 all_patterns(Children,
-                              lists:foldl(fun(Pattern, Acc) ->
-                                                  maps:put(Pattern, Pattern, Acc)
-                                          end, PatternDb, Patterns))).
-
 -define(ask(Name, Patterns, Onsuccess),
 	#command{
 	   name = (Name),
@@ -66,6 +49,31 @@ all_patterns([#command{patterns = Patterns,
 			       ["nah"]],
 		   onsuccess = No}]}).
 
+%%
+%% all_patterns
+%%
+
+all_patterns() ->
+    all_patterns(all(), #{}).
+
+all_patterns([], PatternDb) ->
+    PatternDb;
+all_patterns([#command{patterns = Patterns,
+                       children = Children}|Rest], PatternDb) ->
+    all_patterns(Rest,
+                 all_patterns(Children,
+                              lists:foldl(fun(Pattern, Acc) ->
+                                                  maps:put(Pattern, Pattern, Acc)
+                                          end, PatternDb, Patterns))).
+
+%%
+%% Export: leave_command_mode
+%%
+
+leave_command_mode() ->
+    ?LOG_DEBUG(#{leave_command_mode => now}),
+    %%ok = gaia_asr_serv:serve_all().
+    play(leave_command_mode).
 
 %%
 %% Export: all
@@ -344,15 +352,6 @@ call_no(_Dict) ->
     ?LOG_INFO(#{onsuccess => no}),
     ok = gaia_tts_serv:say(<<"OK">>),
     leaving_command_mode().
-
-%%
-%% Export: leave_command_mode
-%%
-
-leave_command_mode() ->
-    ?LOG_DEBUG(#{leave_command_mode => now}),
-    %%ok = gaia_asr_serv:serve_all().
-    play(leave_command_mode).
 
 hang_up(Dict) ->
     ?LOG_INFO(#{onsuccess => hang_up}),
@@ -1113,8 +1112,6 @@ online_contacts(_Dict) ->
 %%
 %% Command utilities
 %%
-
-
 
 enter_command_mode() ->
     ?LOG_DEBUG(#{enter_command_mode => now}),
