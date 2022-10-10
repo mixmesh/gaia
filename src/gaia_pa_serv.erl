@@ -152,7 +152,8 @@ message_handler(#{parent := Parent,
                 false ->
                     {reply, From, {error, not_subsccribed}}
             end;
-	{signal, _Ref, Header, Message} ->
+	{signal, _Ref, Header, Message} = Msg ->
+            ?LOG_DEBUG(#{msgl => Msg}),
 	    Fds = Header#dbus_header.fields,
 	    case {Fds#dbus_field.interface,Fds#dbus_field.member} of
 		{"org.PulseAudio.Core1", "NewCard"} ->
@@ -170,7 +171,8 @@ message_handler(#{parent := Parent,
 		_ ->
 		    {noreply, State}
 	    end;
-	{select, Umon, Uref, ready_input} ->
+	{select, Umon, Uref, ready_input} = Msg ->
+            ?LOG_DEBUG(#{msg => Msg}),
 	    Recv = udev:monitor_receive_device(Umon),
 	    %% reselect should be ok to reuse the Uref...
 	    select = udev:select(Umon, Uref),
