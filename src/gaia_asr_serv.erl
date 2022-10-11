@@ -90,7 +90,8 @@ init(Parent, ListenAlways) ->
            true ->
                 fun(Data) -> Data end
         end,
-    ?LOG_INFO("Gaia ASR server has been started"),
+    ?LOG_INFO("Gaia ASR server has been started (~w)",
+              [serv:since_system_start()]),
     {ok, #{parent => Parent,
            listen_always => ListenAlways,
            vosk_recognizer => VoskRecognizer,

@@ -117,7 +117,8 @@ init(Parent) ->
 	       subscribers => []},
     State1 = add_existing_devices(Connection, Udev, Enum, State0),
     %% Devices = refresh_devices([]),
-    ?LOG_INFO("Gaia pulseaudio server has been started"),
+    ?LOG_INFO("Gaia pulseaudio server has been started (~w)",
+              [serv:since_system_start()]),
     {ok, State1}.
 
 message_handler(#{parent := Parent,

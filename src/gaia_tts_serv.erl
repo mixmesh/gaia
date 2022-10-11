@@ -175,7 +175,8 @@ format_remaining_items([Item|Rest]) ->
 %%
 
 init(Parent) ->
-    ?LOG_INFO("Gaia TTS server has been started"),
+    ?LOG_INFO("Gaia TTS server has been started (~w)",
+              [serv:since_system_start()]),
     {ok, #{parent => Parent}}.
 
 initial_message_handler(State) ->

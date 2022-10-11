@@ -21,8 +21,8 @@ start_link(PeerId, RestPort) ->
 	  {?MODULE, handle_http_request, [{peer_id, PeerId}]}},
 	 {nodelay, true},
 	 {reuseaddr, true}],
-    ?LOG_INFO("Gaia REST service has been started on port 0.0.0.0:~w",
-              [RestPort]),
+    ?LOG_INFO("Gaia REST service has been started on port 0.0.0.0:~w (~w)",
+              [RestPort, serv:since_system_start()]),
     rester_http_server:start_link(RestPort, ResterHttpArgs).
 
 %%

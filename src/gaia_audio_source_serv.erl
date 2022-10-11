@@ -75,7 +75,8 @@ serve_all() ->
 init(Parent, Params) ->
     AudioProducerPid =
         spawn_link(fun() -> audio_producer_init(Params) end),
-    ?LOG_INFO("Gaia audio source server has been started"),
+    ?LOG_INFO("Gaia audio source server has been started (~w)",
+              [serv:since_system_start()]),
     {ok, #{parent => Parent,
            audio_producer_pid => AudioProducerPid,
            subscribers => []}}.

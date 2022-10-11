@@ -41,7 +41,8 @@ set_conversation_addresses(ConversationAddresses) ->
 init(Parent, PeerId, UseCallback, OpusEnabled) ->
     case gen_udp:open(0, [{mode, binary}, {active, false}]) of
         {ok, Socket} ->
-            ?LOG_INFO("Gaia network sender server has been started"),
+            ?LOG_INFO("Gaia network sender server has been started (~w)",
+                      [serv:since_system_start()]),
             {ok, #{parent => Parent,
                    peer_id => PeerId,
                    use_callback => UseCallback,

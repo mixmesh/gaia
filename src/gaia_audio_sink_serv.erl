@@ -33,7 +33,8 @@ stop() ->
 
 init(Parent, Params) ->
     AudioConsumerPid = spawn_link(fun() -> start_audio_consumer(Params) end),
-    ?LOG_INFO("Gaia audio sink server has been started"),
+    ?LOG_INFO("Gaia audio sink server has been started (~w)",
+              [erlang:system_time(milli_seconds)]),
     {ok, #{parent => Parent, audio_consumer_pid => AudioConsumerPid}}.
 
 initial_message_handler(State) ->
