@@ -62,8 +62,6 @@ playcd(PidOrName) ->
 %%
 
 init(Parent) ->
-%%    Port = open_port({spawn, "/usr/bin/pactl subscribe"},
-%%                     [stream, {line, 1024}, in]),
     UserId = string:strip(os:cmd("id --user"), right, $\n),
     UserDbusSocketPath =
         filename:join(["run", "user", UserId, "pulse", "dbus-socket"]),
@@ -104,15 +102,16 @@ init(Parent) ->
     udev:enumerate_add_match_subsystem(Enum, "input"),
     udev:enumerate_add_match_tag(Enum, "power-switch"),
 
-
-    %% fixme! support usb cards (think jabra eveolve dongle..)
     udev:enumerate_add_match_property(Enum, "ID_BUS", "bluetooth"),
+    udev:enumerate_add_match_property(Enum, "ID_BUS", "usb"),
+
     State0 = #{parent => Parent,
 	       %% port => Port,
 	       dbus => Connection,
 	       %% udev => Udev,
 	       udev_mon => Umon,
 	       udev_ref => Uref,
+	       udev_names => [{name, "Jabra"},{name, "OpenMove"}],
 	       devices => #{},
 	       subscribers => []},
     State1 = add_existing_devices(Connection, Udev, Enum, State0),
@@ -189,21 +188,6 @@ message_handler(#{parent := Parent,
 		    end
 	    end;
 
-%%        {Port, {data, {eol, "Event 'new' on card #" ++ N} = Data}} ->
-%%            ?LOG_DEBUG(#{data => Data}),
-%%            ok = maybe_set_card_profile(N),
-%%            UpdatedDevices = refresh_devices(Devices),
-%%            ?LOG_INFO(#{devices => UpdatedDevices}),
-%%            {noreply, State#{devices => UpdatedDevices}};
-
-%%        {Port, {data, {eol, "Event 'remove' on card #" ++ _} = Data}} ->
-%%            ?LOG_DEBUG(#{data => Data}),
-%%            UpdatedDevices = refresh_devices(Devices),
-%%            ?LOG_INFO(#{devices => UpdatedDevices}),
-%%            {noreply, State#{devices => UpdatedDevices}};
-%%        {Port, {data, _Data}} ->
-%%            %?LOG_DEBUG(#{skip_data => Data}),
-%%            noreply;
         #input_event{code_sym = playcd, value = 0} = InputEvent ->
             ?LOG_DEBUG(#{event => InputEvent}),
             lists:foreach(fun({Pid, _MonitorRef}) ->
@@ -242,7 +226,7 @@ add_existing_devices(Connection, Udev, Enum, State) ->
               Si2
       end, State, udev:enumerate_get_devices(Enum)).
 
-add_udev_card(Dev, State) ->
+add_udev_card(Dev, State = #{ udev_names := MatchNames }) ->
     Prop = udev:device_get_properties(Dev),
     DevNode = udev:device_get_devnode(Dev),
     NAME = proplists:get_value("NAME",Prop,undefined),
@@ -251,18 +235,30 @@ add_udev_card(Dev, State) ->
 	    Parent = udev:device_get_parent(Dev),
 	    PProp = udev:device_get_properties(Parent),
 	    PNAME = stripq(proplists:get_value("NAME",PProp,undefined)),
-	    ?LOG_DEBUG(#{add_udev_card => [{add, stripq(PNAME)}, {devnode, DevNode}]}),
-	    case inpevt:add_device(#{device => DevNode}) of
-		[] ->
-                    ?LOG_DEBUG(#{add_udev_card => not_added}),
-		    State;
-		[Added] ->
-                    ?LOG_DEBUG(#{add_udev_card => {added, Added}}),
-                    SubscribeResult = inpevt:subscribe(Added),
-                    ?LOG_DEBUG(#{add_udev_card => {subscribe, SubscribeResult}}),
-                    Devices = maps:get(devices, State, #{}),
-		    Devices1 = maps:put(DevNode, Added, Devices),
-		    State#{ devices => Devices1 }
+	    Match = lists:any(
+		      fun(N) ->
+			      case re:run(PNAME, N) of
+				  {match,_} -> true;
+				  _ -> false
+			      end
+		      end, proplists:get_all_values(name, MatchNames)),
+	    ?LOG_DEBUG(#{add_udev_card => [Match,{add, stripq(PNAME)}, {devnode, DevNode}]}),
+	    case Match of
+		true ->
+		    case inpevt:add_device(#{device => DevNode}) of
+			[] ->
+			    ?LOG_DEBUG(#{add_udev_card => not_added}),
+			    State;
+			[Added] ->
+			    ?LOG_DEBUG(#{add_udev_card => {added, Added}}),
+			    SubscribeResult = inpevt:subscribe(Added),
+			    ?LOG_DEBUG(#{add_udev_card => {subscribe, SubscribeResult}}),
+			    Devices = maps:get(devices, State, #{}),
+			    Devices1 = maps:put(DevNode, Added, Devices),
+			    State#{ devices => Devices1 }
+		    end;
+		false ->
+		    State
 	    end;
        true ->
 	    State
@@ -328,91 +324,3 @@ stripq(String) when is_list(String) ->
 	    end;
 	_ -> String
     end.
-
-%% maybe_set_card_profile(N) ->
-%%     Lines = os:cmd("/usr/bin/pactl list short cards"),
-%%     maybe_set_card_profile(N, string:tokens(Lines, "\n")).
-
-%% maybe_set_card_profile(_N, []) ->
-%%     ok;
-%% maybe_set_card_profile(N, [Line|Rest]) ->
-%%     case string:tokens(Line, "\t") of
-%%         [N, "bluez_card." ++ _ = Card, _] ->
-%%             set_card_profile(Card);
-%%         _ ->
-%%             maybe_set_card_profile(N, Rest)
-%%     end.
-
-%% set_card_profile(Card) ->
-%%     set_card_profile("/usr/bin/pactl set-card-profile " ++ Card,
-%%                      ["headset_head_unit", "handsfree_head_unit"]).
-
-%% set_card_profile(_Command, []) ->
-%%     ok;
-%% set_card_profile(Command, [Profile|Rest]) ->
-%%     FinalCommand = Command ++ " " ++ Profile ++ " 2>&1",
-%%     case os:cmd(FinalCommand) of
-%%         "" ->
-%%             ?LOG_INFO(#{command_success => FinalCommand}),
-%%             ok;
-%%         Failure ->
-%%             ?LOG_INFO(#{command_failure => FinalCommand, reason => Failure}),
-%%             set_card_profile(Command, Rest)
-%%     end.
-
-%%
-%% Device handling
-%%
-
-%% refresh_devices(Devices) ->
-%%     {_Added,Removed} = inpevt:diff_devices(Devices),
-%%     inpevt:delete_devices(Removed),
-%%     ?LOG_DEBUG(#{delete_devices => Removed}),
-%%     Added1 = inpevt:add_matched_devices([{name, "OpenMove|Jabra"}]),
-%%     ?LOG_DEBUG(#{add_devices => Added1}),
-%%     inpevt:subscribe(Added1),
-%%     inpevt:get_devices().
-
-    %% {ok, UpdatedDevices} = inpevt:get_devices(),
-    %% %% Unsubscribe
-    %% lists:foreach(
-    %%   fun({_Name, #{device := DeviceFilename, port := Port}}) ->
-    %%           case device_exists(DeviceFilename, UpdatedDevices) of
-    %%               true ->
-    %%                   ok;
-    %%               false ->
-    %%                   ?LOG_DEBUG(#{unsubscribe => DeviceFilename}),
-    %%                   ok = inpevt:unsubscribe(Port, self())
-    %%           end
-    %%   end, Devices),
-    %% %% Subscribe
-    %% lists:foreach(
-    %%   fun({_Name, #{device := DeviceFilename, port := Port}}) ->
-    %%           case device_exists(DeviceFilename, Devices) of
-    %%               true ->
-    %%                   ok;
-    %%               false ->
-    %%                   ?LOG_DEBUG(#{subscribe => DeviceFilename}),
-    %%                   ok = inpevt:subscribe(Port, self())
-    %%           end
-    %%   end, UpdatedDevices),
-    %% UpdatedDevices.
-
-%% delete_devices(_AllDevices, []) ->
-%%     ok;
-%% delete_devices(AllDevices, [{_Name, #{device := DeviceFilename}}|Rest]) ->
-%%     case device_exists(DeviceFilename, AllDevices) of
-%%         true ->
-%%             delete_devices(AllDevices, Rest);
-%%         false ->
-%%             ?LOG_DEBUG(#{delete_device => DeviceFilename}),
-%%             ok = inpevt:delete_device(DeviceFilename),
-%%             delete_devices(AllDevices, Rest)
-%%     end.
-
-%% device_exists(_DeviceFilename, []) ->
-%%     false;
-%% device_exists(DeviceFilename, [{_Name, #{device := DeviceFilename}}|_]) ->
-%%     true;
-%% device_exists(DeviceFilename, [_|Rest]) ->
-%%     device_exists(DeviceFilename, Rest).
