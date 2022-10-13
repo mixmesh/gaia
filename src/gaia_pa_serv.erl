@@ -111,7 +111,7 @@ init(Parent) ->
 	       %% udev => Udev,
 	       udev_mon => Umon,
 	       udev_ref => Uref,
-	       udev_names => [{name, "Jabra"},{name, "OpenMove"}],
+	       udev_names => [{name, "Jabra"},{name, "OpenMove"},{name, "UInput Keyboard"}],
 	       devices => #{},
 	       subscribers => []},
     State1 = add_existing_devices(Connection, Udev, Enum, State0),
