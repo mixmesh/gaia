@@ -62,6 +62,7 @@ playcd(PidOrName) ->
 %%
 
 init(Parent) ->
+    %% Setup dbus to listen to NewCard and RemoveCard signals
     UserId = string:strip(os:cmd("id --user"), right, $\n),
     UserDbusSocketPath =
         filename:join(["run", "user", UserId, "pulse", "dbus-socket"]),
@@ -80,13 +81,13 @@ init(Parent) ->
     {ok,Connection} = dbus_connection:open(PulseAddress, external, false),
     Signals = ["org.PulseAudio.Core1.NewCard",
                "org.PulseAudio.Core1.CardRemoved" ],
-    Fs = [{path, "/org/pulseaudio/core1"},{destination, "org.PulseAudio1"}],
+    Fs = [{path, "/org/pulseaudio/core1"}, {destination, "org.PulseAudio1"}],
     lists:foreach(
-      fun(Sig) ->
-	      %% filter objects (paths) may be given as list
-	      {ok,_Ref} = dbus_pulse:listen_for_signal(Connection,Fs,Sig,[])
+      fun(Signal) ->
+	      %% Filter objects (paths) may be given as list
+	      {ok, _Ref} =
+                  dbus_pulse:listen_for_signal(Connection, Fs, Signal, [])
       end, Signals),
-
     %% Setup udev to look for input/power-switch devices
     Udev = udev:new(),
     Umon = udev:monitor_new_from_netlink(Udev, udev),
@@ -97,36 +98,29 @@ init(Parent) ->
     ok = udev:monitor_enable_receiving(Umon),
     Uref = erlang:make_ref(),
     select = udev:select(Umon, Uref),
-    %% Now enumerate and add all existing devices
     Enum = udev:enumerate_new(Udev),
     udev:enumerate_add_match_subsystem(Enum, "input"),
     udev:enumerate_add_match_tag(Enum, "power-switch"),
-
     udev:enumerate_add_match_property(Enum, "ID_BUS", "bluetooth"),
     udev:enumerate_add_match_property(Enum, "ID_BUS", "usb"),
-
     State0 = #{parent => Parent,
-	       %% port => Port,
 	       dbus => Connection,
-	       %% udev => Udev,
 	       udev_mon => Umon,
 	       udev_ref => Uref,
-	       udev_names => [{name, "Jabra"},{name, "OpenMove"},{name, "UInput Keyboard"}],
+	       udev_names => [{name, "Jabra"},
+                              {name, "OpenMove"},
+                              {name, "UInput Keyboard"}],
 	       devices => #{},
 	       subscribers => []},
     State1 = add_existing_devices(Connection, Udev, Enum, State0),
-    %% Devices = refresh_devices([]),
     ?LOG_INFO("Gaia pulseaudio server has been started (~w)",
               [serv:since_system_start()]),
     {ok, State1}.
 
 message_handler(#{parent := Parent,
-                  %% port := Port,
 		  dbus := Connection,
-		  %% udev := Udev,
 		  udev_mon := Umon,
 		  udev_ref := Uref,
-                  %% devices := Devices,
                   subscribers := Subscribers} = State) ->
     receive
         {call, From, stop = Call} ->
@@ -158,15 +152,12 @@ message_handler(#{parent := Parent,
 	    case {Fds#dbus_field.interface,Fds#dbus_field.member} of
 		{"org.PulseAudio.Core1", "NewCard"} ->
 		    [Card|_] = Message,
-		    ?LOG_DEBUG(#{card=>Card}),
+		    ?LOG_DEBUG(#{card => Card}),
 		    new_dbus_card(Connection, Card),
-		    %% UpdatedDevices = refresh_devices(Devices),
 		    {noreply, State};
 		{"org.PulseAudio.Core1", "CardRemoved"} ->
 		    [Card|_] = Message,
 		    ?LOG_DEBUG(#{card => Card}),
-		    %%timer:sleep(2000), % ehhh! try fnotify?
-		    %% UpdatedDevices = refresh_devices(Devices),
 		    {noreply, State};
 		_ ->
 		    {noreply, State}
@@ -187,7 +178,6 @@ message_handler(#{parent := Parent,
 			    {noreply,remove_udev_card(Dev, State)}
 		    end
 	    end;
-
         #input_event{code_sym = playcd, value = 0} = InputEvent ->
             ?LOG_DEBUG(#{event => InputEvent}),
             lists:foreach(fun({Pid, _MonitorRef}) ->
@@ -211,7 +201,6 @@ message_handler(#{parent := Parent,
             noreply
     end.
 
-%% call at start to add subscriptions to existing cards
 add_existing_devices(Connection, Udev, Enum, State) ->
     {ok,Cards} = dbus_pulse:get_cards(Connection),
     lists:foreach(
@@ -242,7 +231,9 @@ add_udev_card(Dev, State = #{ udev_names := MatchNames }) ->
 				  _ -> false
 			      end
 		      end, proplists:get_all_values(name, MatchNames)),
-	    ?LOG_DEBUG(#{add_udev_card => [Match,{add, stripq(PNAME)}, {devnode, DevNode}]}),
+	    ?LOG_DEBUG(
+               #{add_udev_card =>
+                     [Match, {add, stripq(PNAME)}, {devnode, DevNode}]}),
 	    case Match of
 		true ->
 		    case inpevt:add_device(#{device => DevNode}) of
@@ -252,7 +243,8 @@ add_udev_card(Dev, State = #{ udev_names := MatchNames }) ->
 			[Added] ->
 			    ?LOG_DEBUG(#{add_udev_card => {added, Added}}),
 			    SubscribeResult = inpevt:subscribe(Added),
-			    ?LOG_DEBUG(#{add_udev_card => {subscribe, SubscribeResult}}),
+			    ?LOG_DEBUG(#{add_udev_card =>
+                                             {subscribe, SubscribeResult}}),
 			    Devices = maps:get(devices, State, #{}),
 			    Devices1 = maps:put(DevNode, Added, Devices),
 			    State#{ devices => Devices1 }
@@ -288,22 +280,20 @@ remove_udev_card(Dev, State) ->
 	    State
     end.
 
-%%
-%% Card profile handling
-%%
-new_dbus_card(Connection,Card) ->
+new_dbus_card(Connection, Card) ->
     case dbus_pulse:get_card_profiles(Connection, Card) of
-	{ok,Profiles} ->
+	{ok, Profiles} ->
 	    lists:foreach(
 	      fun(Profile) ->
-		      case dbus_pulse:get_card_profile_name(Connection,Profile) of
-			  {ok,Name="handsfree_head_unit"} ->
-			      io:format("Set Active Profile: ~p\n", [Name]),
-			      dbus_pulse:set_card_active_profile(Connection, Card, Profile);
-			  {ok,Name="headset_head_unit"} ->
-			      io:format("Set Active Profile: ~p\n", [Name]),
-			      dbus_pulse:set_card_active_profile(Connection, Card, Profile);
-			  {ok,Name} ->
+		      case dbus_pulse:get_card_profile_name(
+                             Connection, Profile) of
+			  {ok, Name = "handsfree_head_unit"} ->
+			      io:format("Set Active Profile: ~s\n", [Name]),
+			      set_active_profile(Connection, Card, Profile);
+			  {ok, Name = "headset_head_unit"} ->
+			      io:format("Set Active Profile: ~s\n", [Name]),
+			      set_active_profile(Connection, Card, Profile);
+			  {ok, Name} ->
 			      io:format("Profile: ~p\n", [Name]);
 			  _Error ->
 			      ignore
@@ -313,8 +303,31 @@ new_dbus_card(Connection,Card) ->
 	    ignore
     end.
 
-%% strip double quotes
-stripq(Atom) when is_atom(Atom) -> Atom;
+set_active_profile(Connection, Card, Profile) ->
+    timer:sleep(500),
+    %% Fixme: Did not work
+    %%OffProfile = dbus_pulse:get_card_profile_by_name(Connection, Card, "off"),
+    OffProfile = get_card_profile_by_name(Connection, Card, "off"),
+    dbus_pulse:set_card_active_profile(Connection, Card, OffProfile),
+    timer:sleep(500),
+    dbus_pulse:set_card_active_profile(Connection, Card, Profile).
+
+get_card_profile_by_name(Connection, Card, Name) ->
+    {ok, Profiles} = dbus_pulse:get_card_profiles(Connection, Card),
+    get_card_profile_by_name(Connection, Card, Name, Profiles).
+
+get_card_profile_by_name(_Connection, _Card, _Name, []) ->
+    throw(badarg);
+get_card_profile_by_name(Connection, Card, Name, [Profile|Rest]) ->
+    case dbus_pulse:get_card_profile_name(Connection, Profile) of
+        {ok, "off"} ->
+            Profile;
+        _ ->
+            get_card_profile_by_name(Connection, Card, Name, Rest)
+    end.
+
+stripq(Atom) when is_atom(Atom) ->
+    Atom;
 stripq(String) when is_list(String) ->
     case String of
 	[$"|String0] ->
