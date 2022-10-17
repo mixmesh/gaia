@@ -304,13 +304,16 @@ new_dbus_card(Connection, Card) ->
     end.
 
 set_active_profile(Connection, Card, Profile) ->
-    timer:sleep(500),
+    timer:sleep(1000),
+    dbus_pulse:set_card_active_profile(Connection, Card, Profile),
+    timer:sleep(1000),
     %% Fixme: Did not work
     %%OffProfile = dbus_pulse:get_card_profile_by_name(Connection, Card, "off"),
     OffProfile = get_card_profile_by_name(Connection, Card, "off"),
     dbus_pulse:set_card_active_profile(Connection, Card, OffProfile),
-    timer:sleep(500),
-    dbus_pulse:set_card_active_profile(Connection, Card, Profile).
+    timer:sleep(1000),
+    dbus_pulse:set_card_active_profile(Connection, Card, Profile),
+    timer:sleep(1000).
 
 get_card_profile_by_name(Connection, Card, Name) ->
     {ok, Profiles} = dbus_pulse:get_card_profiles(Connection, Card),
