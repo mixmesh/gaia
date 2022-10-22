@@ -75,10 +75,10 @@ init(Parent) ->
                     dbus:pulse_address()
                 catch error:_ ->
                         %% We assume that pulseaudio run as a system daemon
-                        "unix:path=/var/run/pulse/dbus-socket"
+                        {"unix:path=/var/run/pulse/dbus-socket", external, false}
                 end
         end,
-    {ok,Connection} = dbus_connection:open(PulseAddress, external, false),
+    {ok,Connection} = dbus_connection:open(PulseAddress),
     Signals = ["org.PulseAudio.Core1.NewCard",
                "org.PulseAudio.Core1.CardRemoved" ],
     Fs = [{path, "/org/pulseaudio/core1"}, {destination, "org.PulseAudio1"}],
