@@ -207,13 +207,20 @@ add_existing_devices(Connection, Udev, Enum, State) ->
       fun(Card) ->
               new_dbus_card(Connection, Card)
       end, Cards),
-    lists:foldl(
-      fun(Path, Si) ->
-	      Dev = udev:device_new_from_syspath(Udev, Path),
-	      Si2 = add_udev_card(Dev, Si),
-              ?LOG_DEBUG(#{add_existing_devices => {Dev, Si, Si2}}),
-              Si2
-      end, State, udev:enumerate_get_devices(Enum)).
+    UpdatedState =
+        lists:foldl(
+          fun(Path, Si) ->
+                  Dev = udev:device_new_from_syspath(Udev, Path),
+                  Si2 = add_udev_card(Dev, Si),
+                  ?LOG_DEBUG(#{add_existing_devices => {Dev, Si, Si2}}),
+                  Si2
+          end, State, udev:enumerate_get_devices(Enum)),
+    timer:sleep(2000), %% ehh!
+    lists:foreach(
+      fun(Card) ->
+              new_dbus_card(Connection, Card)
+      end, Cards),
+    UpdatedState.
 
 add_udev_card(Dev, State = #{ udev_names := MatchNames }) ->
     Prop = udev:device_get_properties(Dev),
@@ -289,10 +296,10 @@ new_dbus_card(Connection, Card) ->
                              Connection, Profile) of
 			  {ok, Name = "handsfree_head_unit"} ->
 			      io:format("Set Active Profile: ~s\n", [Name]),
-			      set_active_profile(Connection, Card, Profile);
+                              dbus_pulse:set_card_active_profile(Connection, Card, Profile);
 			  {ok, Name = "headset_head_unit"} ->
 			      io:format("Set Active Profile: ~s\n", [Name]),
-			      set_active_profile(Connection, Card, Profile);
+                              dbus_pulse:set_card_active_profile(Connection, Card, Profile);
 			  {ok, Name} ->
 			      io:format("Profile: ~p\n", [Name]);
 			  _Error ->
@@ -301,32 +308,6 @@ new_dbus_card(Connection, Card) ->
 	      end, Profiles);
 	_Error ->
 	    ignore
-    end.
-
-set_active_profile(Connection, Card, Profile) ->
-    timer:sleep(1000),
-    dbus_pulse:set_card_active_profile(Connection, Card, Profile),
-    timer:sleep(1000),
-    %% Fixme: Did not work
-    %%OffProfile = dbus_pulse:get_card_profile_by_name(Connection, Card, "off"),
-    OffProfile = get_card_profile_by_name(Connection, Card, "off"),
-    dbus_pulse:set_card_active_profile(Connection, Card, OffProfile),
-    timer:sleep(1000),
-    dbus_pulse:set_card_active_profile(Connection, Card, Profile),
-    timer:sleep(1000).
-
-get_card_profile_by_name(Connection, Card, Name) ->
-    {ok, Profiles} = dbus_pulse:get_card_profiles(Connection, Card),
-    get_card_profile_by_name(Connection, Card, Name, Profiles).
-
-get_card_profile_by_name(_Connection, _Card, _Name, []) ->
-    throw(badarg);
-get_card_profile_by_name(Connection, Card, Name, [Profile|Rest]) ->
-    case dbus_pulse:get_card_profile_name(Connection, Profile) of
-        {ok, "off"} ->
-            Profile;
-        _ ->
-            get_card_profile_by_name(Connection, Card, Name, Rest)
     end.
 
 stripq(Atom) when is_atom(Atom) ->
