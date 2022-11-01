@@ -202,11 +202,6 @@ message_handler(#{parent := Parent,
     end.
 
 add_existing_devices(Connection, Udev, Enum, State) ->
-    {ok,Cards} = dbus_pulse:get_cards(Connection),
-    lists:foreach(
-      fun(Card) ->
-              new_dbus_card(Connection, Card)
-      end, Cards),
     UpdatedState =
         lists:foldl(
           fun(Path, Si) ->
@@ -215,6 +210,8 @@ add_existing_devices(Connection, Udev, Enum, State) ->
                   ?LOG_DEBUG(#{add_existing_devices => {Dev, Si, Si2}}),
                   Si2
           end, State, udev:enumerate_get_devices(Enum)),
+    timer:sleep(1000), % eh!!
+    {ok,Cards} = dbus_pulse:get_cards(Connection),
     lists:foreach(
       fun(Card) ->
               new_dbus_card(Connection, Card)
