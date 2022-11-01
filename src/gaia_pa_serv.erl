@@ -214,10 +214,10 @@ add_existing_devices(Connection, Udev, Enum, State) ->
     {ok,Cards} = dbus_pulse:get_cards(Connection),
     lists:foreach(
       fun(Card) ->
-              ok
-              %%new_dbus_card(Connection, Card)
+              new_dbus_card(Connection, Card)
       end, Cards),
     UpdatedState.
+
 
 add_udev_card(Dev, State = #{ udev_names := MatchNames }) ->
     Prop = udev:device_get_properties(Dev),
@@ -266,12 +266,12 @@ remove_udev_card(Dev, State) ->
     NAME = proplists:get_value("NAME",Prop,undefined),
     if is_list(DevNode), NAME =:= undefined ->
 	    case udev:device_get_parent(Dev) of
-		false -> ok;
+		false ->
+                    ok;
 		Parent ->
 		    PProp = udev:device_get_properties(Parent),
 		    PNAME = stripq(proplists:get_value("NAME",PProp,undefined)),
-		    io:format("~s: PNAME=~p\n", ["remove",stripq(PNAME)]),
-		    io:format("    devnode=~p\n", [DevNode])
+                    ?LOG_INFO(#{remove_udev_card => {stripq(PNAME), DevNode}})
 	    end,
 	    Devices = maps:get(devices, State, #{}),
 	    case maps:take(DevNode, Devices) of
@@ -292,13 +292,13 @@ new_dbus_card(Connection, Card) ->
 		      case dbus_pulse:get_card_profile_name(
                              Connection, Profile) of
 			  {ok, Name = "handsfree_head_unit"} ->
-			      io:format("Set Active Profile: ~s\n", [Name]),
+			      ?LOG_INFO(#{set_active_profile => Name}),
                               dbus_pulse:set_card_active_profile(Connection, Card, Profile);
 			  {ok, Name = "headset_head_unit"} ->
-			      io:format("Set Active Profile: ~s\n", [Name]),
+			      ?LOG_INFO(#{set_active_profile => Name}),
                               dbus_pulse:set_card_active_profile(Connection, Card, Profile);
 			  {ok, Name} ->
-			      io:format("Profile: ~p\n", [Name]);
+			      ?LOG_INFO(#{ignore_profile => Name});
 			  _Error ->
 			      ignore
 		      end
@@ -306,6 +306,45 @@ new_dbus_card(Connection, Card) ->
 	_Error ->
 	    ignore
     end.
+
+%%
+%% START REMOVE THIS
+%%
+
+try_to_set_headset_profile(N) ->
+    Lines = os:cmd("/usr/bin/pactl list short cards"),
+    maybe_set_card_profile(N, string:tokens(Lines, "\n")).
+
+maybe_set_card_profile(_N, []) ->
+    ok;
+maybe_set_card_profile(N, [Line|Rest]) ->
+    case string:tokens(Line, "\t") of
+        [N, "bluez_card." ++ _ = Card, _] ->
+            set_card_profile(Card);
+        _ ->
+            maybe_set_card_profile(N, Rest)
+    end.
+
+set_card_profile(Card) ->
+    set_card_profile("/usr/bin/pactl set-card-profile " ++ Card,
+                     ["headset_head_unit", "handsfree_head_unit"]).
+
+set_card_profile(_Command, []) ->
+    ok;
+set_card_profile(Command, [Profile|Rest]) ->
+    FinalCommand = Command ++ " " ++ Profile ++ " 2>&1",
+    case os:cmd(FinalCommand) of
+        "" ->
+            ?LOG_INFO(#{command_success => FinalCommand}),
+            ok;
+        Failure ->
+            ?LOG_INFO(#{command_failure => FinalCommand, reason => Failure}),
+            set_card_profile(Command, Rest)
+    end.
+
+%%
+%% END REMOVE THIS
+%%
 
 stripq(Atom) when is_atom(Atom) ->
     Atom;
