@@ -215,7 +215,6 @@ add_existing_devices(Connection, Udev, Enum, State) ->
                   ?LOG_DEBUG(#{add_existing_devices => {Dev, Si, Si2}}),
                   Si2
           end, State, udev:enumerate_get_devices(Enum)),
-    timer:sleep(2000), %% ehh!
     lists:foreach(
       fun(Card) ->
               new_dbus_card(Connection, Card)
