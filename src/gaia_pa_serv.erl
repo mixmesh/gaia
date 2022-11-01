@@ -214,7 +214,8 @@ add_existing_devices(Connection, Udev, Enum, State) ->
     {ok,Cards} = dbus_pulse:get_cards(Connection),
     lists:foreach(
       fun(Card) ->
-              new_dbus_card(Connection, Card)
+              ok
+              %%new_dbus_card(Connection, Card)
       end, Cards),
     UpdatedState.
 
