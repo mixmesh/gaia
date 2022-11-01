@@ -210,14 +210,14 @@ add_existing_devices(Connection, Udev, Enum, State) ->
                   ?LOG_DEBUG(#{add_existing_devices => {Dev, Si, Si2}}),
                   Si2
           end, State, udev:enumerate_get_devices(Enum)),
-    timer:sleep(1000), % eh!!
-    {ok,Cards} = dbus_pulse:get_cards(Connection),
+    timer:sleep(4000), % eh!!
+    {ok, Cards} = dbus_pulse:get_cards(Connection),
+    ?LOG_INFO(#{time_to_add_new_card => Cards}),
     lists:foreach(
       fun(Card) ->
               new_dbus_card(Connection, Card)
       end, Cards),
     UpdatedState.
-
 
 add_udev_card(Dev, State = #{ udev_names := MatchNames }) ->
     Prop = udev:device_get_properties(Dev),
@@ -293,10 +293,12 @@ new_dbus_card(Connection, Card) ->
                              Connection, Profile) of
 			  {ok, Name = "handsfree_head_unit"} ->
 			      ?LOG_INFO(#{set_active_profile => Name}),
-                              dbus_pulse:set_card_active_profile(Connection, Card, Profile);
+                              set_bt_headset_profile();
+                              %%dbus_pulse:set_card_active_profile(Connection, Card, Profile);
 			  {ok, Name = "headset_head_unit"} ->
 			      ?LOG_INFO(#{set_active_profile => Name}),
-                              dbus_pulse:set_card_active_profile(Connection, Card, Profile);
+                              set_bt_headset_profile();
+                              %%dbus_pulse:set_card_active_profile(Connection, Card, Profile);
 			  {ok, Name} ->
 			      ?LOG_INFO(#{ignore_profile => Name});
 			  _Error ->
@@ -311,35 +313,34 @@ new_dbus_card(Connection, Card) ->
 %% START REMOVE THIS
 %%
 
-try_to_set_headset_profile(N) ->
+set_bt_headset_profile() ->
     Lines = os:cmd("/usr/bin/pactl list short cards"),
-    maybe_set_card_profile(N, string:tokens(Lines, "\n")).
+    set_bt_headset_profile(string:tokens(Lines, "\n")).
 
-maybe_set_card_profile(_N, []) ->
+set_bt_headset_profile([]) ->
     ok;
-maybe_set_card_profile(N, [Line|Rest]) ->
+set_bt_headset_profile([Line|Rest]) ->
     case string:tokens(Line, "\t") of
-        [N, "bluez_card." ++ _ = Card, _] ->
-            set_card_profile(Card);
+        [_N, "bluez_card." ++ _ = Card, _] ->
+            set_bt_headset_profile(
+              "/usr/bin/pactl set-card-profile " ++ Card,
+              ["headset_head_unit", "handsfree_head_unit"]);
         _ ->
-            maybe_set_card_profile(N, Rest)
+            set_bt_headset_profile(Rest)
     end.
 
-set_card_profile(Card) ->
-    set_card_profile("/usr/bin/pactl set-card-profile " ++ Card,
-                     ["headset_head_unit", "handsfree_head_unit"]).
-
-set_card_profile(_Command, []) ->
+set_bt_headset_profile(_Command, []) ->
     ok;
-set_card_profile(Command, [Profile|Rest]) ->
+set_bt_headset_profile(Command, [Profile|Rest]) ->
     FinalCommand = Command ++ " " ++ Profile ++ " 2>&1",
     case os:cmd(FinalCommand) of
         "" ->
-            ?LOG_INFO(#{command_success => FinalCommand}),
+            ?LOG_INFO(#{set_bt_headset_profile => FinalCommand}),
             ok;
         Failure ->
-            ?LOG_INFO(#{command_failure => FinalCommand, reason => Failure}),
-            set_card_profile(Command, Rest)
+            ?LOG_INFO(#{set_bt_headset_profile_failure => FinalCommand,
+                        reason => Failure}),
+            set_bt_headset_profile(Command, Rest)
     end.
 
 %%
