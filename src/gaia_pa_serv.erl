@@ -293,12 +293,12 @@ new_dbus_card(Connection, Card) ->
                              Connection, Profile) of
 			  {ok, Name = "handsfree_head_unit"} ->
 			      ?LOG_INFO(#{set_active_profile => Name}),
-                              set_bt_headset_profile();
-                              %%dbus_pulse:set_card_active_profile(Connection, Card, Profile);
+                              %%set_bt_headset_profile();
+                              dbus_pulse:set_card_active_profile(Connection, Card, Profile);
 			  {ok, Name = "headset_head_unit"} ->
 			      ?LOG_INFO(#{set_active_profile => Name}),
-                              set_bt_headset_profile();
-                              %%dbus_pulse:set_card_active_profile(Connection, Card, Profile);
+                              %%set_bt_headset_profile();
+                              dbus_pulse:set_card_active_profile(Connection, Card, Profile);
 			  {ok, Name} ->
 			      ?LOG_INFO(#{ignore_profile => Name});
 			  _Error ->
