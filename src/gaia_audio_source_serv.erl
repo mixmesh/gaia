@@ -181,6 +181,8 @@ audio_producer_init(Params) ->
     AlsaHandle = force_open_alsa(PcmName, WantedHwParams),
     audio_producer(AlsaHandle, PeriodSizeInFrames, [], all).
 
+%%alsa:open("default", capture, [{format,s16_le},{channels,1},{rate,16000},{period_size,320},{buffer_size,2560}], []).
+
 force_open_alsa(PcmName, WantedHwParams) ->
     case alsa:open(PcmName, capture, WantedHwParams, []) of
         {ok, AlsaHandle, ActualHwParams, ActualSwParams} ->

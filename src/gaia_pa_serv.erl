@@ -351,7 +351,7 @@ set_bt_headset_profile([Line|Rest]) ->
         [_N, "bluez_card." ++ _ = Card, _] ->
             set_bt_headset_profile(
               "/usr/bin/pactl set-card-profile " ++ Card,
-              ["headset_head_unit", "handsfree_head_unit"]);
+              ["headset_head_unit", "handsfree_head_unit", "HSP/HFP"]);
         _ ->
             set_bt_headset_profile(Rest)
     end.
