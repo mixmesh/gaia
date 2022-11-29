@@ -1,4 +1,4 @@
--module(gaia_pa_serv).
+-module(dbus_gaia_pa_serv).
 -export([start_link/0, stop/0, subscribe/0, unsubscribe/0, playcd/1]).
 -export([message_handler/1]).
 
@@ -62,41 +62,32 @@ playcd(PidOrName) ->
 %%
 
 init(Parent) ->
-    PactlSubscribePort =
-        open_port({spawn, "/usr/bin/pactl subscribe"},
-                  [stream, {line, 1024}, in]),
-
-    %% Do not use use when we test PipeWire. PipeWire has no dbus support!!!
-
     %% Setup dbus to listen to NewCard and RemoveCard signals
-    %% UserId = string:strip(os:cmd("id --user"), right, $\n),
-    %% UserDbusSocketPath =
-    %%     filename:join(["run", "user", UserId, "pulse", "dbus-socket"]),
-    %% PulseAddress =
-    %%     case filelib:is_file(UserDbusSocketPath) of
-    %%         true ->
-    %%             dbus:pulse_address();
-    %%         false ->
-    %%             try
-    %%                 dbus:pulse_address()
-    %%             catch error:_ ->
-    %%                     %% We assume that pulseaudio run as a system daemon
-    %%                     {"unix:path=/var/run/pulse/dbus-socket", external, false}
-    %%             end
-    %%     end,
-    %% {ok,Connection} = dbus_connection:open(PulseAddress),
-    %% Signals = ["org.PulseAudio.Core1.NewCard",
-    %%            "org.PulseAudio.Core1.CardRemoved" ],
-    %% Fs = [{path, "/org/pulseaudio/core1"}, {destination, "org.PulseAudio1"}],
-    %% lists:foreach(
-    %%   fun(Signal) ->
-    %%           %% Filter objects (paths) may be given as list
-    %%           {ok, _Ref} =
-    %%               dbus_pulse:listen_for_signal(Connection, Fs, Signal, [])
-    %%   end, Signals),
-
-    Connection = undefined,
-
+    UserId = string:strip(os:cmd("id --user"), right, $\n),
+    UserDbusSocketPath =
+        filename:join(["run", "user", UserId, "pulse", "dbus-socket"]),
+    PulseAddress =
+        case filelib:is_file(UserDbusSocketPath) of
+            true ->
+                dbus:pulse_address();
+            false ->
+                try
+                    dbus:pulse_address()
+                catch error:_ ->
+                        %% We assume that pulseaudio run as a system daemon
+                        {"unix:path=/var/run/pulse/dbus-socket", external, false}
+                end
+        end,
+    {ok,Connection} = dbus_connection:open(PulseAddress),
+    Signals = ["org.PulseAudio.Core1.NewCard",
+               "org.PulseAudio.Core1.CardRemoved" ],
+    Fs = [{path, "/org/pulseaudio/core1"}, {destination, "org.PulseAudio1"}],
+    lists:foreach(
+      fun(Signal) ->
+	      %% Filter objects (paths) may be given as list
+	      {ok, _Ref} =
+                  dbus_pulse:listen_for_signal(Connection, Fs, Signal, [])
+      end, Signals),
     %% Setup udev to look for input/power-switch devices
     Udev = udev:new(),
     Umon = udev:monitor_new_from_netlink(Udev, udev),
@@ -113,7 +104,6 @@ init(Parent) ->
     udev:enumerate_add_match_property(Enum, "ID_BUS", "bluetooth"),
     udev:enumerate_add_match_property(Enum, "ID_BUS", "usb"),
     State0 = #{parent => Parent,
-               pactl_subscribe_port => PactlSubscribePort,
 	       dbus => Connection,
 	       udev_mon => Umon,
 	       udev_ref => Uref,
@@ -128,7 +118,6 @@ init(Parent) ->
     {ok, State1}.
 
 message_handler(#{parent := Parent,
-                  pactl_subscribe_port := PactlSubscribePort,
 		  dbus := Connection,
 		  udev_mon := Umon,
 		  udev_ref := Uref,
@@ -157,8 +146,6 @@ message_handler(#{parent := Parent,
                 false ->
                     {reply, From, {error, not_subsccribed}}
             end;
-
-
 	{signal, _Ref, Header, Message} = Msg ->
             ?LOG_DEBUG(#{msgl => Msg}),
 	    Fds = Header#dbus_header.fields,
@@ -175,20 +162,6 @@ message_handler(#{parent := Parent,
 		_ ->
 		    {noreply, State}
 	    end;
-
-        {PactlSubscribePort,
-         {data, {eol, "Event 'new' on card #" ++ _} = Data}} ->
-            ?LOG_DEBUG(#{data => Data}),
-            ok = set_bt_headset_profile(),
-            noreply;
-        {PactlSubscribePort,
-         {data, {eol, "Event 'remove' on card #" ++ _} = Data}} ->
-            ?LOG_DEBUG(#{data => Data}),
-            noreply;
-        {PactlSubscribePort, {data, _Data}} ->
-            %?LOG_DEBUG(#{skip_data => Data}),
-            noreply;
-
 	{select, Umon, Uref, ready_input} = Msg ->
             ?LOG_DEBUG(#{msg => Msg}),
 	    Recv = udev:monitor_receive_device(Umon),
@@ -228,7 +201,7 @@ message_handler(#{parent := Parent,
             noreply
     end.
 
-add_existing_devices(_Connection, Udev, Enum, State) ->
+add_existing_devices(Connection, Udev, Enum, State) ->
     UpdatedState =
         lists:foldl(
           fun(Path, Si) ->
@@ -237,17 +210,13 @@ add_existing_devices(_Connection, Udev, Enum, State) ->
                   ?LOG_DEBUG(#{add_existing_devices => {Dev, Si, Si2}}),
                   Si2
           end, State, udev:enumerate_get_devices(Enum)),
-
-
-    %% Do not use use when we test PipeWire. PipeWire has no dbus support!!!
-    %% {ok, Cards} = dbus_pulse:get_cards(Connection),
-    %% ?LOG_INFO(#{time_to_add_new_card => Cards}),
-    %% lists:foreach(
-    %%   fun(Card) ->
-    %%           new_dbus_card(Connection, Card)
-    %%   end, Cards),
-
-
+    timer:sleep(4000), % eh!!
+    {ok, Cards} = dbus_pulse:get_cards(Connection),
+    ?LOG_INFO(#{time_to_add_new_card => Cards}),
+    lists:foreach(
+      fun(Card) ->
+              new_dbus_card(Connection, Card)
+      end, Cards),
     UpdatedState.
 
 add_udev_card(Dev, State = #{ udev_names := MatchNames }) ->
@@ -324,12 +293,12 @@ new_dbus_card(Connection, Card) ->
                              Connection, Profile) of
 			  {ok, Name = "handsfree_head_unit"} ->
 			      ?LOG_INFO(#{set_active_profile => Name}),
-                              dbus_pulse:set_card_active_profile(
-                                Connection, Card, Profile);
+                              %%set_bt_headset_profile();
+                              dbus_pulse:set_card_active_profile(Connection, Card, Profile);
 			  {ok, Name = "headset_head_unit"} ->
 			      ?LOG_INFO(#{set_active_profile => Name}),
-                              dbus_pulse:set_card_active_profile(
-                                Connection, Card, Profile);
+                              %%set_bt_headset_profile();
+                              dbus_pulse:set_card_active_profile(Connection, Card, Profile);
 			  {ok, Name} ->
 			      ?LOG_INFO(#{ignore_profile => Name});
 			  _Error ->
@@ -340,35 +309,43 @@ new_dbus_card(Connection, Card) ->
 	    ignore
     end.
 
-set_bt_headset_profile() ->
-    Lines = os:cmd("/usr/bin/pactl list short cards"),
-    set_bt_headset_profile(string:tokens(Lines, "\n")).
+%%
+%% START REMOVE THIS
+%%
 
-set_bt_headset_profile([]) ->
-    ok;
-set_bt_headset_profile([Line|Rest]) ->
-    case string:tokens(Line, "\t") of
-        [_N, "bluez_card." ++ _ = Card, _] ->
-            set_bt_headset_profile(
-              "/usr/bin/pactl set-card-profile " ++ Card,
-              ["headset_head_unit", "handsfree_head_unit"]);
-        _ ->
-            set_bt_headset_profile(Rest)
-    end.
+%% set_bt_headset_profile() ->
+%%     Lines = os:cmd("/usr/bin/pactl list short cards"),
+%%     set_bt_headset_profile(string:tokens(Lines, "\n")).
 
-set_bt_headset_profile(_Command, []) ->
-    ok;
-set_bt_headset_profile(Command, [Profile|Rest]) ->
-    FinalCommand = Command ++ " " ++ Profile ++ " 2>&1",
-    case os:cmd(FinalCommand) of
-        "" ->
-            ?LOG_INFO(#{set_bt_headset_profile => FinalCommand}),
-            ok;
-        Failure ->
-            ?LOG_INFO(#{set_bt_headset_profile_failure => FinalCommand,
-                        reason => Failure}),
-            set_bt_headset_profile(Command, Rest)
-    end.
+%% set_bt_headset_profile([]) ->
+%%     ok;
+%% set_bt_headset_profile([Line|Rest]) ->
+%%     case string:tokens(Line, "\t") of
+%%         [_N, "bluez_card." ++ _ = Card, _] ->
+%%             set_bt_headset_profile(
+%%               "/usr/bin/pactl set-card-profile " ++ Card,
+%%               ["headset_head_unit", "handsfree_head_unit"]);
+%%         _ ->
+%%             set_bt_headset_profile(Rest)
+%%     end.
+
+%% set_bt_headset_profile(_Command, []) ->
+%%     ok;
+%% set_bt_headset_profile(Command, [Profile|Rest]) ->
+%%     FinalCommand = Command ++ " " ++ Profile ++ " 2>&1",
+%%     case os:cmd(FinalCommand) of
+%%         "" ->
+%%             ?LOG_INFO(#{set_bt_headset_profile => FinalCommand}),
+%%             ok;
+%%         Failure ->
+%%             ?LOG_INFO(#{set_bt_headset_profile_failure => FinalCommand,
+%%                         reason => Failure}),
+%%             set_bt_headset_profile(Command, Rest)
+%%     end.
+
+%%
+%% END REMOVE THIS
+%%
 
 stripq(Atom) when is_atom(Atom) ->
     Atom;
