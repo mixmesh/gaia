@@ -1,4 +1,4 @@
--module(dbus_gaia_pa_serv).
+-module(gaia_pa_serv).
 -export([start_link/0, stop/0, subscribe/0, unsubscribe/0, playcd/1]).
 -export([message_handler/1]).
 
@@ -210,7 +210,6 @@ add_existing_devices(Connection, Udev, Enum, State) ->
                   ?LOG_DEBUG(#{add_existing_devices => {Dev, Si, Si2}}),
                   Si2
           end, State, udev:enumerate_get_devices(Enum)),
-    timer:sleep(4000), % eh!!
     {ok, Cards} = dbus_pulse:get_cards(Connection),
     ?LOG_INFO(#{time_to_add_new_card => Cards}),
     lists:foreach(
